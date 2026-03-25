@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+/* 顺便保留我们刚才加的撑满屏幕样式 */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}

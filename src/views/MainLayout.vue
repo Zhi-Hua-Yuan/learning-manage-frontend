@@ -5,6 +5,21 @@
         <span class="text-blue-500">✅</span> 我的滴答清单
       </div>
 
+      <div class="px-2 py-3 border-b border-gray-100">
+        <div
+          @click="goToDashboard"
+          class="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-colors"
+          :class="
+            currentView === 'dashboard'
+              ? 'bg-indigo-100 text-indigo-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-200'
+          "
+        >
+          <span class="text-xl">📊</span>
+          <span class="flex-1 text-sm">数据仪表盘</span>
+        </div>
+      </div>
+
       <div class="flex-1 overflow-y-auto py-2">
         <div
           v-for="project in projectList"
@@ -102,7 +117,7 @@
       </div>
     </aside>
 
-    <main class="flex-1 flex flex-col relative bg-white">
+    <main v-if="currentView === 'tasks'" class="flex-1 flex flex-col relative bg-white">
       <div class="p-4 border-b border-gray-200 font-bold text-xl flex items-center justify-between">
         <span>
           {{ projectList.find((p) => p.id === selectedProjectId)?.icon }}
@@ -313,8 +328,84 @@
       </div>
     </main>
 
+    <main
+      v-else-if="currentView === 'dashboard'"
+      class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8"
+    >
+      <div class="max-w-5xl mx-auto w-full space-y-8">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">📊 数据仪表盘</h2>
+          <span class="text-sm text-gray-500">数据实时更新</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6">
+          <div
+            class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          >
+            <span class="text-gray-500 text-sm font-medium mb-2">进行中项目</span>
+            <span class="text-4xl font-black text-blue-500">{{
+              statsData.activeProjects || 0
+            }}</span>
+          </div>
+          <div
+            class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          >
+            <span class="text-gray-500 text-sm font-medium mb-2">今日到期任务</span>
+            <span class="text-4xl font-black text-orange-500">{{ statsData.todayTasks || 0 }}</span>
+          </div>
+          <div
+            class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          >
+            <span class="text-gray-500 text-sm font-medium mb-2">已逾期任务</span>
+            <span class="text-4xl font-black text-red-500">{{ statsData.overdueTasks || 0 }}</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6">
+          <div class="col-span-2 bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-bold text-gray-700 mb-4">近 7 天完成趋势</h3>
+            <div ref="trendChartRef" class="w-full h-64"></div>
+          </div>
+
+          <div
+            class="col-span-1 bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex flex-col"
+          >
+            <h3 class="text-lg font-bold text-gray-700 mb-4">🏆 完成率 Top 排行</h3>
+            <div class="flex-1 overflow-y-auto space-y-4 pr-2">
+              <div
+                v-if="!statsData.topProjects || statsData.topProjects.length === 0"
+                class="text-center text-gray-400 mt-10 text-sm"
+              >
+                暂无数据
+              </div>
+              <div
+                v-for="(proj, index) in statsData.topProjects"
+                :key="index"
+                class="flex items-center gap-3"
+              >
+                <div
+                  class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                  :class="
+                    index === 0
+                      ? 'bg-yellow-100 text-yellow-600'
+                      : index === 1
+                        ? 'bg-gray-100 text-gray-500'
+                        : 'bg-orange-50 text-orange-400'
+                  "
+                >
+                  {{ index + 1 }}
+                </div>
+                <div class="flex-1 truncate text-sm font-medium text-gray-700">{{ proj.name }}</div>
+                <div class="text-sm font-bold text-green-500">{{ proj.rate }}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
     <aside
-      v-if="selectedTask"
+      v-if="currentView === 'tasks' && selectedTask"
       class="w-80 bg-white border-l border-gray-200 flex flex-col shadow-sm z-10"
     >
       <div class="p-4 border-b border-gray-100 flex justify-between items-center text-gray-500">
@@ -473,7 +564,7 @@
     </aside>
 
     <aside
-      v-else
+      v-else-if="currentView === 'tasks'"
       class="w-80 bg-gray-50 border-l border-gray-200 flex flex-col items-center justify-center text-gray-400"
     >
       <svg
@@ -495,9 +586,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import * as echarts from 'echarts'
 import { fetchProjectList, addProjectApi, deleteProjectApi } from '@/api/project'
+import { fetchStatsOverview } from '@/api/stats'
 import { fetchTaskList, addTaskApi, updateTaskApi, deleteTaskApi } from '@/api/task'
 import {
   fetchMilestoneList,
@@ -506,7 +599,6 @@ import {
   deleteMilestoneApi,
 } from '@/api/milestone'
 
-// 【第一步】定义前端的实体类 (TypeScript Interface)
 interface Task {
   id: string
   title: string
@@ -526,7 +618,6 @@ interface Milestone {
   status: number
 }
 
-// --- 1. 定义左侧的“清单/项目”实体与数据 ---
 interface Project {
   id: string
   name: string
@@ -544,6 +635,8 @@ const newMilestoneName = ref('')
 // 控制当前正在编辑的里程碑 ID 和绑定的名字
 const editingMilestoneId = ref('')
 const editMilestoneName = ref('')
+// 'tasks' 表示正常任务列表，'dashboard' 表示数据大屏
+const currentView = ref('tasks')
 
 // ================== 核心联调逻辑开始 ==================
 
@@ -635,11 +728,18 @@ const loadMilestones = async () => {
 
 // 切换左侧清单
 const selectProject = async (id: string) => {
+  currentView.value = 'tasks' // 👈 就是新增这一行
   selectedProjectId.value = id
   selectedTask.value = null
 
-  // 切换清单时，并行请求里程碑和任务！
   await Promise.all([loadMilestones(), loadTasks()])
+}
+
+// 切换到数据仪表盘视图
+const goToDashboard = () => {
+  currentView.value = 'dashboard'
+  selectedProjectId.value = ''
+  selectedTask.value = null
 }
 
 // 前端过滤视图 (其实既然我们每次切换都调接口了，这里也可以不用计算属性过滤了，但保留也无妨)
@@ -993,4 +1093,99 @@ const deleteMilestone = async (id: string, name: string) => {
     alert('删除阶段失败')
   }
 }
+
+// ================== 数据仪表盘逻辑 ==================
+const statsData = ref({
+  activeProjects: 0,
+  todayTasks: 0,
+  overdueTasks: 0,
+  trendDates: [] as string[],
+  trendCounts: [] as number[],
+  topProjects: [] as { name: string; rate: number }[],
+})
+
+const trendChartRef = ref<HTMLElement | null>(null)
+let trendChart: echarts.ECharts | null = null
+
+const initTrendChart = () => {
+  if (!trendChartRef.value) return
+  if (!trendChart) {
+    trendChart = echarts.init(trendChartRef.value)
+  }
+  const option = {
+    grid: { top: 10, right: 10, bottom: 20, left: 30 },
+    xAxis: {
+      type: 'category',
+      data: statsData.value.trendDates || [],
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#9CA3AF', margin: 12 },
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { type: 'dashed', color: '#F3F4F6' } },
+      axisLabel: { color: '#9CA3AF' },
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderRadius: 8,
+      borderWidth: 0,
+      padding: [10, 15],
+      textStyle: { color: '#374151', fontWeight: 'bold' },
+      extraCssText: 'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);',
+    },
+    series: [
+      {
+        data: statsData.value.trendCounts || [],
+        type: 'bar',
+        barWidth: '25%',
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#60A5FA' },
+            { offset: 1, color: '#3B82F6' },
+          ]),
+          borderRadius: [6, 6, 0, 0],
+        },
+      },
+    ],
+  }
+  trendChart.setOption(option)
+}
+
+// 监听菜单切换：只要切换到了仪表盘，立刻请求数据并画图！
+watch(currentView, async (newVal) => {
+  if (newVal === 'dashboard') {
+    try {
+      // 1. 拉取后端真实数据
+      // 注意：这里假设你的 axios 拦截器已经把外层的 {code:0, data: {...}} 剥离了，res 直接是里面的 data 对象
+      const res: any = await fetchStatsOverview()
+
+      if (res) {
+        // 2. 核心数据手动映射
+        statsData.value.activeProjects = res.coreMetrics?.ongoingProjectCount || 0
+        statsData.value.todayTasks = res.coreMetrics?.dueTodayTaskCount || 0
+        statsData.value.overdueTasks = res.coreMetrics?.overdueTaskCount || 0
+
+        // 3. 趋势图数据转换：把对象数组 map 成两个一维数组
+        statsData.value.trendDates = (res.dailyTrends || []).map((item: any) => item.date)
+        statsData.value.trendCounts = (res.dailyTrends || []).map(
+          (item: any) => item.completedCount,
+        )
+
+        // 4. 排行榜数据转换：字段重命名
+        statsData.value.topProjects = (res.projectRankings || []).map((item: any) => ({
+          name: item.projectName,
+          rate: item.progress,
+        }))
+      }
+
+      // 5. 等待 Vue 渲染 HTML 后，初始化 ECharts 图表
+      await nextTick()
+      initTrendChart()
+    } catch (error) {
+      console.error('拉取大屏数据失败', error)
+    }
+  }
+})
 </script>

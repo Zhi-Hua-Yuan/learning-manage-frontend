@@ -108,58 +108,207 @@
           {{ projectList.find((p) => p.id === selectedProjectId)?.icon }}
           {{ projectList.find((p) => p.id === selectedProjectId)?.name }}
         </span>
+
+        <div class="flex items-center gap-3 w-48" v-if="selectedProjectId && taskList.length > 0">
+          <span class="text-xs text-gray-500 font-normal">完成度 {{ projectProgress }}%</span>
+          <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-green-500 transition-all duration-500"
+              :style="{ width: projectProgress + '%' }"
+            ></div>
+          </div>
+        </div>
       </div>
 
-      <div class="px-4 pb-3 border-b border-gray-100">
+      <div class="px-4 py-3 border-b border-gray-100">
         <div
           class="flex items-center bg-gray-50 rounded px-3 py-2 border border-transparent focus-within:border-blue-400 focus-within:bg-white transition-all shadow-sm"
         >
           <span class="text-gray-400 mr-2 font-bold text-lg">+</span>
-
           <input
             v-model="newTaskTitle"
             @keyup.enter="addTask"
             type="text"
-            placeholder="添加任务至“今天”，按回车键保存"
+            placeholder="添加任务至“默认列表”，按回车键保存"
             class="flex-1 bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400"
           />
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto p-4">
-        <div
-          v-for="task in filteredTasks"
-          :key="task.id"
-          @click="selectTask(task)"
-          class="flex items-center group py-3 border-b border-gray-100 cursor-pointer rounded px-2 transition-colors"
-          :class="selectedTask?.id === task.id ? 'bg-blue-50' : 'hover:bg-gray-50'"
-        >
+
+      <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+        <div v-if="groupedTasks.unassigned.length > 0" class="flex flex-col">
           <div
-            class="w-5 h-5 rounded border mr-3 flex items-center justify-center cursor-pointer"
-            :class="task.status === 2 ? 'bg-blue-500 border-blue-500' : 'border-gray-400'"
-            @click.stop="toggleTaskStatus(task)"
+            v-for="task in groupedTasks.unassigned"
+            :key="task.id"
+            @click="selectTask(task)"
+            class="flex items-center group py-3 border-b border-gray-100 cursor-pointer rounded px-2 transition-colors"
+            :class="selectedTask?.id === task.id ? 'bg-blue-50' : 'hover:bg-gray-50'"
           >
-            <svg
-              v-if="task.status === 2"
-              class="w-3 h-3 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            <div
+              class="w-5 h-5 rounded border mr-3 flex items-center justify-center cursor-pointer transition-colors"
+              :class="task.status === 2 ? 'bg-blue-500 border-blue-500' : 'border-gray-400'"
+              @click.stop="toggleTaskStatus(task)"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M5 13l4 4L19 7"
-              ></path>
-            </svg>
+              <svg
+                v-if="task.status === 2"
+                class="w-3 h-3 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                ></path>
+              </svg>
+            </div>
+            <span
+              class="flex-1 text-sm transition-all"
+              :class="task.status === 2 ? 'text-gray-400 line-through' : 'text-gray-800'"
+            >
+              {{ task.title }}
+            </span>
+          </div>
+        </div>
+
+        <div
+          v-for="group in groupedTasks.milestones"
+          :key="group.milestone.id"
+          class="bg-gray-50 rounded-xl p-4 border border-gray-100"
+        >
+          <div class="flex items-center justify-between mb-3 px-1 group relative">
+            <div
+              v-if="editingMilestoneId === group.milestone.id"
+              class="flex-1 flex items-center gap-2 mr-4"
+            >
+              <span class="text-blue-500">🚩</span>
+              <input
+                v-model="editMilestoneName"
+                @keyup.enter="saveMilestone(group.milestone)"
+                @blur="saveMilestone(group.milestone)"
+                v-focus
+                type="text"
+                class="flex-1 bg-white border border-blue-400 rounded px-2 py-0.5 text-sm font-bold text-gray-800 outline-none shadow-sm"
+              />
+            </div>
+
+            <h3 v-else class="font-bold text-gray-800 flex items-center gap-2 flex-1">
+              <span class="text-blue-500">🚩</span> {{ group.milestone.name }}
+
+              <div
+                class="opacity-0 group-hover:opacity-100 flex items-center ml-2 transition-opacity duration-200"
+              >
+                <button
+                  @click="startEditMilestone(group.milestone)"
+                  class="p-1 text-gray-400 hover:text-blue-500 hover:bg-white rounded"
+                  title="重命名"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    ></path>
+                  </svg>
+                </button>
+                <button
+                  @click="deleteMilestone(group.milestone.id, group.milestone.name)"
+                  class="p-1 text-gray-400 hover:text-red-500 hover:bg-white rounded"
+                  title="删除阶段"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+            </h3>
+
+            <div class="flex items-center gap-2 w-28">
+              <span class="text-xs text-gray-500">{{ group.progress }}%</span>
+              <div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-blue-400 transition-all duration-500"
+                  :style="{ width: group.progress + '%' }"
+                ></div>
+              </div>
+            </div>
           </div>
 
-          <span
-            class="flex-1 text-sm"
-            :class="task.status === 2 ? 'text-gray-400 line-through' : 'text-gray-800'"
+          <div class="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+            <div
+              v-if="group.tasks.length === 0"
+              class="p-4 text-sm text-gray-400 text-center bg-gray-50/50"
+            >
+              该阶段暂无任务
+            </div>
+
+            <div
+              v-for="task in group.tasks"
+              :key="task.id"
+              @click="selectTask(task)"
+              class="flex items-center group py-3 border-b border-gray-50 cursor-pointer px-3 transition-colors hover:bg-blue-50"
+              :class="selectedTask?.id === task.id ? 'bg-blue-50' : ''"
+            >
+              <div
+                class="w-5 h-5 rounded border mr-3 flex items-center justify-center cursor-pointer transition-colors"
+                :class="task.status === 2 ? 'bg-blue-500 border-blue-500' : 'border-gray-400'"
+                @click.stop="toggleTaskStatus(task)"
+              >
+                <svg
+                  v-if="task.status === 2"
+                  class="w-3 h-3 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M5 13l4 4L19 7"
+                  ></path>
+                </svg>
+              </div>
+              <span
+                class="flex-1 text-sm transition-all"
+                :class="task.status === 2 ? 'text-gray-400 line-through' : 'text-gray-800'"
+              >
+                {{ task.title }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="mt-2 mb-8">
+          <div
+            v-if="isAddingMilestone"
+            class="bg-white rounded-lg border border-blue-400 overflow-hidden shadow-sm p-1"
           >
-            {{ task.title }}
-          </span>
+            <input
+              v-model="newMilestoneName"
+              @keyup.enter="submitNewMilestone"
+              @blur="isAddingMilestone = false"
+              autofocus
+              type="text"
+              placeholder="里程碑名称 (例如: V1.0 核心功能) - 按回车保存"
+              class="w-full text-sm px-3 py-2 outline-none text-gray-700 bg-transparent"
+            />
+          </div>
+
+          <button
+            v-else
+            @click="openAddMilestoneInput"
+            class="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 hover:text-blue-500 hover:border-blue-300 hover:bg-blue-50 transition-all font-medium text-sm"
+          >
+            <span class="text-lg font-bold">+</span> 添加阶段 (Milestone)
+          </button>
         </div>
       </div>
     </main>
@@ -293,6 +442,27 @@
           </div>
         </div>
 
+        <div class="flex items-center gap-3 border-b border-gray-100 py-3 relative">
+          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            ></path>
+          </svg>
+          <label class="text-sm font-medium text-gray-600 w-16">所属阶段:</label>
+
+          <select
+            :value="selectedTask.milestoneId || ''"
+            @change="onMilestoneChange"
+            class="flex-1 text-sm outline-none bg-transparent text-gray-700 cursor-pointer"
+          >
+            <option value="">(默认列表 / 未分配)</option>
+            <option v-for="m in milestoneList" :key="m.id" :value="m.id">🚩 {{ m.name }}</option>
+          </select>
+        </div>
+
         <textarea
           v-model="selectedTask.description"
           @blur="onTextBlur"
@@ -326,9 +496,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { fetchProjectList, addProjectApi, deleteProjectApi } from '@/api/project'
 import { fetchTaskList, addTaskApi, updateTaskApi, deleteTaskApi } from '@/api/task'
-import { useRouter } from 'vue-router'
+import {
+  fetchMilestoneList,
+  addMilestoneApi,
+  updateMilestoneApi,
+  deleteMilestoneApi,
+} from '@/api/milestone'
 
 // 【第一步】定义前端的实体类 (TypeScript Interface)
 interface Task {
@@ -338,7 +514,16 @@ interface Task {
   status: number
   priority: number
   projectId: string
-  dueDate?: string // 👈 新增：截止日期 (格式为 YYYY-MM-DD)
+  dueDate?: string
+  milestoneId?: string | null
+}
+
+interface Milestone {
+  id: string
+  name: string
+  projectId: string
+  orderNo: number
+  status: number
 }
 
 // --- 1. 定义左侧的“清单/项目”实体与数据 ---
@@ -352,6 +537,13 @@ const projectList = ref<Project[]>([])
 const taskList = ref<Task[]>([])
 const selectedProjectId = ref('')
 const selectedTask = ref<Task | null>(null)
+const milestoneList = ref<Milestone[]>([])
+// 【新增：新建里程碑逻辑】
+const isAddingMilestone = ref(false)
+const newMilestoneName = ref('')
+// 控制当前正在编辑的里程碑 ID 和绑定的名字
+const editingMilestoneId = ref('')
+const editMilestoneName = ref('')
 
 // ================== 核心联调逻辑开始 ==================
 
@@ -425,11 +617,29 @@ onMounted(() => {
 
 // ================== 用户交互逻辑更新 ==================
 
+// 【新增：加载当前项目的里程碑】
+const loadMilestones = async () => {
+  if (!selectedProjectId.value) return
+  try {
+    const res: any = await fetchMilestoneList({ projectId: selectedProjectId.value })
+    // 如果后端直接返回 List，就是 res；如果是 Page，就是 res.records。请根据实际情况调整。
+    // 假设后端返回的是列表：
+    milestoneList.value = res || []
+
+    // 如果有 orderNo，前端排个序保证展示顺序
+    milestoneList.value.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
+  } catch (error) {
+    console.error('加载里程碑失败', error)
+  }
+}
+
 // 切换左侧清单
-const selectProject = (id: string) => {
+const selectProject = async (id: string) => {
   selectedProjectId.value = id
   selectedTask.value = null
-  loadTasks() // 切换清单时，重新向后端请求该清单下的任务！
+
+  // 切换清单时，并行请求里程碑和任务！
+  await Promise.all([loadMilestones(), loadTasks()])
 }
 
 // 前端过滤视图 (其实既然我们每次切换都调接口了，这里也可以不用计算属性过滤了，但保留也无妨)
@@ -548,6 +758,37 @@ const onDueDateChange = async (event: Event) => {
   }
 }
 
+// 【新增：处理所属里程碑变更】
+const onMilestoneChange = async (event: Event) => {
+  if (!selectedTask.value) return
+
+  const target = event.target as HTMLSelectElement
+  const newMilestoneId = target.value
+
+  // 乐观更新 UI：如果是空字符串，说明用户选了“未分配”，处理成 null
+  const finalMilestoneId = newMilestoneId === '' ? null : newMilestoneId
+  const oldMilestoneId = selectedTask.value.milestoneId
+
+  // 绕过 TS 严格检查
+  ;(selectedTask.value as any).milestoneId = finalMilestoneId
+
+  try {
+    // 同步给后端：我们依然使用那个全量更新的接口
+    await updateTaskApi({
+      ...selectedTask.value,
+      milestoneId: finalMilestoneId,
+    })
+
+    // ⚠️ 最核心的一步：重新拉取任务列表
+    // 拉取完之后，groupedTasks 会自动重新计算，你会看到任务瞬间跳到对应的里程碑下面！
+    await loadTasks()
+  } catch (error) {
+    // 失败回滚
+    selectedTask.value.milestoneId = oldMilestoneId
+    alert('更新所属阶段失败')
+  }
+}
+
 // 【新增：无感自动保存标题和描述】
 const onTextBlur = async () => {
   if (!selectedTask.value) return
@@ -627,5 +868,129 @@ const handleLogout = () => {
 
   // 2. 强制跳转回登录页
   router.push('/login')
+}
+
+// 【新增：计算当前项目的总体进度 0 ~ 100】
+const projectProgress = computed(() => {
+  if (taskList.value.length === 0) return 0 // 没有任务时进度为 0
+
+  // 统计 status === 2 (已完成) 的任务数量
+  const completedCount = taskList.value.filter((t) => t.status === 2).length
+
+  // 计算百分比并保留整数
+  return Math.round((completedCount / taskList.value.length) * 100)
+})
+
+// 【新增：里程碑分组与独立进度计算】
+const groupedTasks = computed(() => {
+  // 1. 初始化数据结构：一个“未分配区” + 多个“里程碑区”
+  const result = {
+    unassigned: [] as Task[],
+    milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
+  }
+
+  // 2. 把当前所有的里程碑“空壳”放进去
+  milestoneList.value.forEach((m) => {
+    result.milestones.push({ milestone: m, tasks: [], progress: 0 })
+  })
+
+  // 3. 遍历所有任务，根据 milestoneId 将它们塞进对应的壳子里
+  taskList.value.forEach((task) => {
+    // 假设没有传、传了空或者 '0' 都代表未分配里程碑
+    if (task.milestoneId && String(task.milestoneId) !== '0') {
+      const group = result.milestones.find((g) => g.milestone.id === String(task.milestoneId))
+      if (group) {
+        group.tasks.push(task)
+      } else {
+        result.unassigned.push(task)
+      }
+    } else {
+      result.unassigned.push(task)
+    }
+  })
+
+  // 4. 计算每个里程碑自己内部的进度百分比
+  result.milestones.forEach((g) => {
+    if (g.tasks.length === 0) {
+      g.progress = 0
+    } else {
+      const completedCount = g.tasks.filter((t) => t.status === 2).length
+      g.progress = Math.round((completedCount / g.tasks.length) * 100)
+    }
+  })
+
+  return result
+})
+
+const submitNewMilestone = async () => {
+  const name = newMilestoneName.value.trim()
+  if (!name || !selectedProjectId.value) {
+    isAddingMilestone.value = false
+    return
+  }
+
+  try {
+    // 调用新增接口，将新里程碑排在最后面
+    await addMilestoneApi({
+      name: name,
+      projectId: selectedProjectId.value,
+      orderNo: milestoneList.value.length, // 简单的排序序号
+    })
+
+    // 清空并收起输入框
+    newMilestoneName.value = ''
+    isAddingMilestone.value = false
+
+    // 重新拉取当前项目的里程碑列表
+    await loadMilestones()
+  } catch (error) {
+    alert('创建里程碑失败，请检查控制台报错')
+  }
+}
+
+const openAddMilestoneInput = () => {
+  isAddingMilestone.value = true
+  newMilestoneName.value = ''
+}
+
+// 点击编辑按钮，进入编辑模式
+const startEditMilestone = (milestone: Milestone) => {
+  editingMilestoneId.value = milestone.id
+  editMilestoneName.value = milestone.name
+}
+
+// 保存修改后的里程碑名称
+const saveMilestone = async (milestone: Milestone) => {
+  const newName = editMilestoneName.value.trim()
+
+  // 如果没修改或者改成了空，直接取消编辑状态
+  if (!newName || newName === milestone.name) {
+    editingMilestoneId.value = ''
+    return
+  }
+
+  try {
+    await updateMilestoneApi({ ...milestone, name: newName })
+    editingMilestoneId.value = ''
+    await loadMilestones() // 重新加载数据
+  } catch (error) {
+    alert('重命名失败')
+  }
+}
+
+// 删除里程碑
+const deleteMilestone = async (id: string, name: string) => {
+  const isConfirm = window.confirm(
+    `确定要删除阶段 "${name}" 吗？\n该阶段下的任务不会被删除，但会变回"未分配"状态！`,
+  )
+  if (!isConfirm) return
+
+  try {
+    await deleteMilestoneApi(id)
+    // 删除阶段后，为了防止数据不一致，同时重新拉取里程碑和任务
+    await Promise.all([loadMilestones(), loadTasks()])
+  } catch (error) {
+    alert('删除阶段失败')
+  }
 }
 </script>

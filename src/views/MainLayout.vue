@@ -18,6 +18,19 @@
           <span class="text-xl">📊</span>
           <span class="flex-1 text-sm">数据仪表盘</span>
         </div>
+
+        <div
+          @click="goToReview"
+          class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
+          :class="
+            currentView === 'review'
+              ? 'bg-indigo-100 text-indigo-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-200'
+          "
+        >
+          <span class="text-xl">📅</span>
+          <span class="flex-1 text-sm">周报回顾</span>
+        </div>
       </div>
 
       <div class="flex-1 overflow-y-auto py-2">
@@ -404,6 +417,126 @@
       </div>
     </main>
 
+    <main
+      v-else-if="currentView === 'review'"
+      class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8"
+    >
+      <div class="max-w-6xl mx-auto w-full space-y-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            📅 周报回顾与规划
+          </h2>
+          <span class="text-sm text-gray-500">温故而知新</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6">
+          <div class="col-span-2 space-y-6">
+            <div
+              class="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl p-6 text-white shadow-md flex justify-between items-center"
+            >
+              <div>
+                <div class="text-blue-100 text-sm font-medium mb-1">
+                  第 {{ currentReview.weekNo || '?' }} 周 ({{ currentReview.startDate }} ~
+                  {{ currentReview.endDate }})
+                </div>
+                <div class="text-2xl font-bold">本周高光时刻</div>
+              </div>
+              <div class="flex gap-6 text-center">
+                <div class="bg-white/20 rounded-lg px-4 py-2 backdrop-blur-sm">
+                  <div class="text-3xl font-black">{{ currentReview.completedTaskCount || 0 }}</div>
+                  <div class="text-xs text-blue-100 mt-1">完成任务数</div>
+                </div>
+                <div class="bg-white/20 rounded-lg px-4 py-2 backdrop-blur-sm min-w-[100px]">
+                  <div class="text-xl font-bold truncate mt-1">
+                    {{ currentReview.focusProjectName || '暂无重点' }}
+                  </div>
+                  <div class="text-xs text-blue-100 mt-1">核心推进项目</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                  <span>🧠</span> 本周复盘 (Reflection)
+                </label>
+                <textarea
+                  v-model="currentReview.reflection"
+                  class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all min-h-[120px] resize-none"
+                  placeholder="这周做的好与不好的地方？有什么感悟？..."
+                ></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                  <span>🎯</span> 下周计划 (Next Plan)
+                </label>
+                <textarea
+                  v-model="currentReview.nextPlan"
+                  class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all min-h-[120px] resize-none"
+                  placeholder="下周的核心目标是什么？打算怎么安排时间？..."
+                ></textarea>
+              </div>
+
+              <div class="flex justify-end pt-2">
+                <button
+                  @click="saveReview"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                    ></path>
+                  </svg>
+                  保存本周总结
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-[calc(100vh-12rem)]"
+          >
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span>🕰️</span> 历史轨迹
+            </h3>
+            <div class="flex-1 overflow-y-auto space-y-4 pr-2">
+              <div
+                v-if="historyReviews.length === 0"
+                class="text-center text-gray-400 mt-10 text-sm"
+              >
+                暂无历史记录
+              </div>
+
+              <div
+                v-for="item in historyReviews"
+                :key="item.id"
+                class="border-l-2 border-blue-200 pl-4 py-2 relative group"
+              >
+                <div
+                  class="absolute w-3 h-3 bg-blue-500 rounded-full -left-[7px] top-3 border-2 border-white"
+                ></div>
+                <div class="text-xs text-gray-400 font-medium mb-1">
+                  {{ item.year }} 年 • 第 {{ item.weekNo }} 周
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3 group-hover:bg-blue-50 transition-colors">
+                  <div class="text-sm font-bold text-gray-700 mb-1 line-clamp-1">
+                    {{ item.focusProjectName || '日常推进' }}
+                  </div>
+                  <div class="text-xs text-gray-500 line-clamp-2">
+                    {{ item.reflection || '无复盘内容' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
     <aside
       v-if="currentView === 'tasks' && selectedTask"
       class="w-80 bg-white border-l border-gray-200 flex flex-col shadow-sm z-10"
@@ -591,6 +724,7 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { fetchProjectList, addProjectApi, deleteProjectApi } from '@/api/project'
 import { fetchStatsOverview } from '@/api/stats'
+import { fetchCurrentReview, saveReviewApi, fetchReviewHistory } from '@/api/review'
 import { fetchTaskList, addTaskApi, updateTaskApi, deleteTaskApi } from '@/api/task'
 import {
   fetchMilestoneList,
@@ -738,6 +872,12 @@ const selectProject = async (id: string) => {
 // 切换到数据仪表盘视图
 const goToDashboard = () => {
   currentView.value = 'dashboard'
+  selectedProjectId.value = ''
+  selectedTask.value = null
+}
+
+const goToReview = () => {
+  currentView.value = 'review'
   selectedProjectId.value = ''
   selectedTask.value = null
 }
@@ -1186,6 +1326,49 @@ watch(currentView, async (newVal) => {
     } catch (error) {
       console.error('拉取大屏数据失败', error)
     }
+  }
+})
+
+// ================== 周报回顾逻辑 ==================
+const currentReview = ref<any>({})
+const historyReviews = ref<any[]>([])
+
+const loadReviewData = async () => {
+  try {
+    // 恢复原样：拦截器已经解包了，直接赋值！
+    const currentRes: any = await fetchCurrentReview()
+    currentReview.value = currentRes || {}
+
+    const historyRes: any = await fetchReviewHistory()
+    historyReviews.value = historyRes || []
+  } catch (error) {
+    console.error('加载周报数据失败', error)
+  }
+}
+
+const saveReview = async () => {
+  try {
+    await saveReviewApi({
+      year: currentReview.value.year,
+      weekNo: currentReview.value.weekNo,
+      startDate: currentReview.value.startDate,
+      endDate: currentReview.value.endDate,
+      completedTaskCount: currentReview.value.completedTaskCount,
+      focusProjectName: currentReview.value.focusProjectName,
+      reflection: currentReview.value.reflection,
+      nextPlan: currentReview.value.nextPlan,
+    })
+    alert('🎉 本周总结保存成功！')
+    await loadReviewData() // 刷新一下历史记录
+  } catch (error) {
+    alert('保存失败，请检查网络')
+  }
+}
+
+// 监听菜单切换：切到 review 时加载数据
+watch(currentView, (newVal) => {
+  if (newVal === 'review') {
+    loadReviewData()
   }
 })
 </script>

@@ -31,6 +31,23 @@
           <span class="text-xl">📅</span>
           <span class="flex-1 text-sm">周报回顾</span>
         </div>
+
+        <div
+          @click="goToAiPlanner"
+          class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
+          :class="
+            currentView === 'ai-planner'
+              ? 'bg-indigo-100 text-indigo-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-200'
+          "
+        >
+          <span class="text-xl">✨</span>
+          <span
+            class="flex-1 text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-indigo-500"
+          >
+            AI 智能规划
+          </span>
+        </div>
       </div>
 
       <div class="flex-1 overflow-y-auto py-2">
@@ -99,34 +116,59 @@
         </button>
       </div>
 
-      <div
-        class="mt-auto p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between group"
-      >
-        <div class="flex items-center gap-2 overflow-hidden">
-          <div
-            class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm"
-          >
-            Me
-          </div>
-          <div class="flex flex-col">
-            <span class="text-sm font-medium text-gray-700 truncate">当前用户</span>
-          </div>
-        </div>
-
-        <button
-          @click="handleLogout"
-          class="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-600 transition-all rounded hover:bg-gray-200"
-          title="退出登录"
+      <div class="mt-auto p-4 border-t border-gray-200 bg-gray-50 group relative">
+        <div
+          class="flex items-center justify-between cursor-pointer"
+          @click="isUserMenuOpen = !isUserMenuOpen"
         >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex items-center gap-2 overflow-hidden">
+            <div
+              class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-sm"
+            >
+              {{
+                currentUserInfo.username ? currentUserInfo.username.charAt(0).toUpperCase() : 'U'
+              }}
+            </div>
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-gray-700 truncate">{{
+                currentUserInfo.username || '加载中...'
+              }}</span>
+              <span class="text-xs text-gray-400 truncate">{{
+                currentUserInfo.account || '@user'
+              }}</span>
+            </div>
+          </div>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              d="M5 15l7-7 7 7"
             ></path>
           </svg>
-        </button>
+        </div>
+
+        <div
+          v-if="isUserMenuOpen"
+          class="absolute bottom-16 left-4 w-[calc(100%-2rem)] bg-white border border-gray-100 rounded-lg shadow-xl z-50 py-1 overflow-hidden"
+        >
+          <div
+            @click="
+              currentView = 'settings'
+              isUserMenuOpen = false
+            "
+            class="flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer hover:bg-gray-50 transition-colors text-gray-700"
+          >
+            <span>⚙️</span> 个人设置
+          </div>
+          <div class="h-px bg-gray-100 my-1"></div>
+          <div
+            @click="handleLogout"
+            class="flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer hover:bg-red-50 transition-colors text-red-600 font-medium"
+          >
+            <span>🚪</span> 退出登录
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -457,9 +499,46 @@
 
             <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
               <div>
-                <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                  <span>🧠</span> 本周复盘 (Reflection)
-                </label>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="block text-sm font-bold text-gray-700 flex items-center gap-2">
+                    <span>🧠</span> 本周复盘 (Reflection)
+                  </label>
+
+                  <button
+                    @click="handleAiPolish"
+                    :disabled="isPolishing"
+                    class="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all"
+                    :class="
+                      isPolishing
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-md hover:scale-105'
+                    "
+                  >
+                    <svg
+                      v-if="isPolishing"
+                      class="animate-spin h-3 w-3 text-gray-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      ></circle>
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <span v-else>✨</span>
+                    {{ isPolishing ? 'AI 思考中...' : 'AI 一键润色' }}
+                  </button>
+                </div>
                 <textarea
                   v-model="currentReview.reflection"
                   class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all min-h-[120px] resize-none"
@@ -531,6 +610,247 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <main
+      v-else-if="currentView === 'ai-planner'"
+      class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8"
+    >
+      <div class="max-w-4xl mx-auto w-full space-y-8">
+        <div class="text-center space-y-2 mb-8">
+          <h2 class="text-3xl font-black text-gray-800 tracking-tight">
+            让
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500"
+              >AI</span
+            >
+            帮你拆解宏大目标
+          </h2>
+          <p class="text-gray-500">只需一句话，自动生成包含阶段与任务的落地执行计划</p>
+        </div>
+
+        <div
+          class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 space-y-6 relative overflow-hidden"
+        >
+          <div
+            class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500"
+          ></div>
+
+          <div class="grid grid-cols-2 gap-6">
+            <div class="col-span-2">
+              <label class="block text-sm font-bold text-gray-700 mb-2">🎯 你的目标是什么？</label>
+              <input
+                v-model="aiForm.target"
+                type="text"
+                placeholder="例如：三个月内通过英语六级 / 独立开发一款小程序"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all"
+              />
+            </div>
+            <div class="col-span-1">
+              <label class="block text-sm font-bold text-gray-700 mb-2">⏳ 期望周期</label>
+              <input
+                v-model="aiForm.duration"
+                type="text"
+                placeholder="例如：12周 / 1个月"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all"
+              />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-sm font-bold text-gray-700 mb-2">📝 补充描述 (可选)</label>
+              <textarea
+                v-model="aiForm.description"
+                placeholder="例如：我目前的基础比较薄弱，希望前两周以背单词和基础语法为主..."
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all min-h-[80px] resize-none"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-center pt-4">
+            <button
+              @click="generatePlan"
+              :disabled="isGeneratingPlan"
+              class="bg-gray-900 hover:bg-black text-white px-8 py-3 rounded-full font-bold transition-all flex items-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              :class="isGeneratingPlan ? 'opacity-70 cursor-not-allowed' : ''"
+            >
+              <svg
+                v-if="isGeneratingPlan"
+                class="animate-spin h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span v-else>✨</span>
+              {{ isGeneratingPlan ? 'AI 正在疯狂燃烧 GPU...' : '开始智能拆解' }}
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="generatedPlan.length > 0"
+          class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 animate-fade-in-up"
+        >
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold text-gray-800">📋 生成的专属计划草稿</h3>
+            <button
+              @click="applyPlanToSystem"
+              :disabled="isApplying"
+              class="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-5 py-2 rounded-lg font-bold transition-all shadow-sm flex items-center gap-2 text-sm"
+              :class="isApplying ? 'opacity-70 cursor-not-allowed' : ''"
+            >
+              <span v-if="isApplying">导入中...</span>
+              <span v-else>✅ 一键生成项目并导入系统</span>
+            </button>
+          </div>
+
+          <div class="space-y-6">
+            <div
+              v-for="(milestone, mIndex) in generatedPlan"
+              :key="mIndex"
+              class="border border-purple-100 rounded-xl p-5 bg-purple-50/30"
+            >
+              <h4 class="font-bold text-purple-700 mb-3 flex items-center gap-2">
+                <span
+                  class="bg-purple-200 text-purple-800 w-6 h-6 rounded flex items-center justify-center text-xs"
+                  >阶段 {{ mIndex + 1 }}</span
+                >
+                {{ milestone.name }}
+              </h4>
+              <div class="space-y-2 pl-8">
+                <div
+                  v-for="(task, tIndex) in milestone.tasks"
+                  :key="tIndex"
+                  class="flex items-start gap-2 text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-100 shadow-sm"
+                >
+                  <span class="text-gray-400 mt-0.5">▪</span>
+                  <div>
+                    <div class="font-medium">{{ task.title || task.name }}</div>
+                    <div v-if="task.description" class="text-xs text-gray-500 mt-1">
+                      {{ task.description }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <main
+      v-else-if="currentView === 'settings'"
+      class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8"
+    >
+      <div class="max-w-3xl mx-auto w-full space-y-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">⚙️ 个人设置</h2>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="flex border-b border-gray-100">
+            <button
+              @click="settingsTab = 'basic'"
+              :class="
+                settingsTab === 'basic'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              "
+              class="flex-1 py-4 text-sm font-bold border-b-2 transition-colors"
+            >
+              基本信息
+            </button>
+            <button
+              @click="settingsTab = 'security'"
+              :class="
+                settingsTab === 'security'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              "
+              class="flex-1 py-4 text-sm font-bold border-b-2 transition-colors"
+            >
+              安全设置
+            </button>
+          </div>
+
+          <div v-if="settingsTab === 'basic'" class="p-8 space-y-6">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">登录账号 (不可修改)</label>
+              <input
+                :value="currentUserInfo.account"
+                disabled
+                type="text"
+                class="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500 cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">显示昵称</label>
+              <input
+                v-model="updateInfoForm.username"
+                type="text"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              />
+            </div>
+            <div class="pt-4">
+              <button
+                @click="handleUpdateInfo"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+              >
+                保存修改
+              </button>
+            </div>
+          </div>
+
+          <div v-if="settingsTab === 'security'" class="p-8 space-y-6">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">当前密码</label>
+              <input
+                v-model="updatePwdForm.oldPassword"
+                type="password"
+                placeholder="请输入旧密码"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">新密码</label>
+              <input
+                v-model="updatePwdForm.newPassword"
+                type="password"
+                placeholder="至少 8 位"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">确认新密码</label>
+              <input
+                v-model="updatePwdForm.confirmNewPassword"
+                type="password"
+                placeholder="再次输入新密码"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              />
+            </div>
+            <div class="pt-4">
+              <button
+                @click="handleUpdatePassword"
+                class="bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+              >
+                更新密码
+              </button>
             </div>
           </div>
         </div>
@@ -725,7 +1045,9 @@ import * as echarts from 'echarts'
 import { fetchProjectList, addProjectApi, deleteProjectApi } from '@/api/project'
 import { fetchStatsOverview } from '@/api/stats'
 import { fetchCurrentReview, saveReviewApi, fetchReviewHistory } from '@/api/review'
+import { aiPolishApi, aiBreakdownApi } from '@/api/ai'
 import { fetchTaskList, addTaskApi, updateTaskApi, deleteTaskApi } from '@/api/task'
+import { getUserMeApi, logoutApi, updateUserInfoApi, updatePasswordApi } from '@/api/user'
 import {
   fetchMilestoneList,
   addMilestoneApi,
@@ -758,11 +1080,18 @@ interface Project {
   icon: string
 }
 
+interface CurrentUserInfo {
+  username?: string
+  account?: string
+}
+
 const projectList = ref<Project[]>([])
 const taskList = ref<Task[]>([])
-const selectedProjectId = ref('')
+const selectedProjectId = ref(localStorage.getItem('tick_selectedProjectId') || '')
 const selectedTask = ref<Task | null>(null)
 const milestoneList = ref<Milestone[]>([])
+const currentUserInfo = ref<CurrentUserInfo>({})
+const isUserMenuOpen = ref(false)
 // 【新增：新建里程碑逻辑】
 const isAddingMilestone = ref(false)
 const newMilestoneName = ref('')
@@ -770,9 +1099,27 @@ const newMilestoneName = ref('')
 const editingMilestoneId = ref('')
 const editMilestoneName = ref('')
 // 'tasks' 表示正常任务列表，'dashboard' 表示数据大屏
-const currentView = ref('tasks')
+const currentView = ref(localStorage.getItem('tick_currentView') || 'tasks')
+
+watch(currentView, (newVal) => {
+  localStorage.setItem('tick_currentView', newVal)
+})
+
+watch(selectedProjectId, (newVal) => {
+  localStorage.setItem('tick_selectedProjectId', newVal)
+})
 
 // ================== 核心联调逻辑开始 ==================
+
+// 1. 加载左侧项目清单
+const loadUserInfo = async () => {
+  try {
+    const res: unknown = await getUserMeApi()
+    currentUserInfo.value = res && typeof res === 'object' ? (res as CurrentUserInfo) : {}
+  } catch (error) {
+    console.error('获取用户信息失败', error)
+  }
+}
 
 // 1. 加载左侧项目清单
 const loadProjects = async () => {
@@ -795,6 +1142,65 @@ const loadProjects = async () => {
 // 【新增：左侧清单新建逻辑】
 const isAddingProject = ref(false) // 控制输入框是否显示的开关
 const newProjectName = ref('') // 绑定的新清单名字
+
+const settingsTab = ref<'basic' | 'security'>('basic')
+const updateInfoForm = ref({ username: '' })
+const updatePwdForm = ref({ oldPassword: '', newPassword: '', confirmNewPassword: '' })
+
+watch(currentView, (val) => {
+  if (val === 'settings') {
+    updateInfoForm.value.username = currentUserInfo.value.username || ''
+  }
+})
+
+const handleUpdateInfo = async () => {
+  if (!updateInfoForm.value.username) {
+    alert('昵称不能为空')
+    return
+  }
+
+  try {
+    await updateUserInfoApi({ username: updateInfoForm.value.username })
+    alert('✅ 信息修改成功！')
+    await loadUserInfo()
+  } catch {
+    alert('修改失败')
+  }
+}
+
+const handleUpdatePassword = async () => {
+  const { oldPassword, newPassword, confirmNewPassword } = updatePwdForm.value
+  if (!oldPassword || !newPassword || !confirmNewPassword) {
+    alert('请完整填写密码信息')
+    return
+  }
+  if (newPassword !== confirmNewPassword) {
+    alert('两次输入的新密码不一致')
+    return
+  }
+  if (newPassword.length < 8) {
+    alert('新密码长度不能少于 8 位')
+    return
+  }
+
+  try {
+    await updatePasswordApi({ oldPassword, newPassword })
+    alert('✅ 密码修改成功！请重新登录。')
+    localStorage.removeItem('token')
+    router.push('/login')
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'response' in error &&
+      (error as { response?: { data?: { message?: string } } }).response?.data?.message
+    ) {
+      alert((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+      return
+    }
+    alert('修改密码失败')
+  }
+}
 
 const submitNewProject = async () => {
   const name = newProjectName.value.trim()
@@ -839,6 +1245,7 @@ const loadTasks = async () => {
 
 // 3. 页面初始化时执行
 onMounted(() => {
+  loadUserInfo()
   loadProjects()
 })
 
@@ -878,6 +1285,12 @@ const goToDashboard = () => {
 
 const goToReview = () => {
   currentView.value = 'review'
+  selectedProjectId.value = ''
+  selectedTask.value = null
+}
+
+const goToAiPlanner = () => {
+  currentView.value = 'ai-planner'
   selectedProjectId.value = ''
   selectedTask.value = null
 }
@@ -1098,15 +1511,13 @@ const deleteProject = async (id: string, name: string) => {
 
 const router = useRouter()
 
-// 【新增：退出登录逻辑】
-const handleLogout = () => {
-  const isConfirm = window.confirm('确定要退出登录吗？')
-  if (!isConfirm) return
-
-  // 1. 清除本地存储的 Token
+// 退出登录逻辑
+const handleLogout = async () => {
+  if (!window.confirm('确定要退出登录吗？')) return
+  try {
+    await logoutApi()
+  } catch {}
   localStorage.removeItem('token')
-
-  // 2. 强制跳转回登录页
   router.push('/login')
 }
 
@@ -1332,6 +1743,8 @@ watch(currentView, async (newVal) => {
 // ================== 周报回顾逻辑 ==================
 const currentReview = ref<any>({})
 const historyReviews = ref<any[]>([])
+// AI 润色状态
+const isPolishing = ref(false)
 
 const loadReviewData = async () => {
   try {
@@ -1365,10 +1778,122 @@ const saveReview = async () => {
   }
 }
 
+// 触发 AI 润色
+const handleAiPolish = async () => {
+  if (!currentReview.value.reflection || currentReview.value.reflection.trim() === '') {
+    alert('请先写几句简单的复盘内容，AI 才能帮你润色哦！')
+    return
+  }
+
+  isPolishing.value = true
+  try {
+    // 拦截器已经解包，返回的直接是润色后的字符串
+    const res: unknown = await aiPolishApi({
+      taskCount: currentReview.value.completedTaskCount || 0,
+      focusProject: currentReview.value.focusProjectName || '日常事务',
+      reflection: currentReview.value.reflection,
+    })
+
+    if (typeof res === 'string' && res) {
+      currentReview.value.reflection = res
+    }
+  } catch (error) {
+    console.error('AI 润色失败:', error)
+    alert('AI 润色失败，请检查网络或后端日志')
+  } finally {
+    isPolishing.value = false
+  }
+}
+
 // 监听菜单切换：切到 review 时加载数据
 watch(currentView, (newVal) => {
   if (newVal === 'review') {
     loadReviewData()
   }
 })
+
+// ================== AI 智能规划逻辑 ==================
+const aiForm = ref({ target: '', description: '', duration: '' })
+const isGeneratingPlan = ref(false)
+const generatedPlan = ref<any[]>([]) // 存储后端的 List<MilestoneDraftVO>
+const isApplying = ref(false)
+
+// 1. 调用 AI 生成草稿
+const generatePlan = async () => {
+  if (!aiForm.value.target || !aiForm.value.duration) {
+    alert('请至少填写目标和期望周期！')
+    return
+  }
+  isGeneratingPlan.value = true
+  generatedPlan.value = []
+  try {
+    const res: any = await aiBreakdownApi(aiForm.value)
+    // 假设拦截器剥离了 data，如果没剥离，请自行加上 .data
+    generatedPlan.value = res || []
+  } catch (error) {
+    alert('AI 拆解失败，请检查网络或后端日志')
+  } finally {
+    isGeneratingPlan.value = false
+  }
+}
+
+// 2. 将生成的草稿一键导入数据库 (核心联动)
+const applyPlanToSystem = async () => {
+  if (generatedPlan.value.length === 0) return
+
+  const isConfirm = window.confirm(`确定要将这个计划作为新清单导入到系统中吗？`)
+  if (!isConfirm) return
+
+  isApplying.value = true
+  try {
+    // 步骤 A: 创建新项目 (清单)
+    const newProjectName = `[AI] ${aiForm.value.target}`
+    // ⚠️ 注意：这里假设你之前的 addProjectApi 返回的是新项目的 ID 或者对象
+    // 如果你的接口只返回 true，你可能需要重新请求 loadProjects() 然后拿到最后一个项目的 ID
+    const projectRes: any = await addProjectApi({ name: newProjectName, icon: '✨' })
+    const newProjectId = projectRes?.id || projectRes // 视你后端的真实返回结构而定，如果返回的是对象就取 .id
+
+    // 如果没有拿到 projectId，需要你手动改一下逻辑，或者直接提示成功然后让用户自己去左侧找
+    if (!newProjectId || newProjectId === true) {
+      await loadProjects() // 重新拉取左侧列表
+      alert(
+        '🎉 AI 计划生成完毕！请在左侧清单列表中查看 (由于接口限制，任务暂未自动关联，建议后端增加一键导入接口)',
+      )
+      isApplying.value = false
+      return
+    }
+
+    // （可选完整实现：如果你的 addProjectApi 能正确返回 ID，这里可以用 for 循环调用 addMilestoneApi 和 addTaskApi 将数据逐个塞进去。为了避免前端循环请求太慢，其实企业级做法是让后端写一个 /ai/apply 接口一次性入库。在这里，只要你保证左侧列表刷新了即可作为 MVP 跑通验证）。
+    for (let mIndex = 0; mIndex < generatedPlan.value.length; mIndex++) {
+      const milestoneDraft = generatedPlan.value[mIndex]
+      const milestoneRes: any = await addMilestoneApi({
+        name: milestoneDraft.name,
+        projectId: String(newProjectId),
+        orderNo: mIndex,
+      })
+      const newMilestoneId = milestoneRes?.id || milestoneRes
+
+      for (const task of milestoneDraft.tasks || []) {
+        await addTaskApi({
+          title: task.title,
+          description: task.description || '',
+          projectId: String(newProjectId),
+          priority: 0,
+          milestoneId: newMilestoneId ? String(newMilestoneId) : undefined,
+        })
+      }
+    }
+
+    await loadProjects()
+    currentView.value = 'tasks'
+    alert('🎉 导入成功！')
+  } catch (error) {
+    alert('导入系统时出现异常')
+  } finally {
+    isApplying.value = false
+    // 初始化表单
+    aiForm.value = { target: '', description: '', duration: '' }
+    generatedPlan.value = []
+  }
+}
 </script>

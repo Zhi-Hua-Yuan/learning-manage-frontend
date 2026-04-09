@@ -27,9 +27,21 @@
             v-model="newTaskTitle"
             @keyup.enter="addTask"
             type="text"
-            placeholder="添加任务至“默认列表”，按回车键保存"
+            placeholder="输入任务标题，按回车键保存"
             class="flex-1 bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400"
           />
+
+          <div class="border-l border-gray-200 pl-3 ml-2 flex items-center">
+            <select
+              v-model="newTaskMilestoneId"
+              class="bg-transparent text-sm outline-none cursor-pointer text-blue-600 font-medium hover:text-blue-700 transition-colors max-w-[120px] truncate"
+            >
+              <option value="" class="text-gray-600">📥 默认列表</option>
+              <option v-for="m in milestoneList" :key="m.id" :value="m.id" class="text-gray-800">
+                🚩 {{ m.name }}
+              </option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -212,9 +224,15 @@
       </div>
     </main>
 
+    <div
+      class="w-1 hover:w-1.5 cursor-col-resize bg-transparent hover:bg-blue-400 active:bg-blue-500 transition-all z-20 -ml-1"
+      @mousedown="startResizeRight"
+    ></div>
+
     <aside
       v-if="selectedTask"
-      class="w-80 bg-white border-l border-gray-200 flex flex-col shadow-sm z-10"
+      class="bg-white border-l border-gray-200 flex flex-col shadow-sm z-10"
+      :style="{ width: detailWidth + 'px' }"
     >
       <div class="p-4 border-b border-gray-100 flex justify-between items-center text-gray-500">
         <span class="text-sm font-medium">任务详情</span>
@@ -373,7 +391,8 @@
 
     <aside
       v-else
-      class="w-80 bg-gray-50 border-l border-gray-200 flex flex-col items-center justify-center text-gray-400"
+      class="bg-gray-50 border-l border-gray-200 flex flex-col items-center justify-center text-gray-400"
+      :style="{ width: detailWidth + 'px' }"
     >
       <svg
         class="w-16 h-16 mb-4 text-gray-300"
@@ -394,7 +413,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchProjectList } from '@/api/project'
 import { addTaskApi, deleteTaskApi, fetchTaskList, updateTaskApi } from '@/api/task'
@@ -440,12 +459,39 @@ const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 
 const newTaskTitle = ref('')
+const newTaskMilestoneId = ref('')
 const isAddingMilestone = ref(false)
 const newMilestoneName = ref('')
 const editingMilestoneId = ref('')
 const editMilestoneName = ref('')
 
 const isPriorityMenuOpen = ref(false)
+const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 320)
+const isResizingRight = ref(false)
+
+const startResizeRight = () => {
+  isResizingRight.value = true
+  document.addEventListener('mousemove', handleMouseMoveRight)
+  document.addEventListener('mouseup', stopResizeRight)
+  document.body.style.userSelect = 'none'
+}
+
+const handleMouseMoveRight = (e: MouseEvent) => {
+  if (!isResizingRight.value) return
+  const newWidth = document.body.clientWidth - e.clientX
+  if (newWidth > 250 && newWidth < 600) {
+    detailWidth.value = newWidth
+  }
+}
+
+const stopResizeRight = () => {
+  isResizingRight.value = false
+  document.removeEventListener('mousemove', handleMouseMoveRight)
+  document.removeEventListener('mouseup', stopResizeRight)
+  document.body.style.userSelect = ''
+  localStorage.setItem('tick_detailWidth', detailWidth.value.toString())
+}
+
 const priorityOptions = [
   { value: 0, text: '无优先级', color: 'text-gray-400', icon: '🏳️' },
   { value: 1, text: '低优先级', color: 'text-blue-500', icon: '🔵' },
@@ -531,6 +577,7 @@ const addTask = async () => {
       title: newTaskTitle.value.trim(),
       projectId: selectedProjectId.value,
       priority: 0,
+      milestoneId: newTaskMilestoneId.value || undefined,
     })
     newTaskTitle.value = ''
     await loadTasks()
@@ -757,5 +804,9 @@ watch(
 onMounted(async () => {
   syncSelectedProject()
   await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
+})
+
+onBeforeUnmount(() => {
+  stopResizeRight()
 })
 </script>

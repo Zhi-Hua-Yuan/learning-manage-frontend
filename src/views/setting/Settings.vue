@@ -98,6 +98,82 @@
         </div>
       </div>
     </div>
+
+    <transition
+      enter-active-class="transform ease-out duration-300 transition"
+      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="toast.show"
+        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4"
+        :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
+      >
+        <div
+          class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg"
+          :class="
+            toast.type === 'success' ? 'text-emerald-500 bg-emerald-100' : 'text-red-500 bg-red-100'
+          "
+        >
+          <span v-if="toast.type === 'success'">✅</span>
+          <span v-else>⚠️</span>
+        </div>
+        <div class="ml-3 text-sm font-bold">{{ toast.message }}</div>
+      </div>
+    </transition>
+
+    <transition
+      enter-active-class="ease-out duration-300"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="ease-in duration-200"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showReLoginModal"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
+      >
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
+
+        <div class="relative w-auto max-w-sm mx-auto my-6 z-50 transform transition-all">
+          <div
+            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+          >
+            <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-green-500"></div>
+            <div class="p-8 pb-4 flex flex-col items-center text-center">
+              <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+                <span class="text-3xl">🔒</span>
+              </div>
+              <h3 class="text-xl font-black text-gray-800 mb-2">密码修改成功</h3>
+              <p class="text-sm text-gray-500 leading-relaxed">
+                您的账户安全信息已更新，为了保障账号安全，请使用新密码重新登录系统。
+              </p>
+            </div>
+            <div class="flex items-center justify-center p-6 pt-2">
+              <button
+                class="w-full px-6 py-3 text-sm font-bold text-white bg-green-500 rounded-xl shadow-md hover:bg-green-600 hover:shadow-lg transition-all outline-none focus:outline-none flex items-center justify-center gap-2"
+                type="button"
+                @click="confirmReLogin"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                  ></path>
+                </svg>
+                前往重新登录
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
   </main>
 </template>
 
@@ -112,6 +188,21 @@ interface CurrentUserInfo {
 }
 
 const router = useRouter()
+
+const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
+const showReLoginModal = ref(false)
+
+const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+  toast.value = { show: true, message: msg, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 3000)
+}
+
+const confirmReLogin = async () => {
+  localStorage.removeItem('token')
+  await router.push('/login')
+}
 
 const settingsTab = ref<'basic' | 'security'>('basic')
 const currentUserInfo = ref<CurrentUserInfo>({})
@@ -130,50 +221,47 @@ const loadUserInfo = async () => {
 
 const handleUpdateInfo = async () => {
   if (!updateInfoForm.value.username) {
-    alert('昵称不能为空')
+    showToast('昵称不能为空', 'error')
     return
   }
 
   try {
     await updateUserInfoApi({ username: updateInfoForm.value.username })
-    alert('✅ 信息修改成功！')
+    showToast('信息修改成功！', 'success')
     await loadUserInfo()
   } catch {
-    alert('修改失败')
+    showToast('修改失败，请重试', 'error')
   }
 }
 
 const handleUpdatePassword = async () => {
   const { oldPassword, newPassword, confirmNewPassword } = updatePwdForm.value
   if (!oldPassword || !newPassword || !confirmNewPassword) {
-    alert('请完整填写密码信息')
+    showToast('请完整填写密码信息', 'error')
     return
   }
   if (newPassword !== confirmNewPassword) {
-    alert('两次输入的新密码不一致')
+    showToast('两次输入的新密码不一致', 'error')
     return
   }
   if (newPassword.length < 8) {
-    alert('新密码长度不能少于 8 位')
+    showToast('新密码长度不能少于 8 位', 'error')
     return
   }
 
   try {
     await updatePasswordApi({ oldPassword, newPassword })
-    alert('✅ 密码修改成功！请重新登录。')
-    localStorage.removeItem('token')
-    await router.push('/login')
+    showReLoginModal.value = true
   } catch (error: unknown) {
-    if (
+    const backendMessage =
       error &&
       typeof error === 'object' &&
       'response' in error &&
       (error as { response?: { data?: { message?: string } } }).response?.data?.message
-    ) {
-      alert((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-      return
-    }
-    alert('修改密码失败')
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+    const errorMsg = backendMessage || '修改密码失败，请检查旧密码'
+    showToast(errorMsg, 'error')
   }
 }
 

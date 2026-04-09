@@ -1,8 +1,16 @@
 <template>
   <div class="flex h-screen w-screen bg-white overflow-hidden text-gray-800">
-    <aside class="w-64 bg-gray-50 border-r border-gray-200 flex flex-col z-10">
-      <div class="p-4 font-bold text-lg border-b border-gray-200 flex items-center gap-2">
-        <span class="text-blue-500">✅</span> 我的滴答清单
+    <aside
+      class="relative bg-gray-50 border-r border-gray-200 flex flex-col z-10"
+      :style="{ width: sidebarWidth + 'px' }"
+    >
+      <div class="p-6 border-b border-gray-100 flex items-center justify-center gap-3">
+        <img
+          src="@/assets/logo.png"
+          alt="SmartPath Logo"
+          class="w-8 h-8 rounded-lg shadow-sm object-cover"
+        />
+        <span class="text-xl font-black text-gray-800 tracking-wider">智 径</span>
       </div>
 
       <div class="px-2 py-3 border-b border-gray-100">
@@ -160,21 +168,78 @@
           </div>
           <div class="h-px bg-gray-100 my-1"></div>
           <div
-            @click="handleLogout"
+            @click="openLogoutModal"
             class="flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer hover:bg-red-50 transition-colors text-red-600 font-medium"
           >
             <span>🚪</span> 退出登录
           </div>
         </div>
       </div>
+
+      <div
+        class="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-400 active:bg-blue-500 transition-all z-20"
+        @mousedown="startResizeLeft"
+      ></div>
     </aside>
 
-    <router-view class="flex-1 overflow-y-auto bg-gray-50" />
+    <router-view class="flex-1 overflow-y-auto bg-gray-50" @refresh-projects="loadProjects" />
+
+    <transition
+      enter-active-class="ease-out duration-300"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="ease-in duration-200"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showLogoutModal"
+        class="fixed inset-0 z-[100] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
+      >
+        <div
+          class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
+          @click="showLogoutModal = false"
+        ></div>
+
+        <div class="relative w-auto max-w-sm mx-auto my-6 z-[101] transform transition-all">
+          <div
+            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+          >
+            <div class="h-1 w-full bg-gradient-to-r from-red-500 to-rose-500"></div>
+            <div class="p-6 pb-0 flex flex-col items-center text-center">
+              <div class="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                <span class="text-2xl">🚪</span>
+              </div>
+              <h3 class="text-xl font-black text-gray-800 mb-2">准备离开？</h3>
+              <p class="text-sm text-gray-500 leading-relaxed px-4">
+                确定要退出当前账号吗？未保存的草稿可能会丢失。
+              </p>
+            </div>
+            <div class="flex items-center justify-center p-6 gap-3 rounded-b mt-2">
+              <button
+                class="flex-1 px-4 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors outline-none focus:outline-none"
+                type="button"
+                @click="showLogoutModal = false"
+              >
+                取消
+              </button>
+              <button
+                class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-500 rounded-xl shadow hover:bg-red-600 hover:shadow-lg transition-all outline-none focus:outline-none"
+                type="button"
+                @click="executeLogout"
+              >
+                退出登录
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { addProjectApi, deleteProjectApi, fetchProjectList } from '@/api/project'
 import { getUserMeApi, logoutApi } from '@/api/user'
@@ -197,7 +262,33 @@ const projectList = ref<Project[]>([])
 const isAddingProject = ref(false)
 const newProjectName = ref('')
 const isUserMenuOpen = ref(false)
+const showLogoutModal = ref(false)
 const currentUserInfo = ref<CurrentUserInfo>({})
+const sidebarWidth = ref(Number(localStorage.getItem('tick_sidebarWidth')) || 256)
+const isResizingLeft = ref(false)
+
+const startResizeLeft = () => {
+  isResizingLeft.value = true
+  document.addEventListener('mousemove', handleMouseMoveLeft)
+  document.addEventListener('mouseup', stopResizeLeft)
+  document.body.style.userSelect = 'none'
+}
+
+const handleMouseMoveLeft = (e: MouseEvent) => {
+  if (!isResizingLeft.value) return
+  const newWidth = e.clientX
+  if (newWidth > 200 && newWidth < 400) {
+    sidebarWidth.value = newWidth
+  }
+}
+
+const stopResizeLeft = () => {
+  isResizingLeft.value = false
+  document.removeEventListener('mousemove', handleMouseMoveLeft)
+  document.removeEventListener('mouseup', stopResizeLeft)
+  document.body.style.userSelect = ''
+  localStorage.setItem('tick_sidebarWidth', sidebarWidth.value.toString())
+}
 
 const selectedProjectId = computed(() => {
   const routeId = route.query.projectId
@@ -288,15 +379,20 @@ const goToSettings = async () => {
   await router.push('/settings')
 }
 
-const handleLogout = async () => {
-  if (!window.confirm('确定要退出登录吗？')) return
+const openLogoutModal = () => {
+  showLogoutModal.value = true
+  isUserMenuOpen.value = false
+}
+
+const executeLogout = async () => {
+  showLogoutModal.value = false
   try {
     await logoutApi()
   } catch {
-    // keep frontend logout behavior even if API call fails
+    // force logout even when API request fails
   }
   localStorage.removeItem('token')
-  await router.push('/login')
+  router.push('/login')
 }
 
 watch(
@@ -309,5 +405,9 @@ watch(
 onMounted(() => {
   loadUserInfo()
   loadProjects()
+})
+
+onBeforeUnmount(() => {
+  stopResizeLeft()
 })
 </script>

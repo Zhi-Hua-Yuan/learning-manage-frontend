@@ -89,7 +89,7 @@
         <div class="flex items-center justify-between mb-6">
           <h3 class="text-xl font-bold text-gray-800">📋 生成的专属计划草稿</h3>
           <button
-            @click="applyPlanToSystem"
+            @click="openConfirmModal"
             :disabled="isApplying"
             class="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-5 py-2 rounded-lg font-bold transition-all shadow-sm flex items-center gap-2 text-sm"
             :class="isApplying ? 'opacity-70 cursor-not-allowed' : ''"
@@ -131,6 +131,97 @@
         </div>
       </div>
     </div>
+
+    <transition
+      enter-active-class="transform ease-out duration-300 transition"
+      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showSuccessToast"
+        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4 border-emerald-500"
+      >
+        <div
+          class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-emerald-500 bg-emerald-100 rounded-lg"
+        >
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fill-rule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clip-rule="evenodd"
+            ></path>
+          </svg>
+        </div>
+        <div class="ml-3 text-sm font-bold">🎉 AI 计划已成功导入系统！</div>
+      </div>
+    </transition>
+
+    <transition
+      enter-active-class="ease-out duration-300"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="ease-in duration-200"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showConfirmModal"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
+      >
+        <div
+          class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
+          @click="showConfirmModal = false"
+        ></div>
+
+        <div class="relative w-auto max-w-md mx-auto my-6 z-50 transform transition-all">
+          <div
+            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+          >
+            <div class="h-1 w-full bg-gradient-to-r from-purple-500 to-blue-500"></div>
+            <div class="p-6 pb-0 flex flex-col items-center text-center">
+              <div class="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+                <span class="text-2xl">✨</span>
+              </div>
+              <h3 class="text-xl font-black text-gray-800 mb-2">确认导入计划？</h3>
+              <p class="text-sm text-gray-500 leading-relaxed px-4">
+                此操作将根据 AI 生成的草稿，在您的系统中创建一个名为 <br />
+                <span class="font-bold text-blue-600 border-b border-blue-200"
+                  >"[AI] {{ aiForm.target }}"</span
+                >
+                的新清单项目。
+              </p>
+            </div>
+            <div class="flex items-center justify-center p-6 gap-3 rounded-b">
+              <button
+                class="px-6 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-colors outline-none focus:outline-none"
+                type="button"
+                @click="showConfirmModal = false"
+              >
+                取消
+              </button>
+              <button
+                class="px-6 py-2.5 text-sm font-bold text-white bg-gray-900 rounded-xl shadow hover:bg-black hover:shadow-lg transition-all outline-none focus:outline-none flex items-center gap-2"
+                type="button"
+                @click="executeImport"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M5 13l4 4L19 7"
+                  ></path>
+                </svg>
+                立即导入
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
   </main>
 </template>
 
@@ -141,6 +232,8 @@ import { aiBreakdownApi } from '@/api/ai'
 import { addMilestoneApi } from '@/api/milestone'
 import { addProjectApi } from '@/api/project'
 import { addTaskApi } from '@/api/task'
+
+const emit = defineEmits(['refresh-projects'])
 
 interface DraftTask {
   title?: string
@@ -159,6 +252,8 @@ const aiForm = ref({ target: '', description: '', duration: '' })
 const isGeneratingPlan = ref(false)
 const generatedPlan = ref<DraftMilestone[]>([])
 const isApplying = ref(false)
+const showConfirmModal = ref(false)
+const showSuccessToast = ref(false)
 
 const generatePlan = async () => {
   if (!aiForm.value.target || !aiForm.value.duration) {
@@ -179,12 +274,13 @@ const generatePlan = async () => {
   }
 }
 
-const applyPlanToSystem = async () => {
+const openConfirmModal = () => {
   if (generatedPlan.value.length === 0) return
+  showConfirmModal.value = true
+}
 
-  const isConfirm = window.confirm('确定要将这个计划作为新清单导入到系统中吗？')
-  if (!isConfirm) return
-
+const executeImport = async () => {
+  showConfirmModal.value = false
   isApplying.value = true
   try {
     const created = await addProjectApi({ name: `[AI] ${aiForm.value.target}`, icon: '✨' })
@@ -194,7 +290,11 @@ const applyPlanToSystem = async () => {
         : String(created || '')
 
     if (!newProjectId || newProjectId === 'true') {
-      alert('🎉 AI 计划生成完毕！请在左侧清单列表中查看')
+      emit('refresh-projects')
+      showSuccessToast.value = true
+      setTimeout(() => {
+        showSuccessToast.value = false
+      }, 3000)
       await router.push('/tasks')
       return
     }
@@ -223,10 +323,14 @@ const applyPlanToSystem = async () => {
       }
     }
 
-    alert('🎉 导入成功！')
+    emit('refresh-projects')
+    showSuccessToast.value = true
+    setTimeout(() => {
+      showSuccessToast.value = false
+    }, 3000)
     await router.push({ path: '/tasks', query: { projectId: newProjectId } })
   } catch {
-    alert('导入系统时出现异常')
+    alert('导入系统时出现异常，请检查网络')
   } finally {
     isApplying.value = false
     aiForm.value = { target: '', description: '', duration: '' }

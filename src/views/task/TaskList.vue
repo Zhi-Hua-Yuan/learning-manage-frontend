@@ -56,7 +56,12 @@
                 :key="task.id"
                 @click="selectTask(task)"
                 class="card-base group flex cursor-pointer items-center gap-3 bg-white px-3 py-3"
-                :class="selectedTask?.id === task.id ? 'border-gray-300 bg-gray-100' : ''"
+                :class="
+                  selectedTask?.id === task.id
+                    ? 'bg-gray-100 ring-2 ring-blue-200 ring-offset-1 ring-offset-gray-50'
+                    : ''
+                "
+                :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
               >
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
@@ -144,7 +149,7 @@
                     </svg>
                   </button>
                   <button
-                    @click="deleteMilestone(group.milestone.id, group.milestone.name)"
+                    @click="requestDeleteMilestone(group.milestone.id, group.milestone.name)"
                     class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500"
                     title="删除阶段"
                   >
@@ -184,7 +189,12 @@
                 :key="task.id"
                 @click="selectTask(task)"
                 class="card-base group flex cursor-pointer items-center gap-3 bg-white px-3 py-3"
-                :class="selectedTask?.id === task.id ? 'border-gray-300 bg-gray-100' : ''"
+                :class="
+                  selectedTask?.id === task.id
+                    ? 'bg-gray-100 ring-2 ring-blue-200 ring-offset-1 ring-offset-gray-50'
+                    : ''
+                "
+                :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
               >
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
@@ -284,7 +294,7 @@
 
           <div class="flex items-center gap-1">
             <button
-              @click="deleteTask"
+              @click="requestDeleteTask"
               class="rounded p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
               title="删除任务"
             >
@@ -386,27 +396,33 @@
             </svg>
             <label class="w-20 text-sm font-medium text-gray-600">截止日期</label>
 
-            <div class="relative flex-1">
+            <div class="relative flex min-w-0 flex-1 items-center justify-between gap-2 pr-1 text-sm">
+              <span class="truncate" :class="selectedTask.dueDate ? 'text-gray-700' : 'text-gray-400'">
+                {{ selectedTask.dueDate || '设置截止日期' }}
+              </span>
+              <svg
+                class="pointer-events-none h-4 w-4 shrink-0 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                ></path>
+              </svg>
               <input
                 ref="dueDateInputRef"
                 type="date"
+                tabindex="-1"
                 :value="selectedTask.dueDate || ''"
                 @change="onDueDateChange"
-                @keydown="onDueDateKeydown"
-                @paste.prevent
-                @drop.prevent
-                @click.stop
                 @focus="onDueDateFocus"
                 @blur="onDueDateBlur"
-                class="w-full cursor-pointer bg-transparent text-sm outline-none [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                :class="!selectedTask.dueDate ? 'text-transparent' : 'text-gray-700'"
+                class="pointer-events-none absolute h-0 w-0 opacity-0"
               />
-              <span
-                v-if="!selectedTask.dueDate"
-                class="pointer-events-none absolute left-0 top-0 text-sm text-gray-400"
-              >
-                设置截止日期
-              </span>
             </div>
           </div>
 
@@ -463,12 +479,35 @@
         </div>
       </template>
     </aside>
+
+    <AppConfirmDialog
+      v-model="showDeleteTaskConfirm"
+      variant="danger"
+      icon="🗑️"
+      :title="deleteTaskConfirmTitle"
+      message="删除后可在 5 秒内撤销。"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      @confirm="confirmDeleteTask"
+    />
+
+    <AppConfirmDialog
+      v-model="showDeleteMilestoneConfirm"
+      variant="danger"
+      icon="🗑️"
+      :title="deleteMilestoneConfirmTitle"
+      message="该阶段下的任务不会被删除，但会变回未分配状态。"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      @confirm="confirmDeleteMilestone"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import { fetchProjectList } from '@/api/project'
 import { addTaskApi, deleteTaskApi, fetchTaskList, updateTaskApi } from '@/api/task'
 import {
@@ -532,6 +571,10 @@ const editMilestoneName = ref('')
 
 const isPriorityMenuOpen = ref(false)
 const isDueDatePickerOpen = ref(false)
+const showDeleteTaskConfirm = ref(false)
+const showDeleteMilestoneConfirm = ref(false)
+const pendingDeleteTask = ref<Task | null>(null)
+const pendingDeleteMilestone = ref<{ id: string; name: string } | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
 const dueDateInputRef = ref<HTMLInputElement | null>(null)
@@ -542,14 +585,24 @@ const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWid
 const isMobile = computed(() => viewportWidth.value < 768)
 
 const priorityOptions: PriorityOption[] = [
-  { value: 3, text: '紧急', dotClass: 'priority-dot--urgent', textClass: 'priority-text--urgent' },
-  { value: 2, text: '高', dotClass: 'priority-dot--high', textClass: 'priority-text--high' },
-  { value: 1, text: '中', dotClass: 'priority-dot--medium', textClass: 'priority-text--medium' },
-  { value: 0, text: '低', dotClass: 'priority-dot--low', textClass: 'priority-text--low' },
+  { value: 3, text: '高', dotClass: 'priority-dot--urgent', textClass: 'priority-text--urgent' },
+  { value: 2, text: '中', dotClass: 'priority-dot--high', textClass: 'priority-text--high' },
+  { value: 1, text: '低', dotClass: 'priority-dot--low', textClass: 'priority-text--low' },
+  { value: 0, text: '无', dotClass: 'priority-dot--medium', textClass: 'priority-text--medium' },
 ]
 
 const getPriorityOption = (priority: number) =>
   priorityOptions.find((option) => option.value === priority) || priorityOptions[priorityOptions.length - 1]!
+
+const taskItemPriorityBorderColorMap: Record<number, string> = {
+  3: 'var(--color-danger)',
+  2: 'var(--color-warning)',
+  1: 'var(--color-success)',
+  0: 'var(--color-text-primary)',
+}
+
+const getTaskItemBorderColor = (priority: number) =>
+  taskItemPriorityBorderColorMap[priority] || taskItemPriorityBorderColorMap[0]
 
 const updateViewport = () => {
   viewportWidth.value = window.innerWidth
@@ -711,6 +764,16 @@ const currentMilestoneLabel = computed(() => {
   return `🚩 ${milestone.name}`
 })
 
+const deleteTaskConfirmTitle = computed(() => {
+  if (!pendingDeleteTask.value) return '确认删除任务？'
+  return `确认删除任务“${pendingDeleteTask.value.title}”？`
+})
+
+const deleteMilestoneConfirmTitle = computed(() => {
+  if (!pendingDeleteMilestone.value) return '确认删除阶段？'
+  return `确认删除阶段“${pendingDeleteMilestone.value.name}”？`
+})
+
 const togglePriorityMenuFromRow = () => {
   isPriorityMenuOpen.value = !isPriorityMenuOpen.value
 }
@@ -734,6 +797,12 @@ const openDueDatePicker = () => {
   }
 
   isDueDatePickerOpen.value = true
+
+  const openNativePickerByClick = () => {
+    input.focus()
+    input.click()
+  }
+
   const inputWithPicker = input as HTMLInputElement & { showPicker?: () => void }
   if (typeof inputWithPicker.showPicker === 'function') {
     try {
@@ -744,8 +813,7 @@ const openDueDatePicker = () => {
     }
   }
 
-  input.focus()
-  input.click()
+  openNativePickerByClick()
 }
 
 const onDueDateFocus = () => {
@@ -754,18 +822,6 @@ const onDueDateFocus = () => {
 
 const onDueDateBlur = () => {
   isDueDatePickerOpen.value = false
-}
-
-const onDueDateKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Tab') return
-
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault()
-    openDueDatePicker()
-    return
-  }
-
-  event.preventDefault()
 }
 
 const handleDocumentPointerDown = (event: PointerEvent) => {
@@ -843,12 +899,17 @@ const onTextBlur = async () => {
   }
 }
 
-const deleteTask = async () => {
+const requestDeleteTask = () => {
   if (!selectedTask.value) return
+  pendingDeleteTask.value = { ...selectedTask.value }
+  showDeleteTaskConfirm.value = true
+}
 
-  const taskToDelete = { ...selectedTask.value }
-  const isConfirm = window.confirm(`确定要删除任务 "${taskToDelete.title}" 吗？`)
-  if (!isConfirm) return
+const confirmDeleteTask = async () => {
+  const taskToDelete = pendingDeleteTask.value
+  if (!taskToDelete) return
+
+  showDeleteTaskConfirm.value = false
 
   const originalIndex = taskList.value.findIndex((task) => task.id === taskToDelete.id)
   taskList.value = taskList.value.filter((task) => task.id !== taskToDelete.id)
@@ -923,11 +984,20 @@ const saveMilestone = async (milestone: Milestone) => {
   }
 }
 
+const requestDeleteMilestone = (id: string, name: string) => {
+  pendingDeleteMilestone.value = { id, name }
+  showDeleteMilestoneConfirm.value = true
+}
+
+const confirmDeleteMilestone = async () => {
+  const target = pendingDeleteMilestone.value
+  if (!target) return
+
+  showDeleteMilestoneConfirm.value = false
+  await deleteMilestone(target.id, target.name)
+}
+
 const deleteMilestone = async (id: string, name: string) => {
-  const isConfirm = window.confirm(
-    `确定要删除阶段 "${name}" 吗？\n该阶段下的任务不会被删除，但会变回未分配状态。`,
-  )
-  if (!isConfirm) return
 
   const snapshot = [...milestoneList.value]
   const removedIndex = snapshot.findIndex((milestone) => milestone.id === id)
@@ -1006,6 +1076,18 @@ watch(
     await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
   },
 )
+
+watch(showDeleteTaskConfirm, (next) => {
+  if (!next) {
+    pendingDeleteTask.value = null
+  }
+})
+
+watch(showDeleteMilestoneConfirm, (next) => {
+  if (!next) {
+    pendingDeleteMilestone.value = null
+  }
+})
 
 onMounted(async () => {
   updateViewport()

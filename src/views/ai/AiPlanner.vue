@@ -44,7 +44,7 @@
           </div>
         </div>
 
-        <div class="flex justify-center pt-4">
+        <div class="flex flex-wrap items-center justify-center gap-3 pt-4">
           <button
             @click="generatePlan"
             :disabled="isGeneratingPlan"
@@ -74,6 +74,18 @@
             </svg>
             <span v-else>✨</span>
             {{ isGeneratingPlan ? 'AI 正在生成计划...' : '开始智能拆解' }}
+          </button>
+
+          <button
+            type="button"
+            class="btn-secondary rounded-full px-5 py-3 text-sm font-bold"
+            :disabled="isGeneratingPlan || isApplying || isRetryingFailed"
+            :class="
+              isGeneratingPlan || isApplying || isRetryingFailed ? 'cursor-not-allowed opacity-70' : ''
+            "
+            @click="clearPlannerContent"
+          >
+            一键清空内容
           </button>
         </div>
       </div>
@@ -276,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { aiBreakdownApi } from '@/api/ai'
 import { addMilestoneApi } from '@/api/milestone'
@@ -319,6 +331,18 @@ interface FailedTaskImport {
 
 type FailedImportItem = FailedMilestoneImport | FailedTaskImport
 
+interface PersistedPlannerDraft {
+  aiForm: {
+    target: string
+    description: string
+    duration: string
+  }
+  generatedPlan: DraftMilestone[]
+  selectedTaskMap: Record<string, boolean>
+}
+
+const AI_PLANNER_DRAFT_STORAGE_KEY = 'tick_aiPlannerDraft_v1'
+
 const router = useRouter()
 const toast = useToast()
 
@@ -331,6 +355,8 @@ const isRetryingFailed = ref(false)
 const showConfirmModal = ref(false)
 const failedImportItems = ref<FailedImportItem[]>([])
 const importProjectId = ref('')
+const isDraftPersistencePaused = ref(false)
+let persistDraftTimer: ReturnType<typeof setTimeout> | null = null
 
 const getTaskKey = (mIndex: number, tIndex: number) => `${mIndex}-${tIndex}`
 
@@ -382,6 +408,88 @@ const normalizePlan = (raw: unknown): DraftMilestone[] => {
 
     return { name, tasks } satisfies DraftMilestone
   })
+}
+
+const pauseDraftPersistenceOnce = () => {
+  if (typeof window === 'undefined') return
+  isDraftPersistencePaused.value = true
+  window.setTimeout(() => {
+    isDraftPersistencePaused.value = false
+  }, 0)
+}
+
+const clearPersistedDraft = () => {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(AI_PLANNER_DRAFT_STORAGE_KEY)
+}
+
+const persistPlannerDraft = () => {
+  if (typeof window === 'undefined') return
+
+  const hasFormContent =
+    aiForm.value.target.trim() !== '' || aiForm.value.duration.trim() !== '' || aiForm.value.description.trim() !== ''
+  if (!hasFormContent && generatedPlan.value.length === 0) {
+    clearPersistedDraft()
+    return
+  }
+
+  const payload: PersistedPlannerDraft = {
+    aiForm: { ...aiForm.value },
+    generatedPlan: generatedPlan.value,
+    selectedTaskMap: selectedTaskMap.value,
+  }
+
+  localStorage.setItem(AI_PLANNER_DRAFT_STORAGE_KEY, JSON.stringify(payload))
+}
+
+const schedulePersistPlannerDraft = () => {
+  if (typeof window === 'undefined') return
+
+  if (persistDraftTimer) {
+    window.clearTimeout(persistDraftTimer)
+  }
+
+  persistDraftTimer = window.setTimeout(() => {
+    persistPlannerDraft()
+    persistDraftTimer = null
+  }, 120)
+}
+
+const hydrateDraftFromStorage = () => {
+  if (typeof window === 'undefined') return
+
+  const raw = localStorage.getItem(AI_PLANNER_DRAFT_STORAGE_KEY)
+  if (!raw) return
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<PersistedPlannerDraft>
+
+    const nextForm = {
+      target: typeof parsed.aiForm?.target === 'string' ? parsed.aiForm.target : '',
+      description: typeof parsed.aiForm?.description === 'string' ? parsed.aiForm.description : '',
+      duration: typeof parsed.aiForm?.duration === 'string' ? parsed.aiForm.duration : '',
+    }
+
+    const nextPlan = normalizePlan(parsed.generatedPlan)
+    const rawMap =
+      parsed.selectedTaskMap && typeof parsed.selectedTaskMap === 'object' ? parsed.selectedTaskMap : {}
+
+    const nextMap: Record<string, boolean> = {}
+    nextPlan.forEach((milestone, mIndex) => {
+      milestone.tasks.forEach((_task, tIndex) => {
+        const taskKey = getTaskKey(mIndex, tIndex)
+        const rawValue = (rawMap as Record<string, unknown>)[taskKey]
+        nextMap[taskKey] = typeof rawValue === 'boolean' ? rawValue : true
+      })
+    })
+
+    pauseDraftPersistenceOnce()
+    aiForm.value = nextForm
+    generatedPlan.value = nextPlan
+    selectedTaskMap.value = nextMap
+  } catch {
+    clearPersistedDraft()
+  }
 }
 
 const initializeSelection = (plan: DraftMilestone[]) => {
@@ -584,11 +692,23 @@ const runImport = async (milestones: SelectedMilestone[], projectId: string) => 
 }
 
 const resetPlannerState = () => {
+  if (persistDraftTimer && typeof window !== 'undefined') {
+    window.clearTimeout(persistDraftTimer)
+    persistDraftTimer = null
+  }
+  pauseDraftPersistenceOnce()
   aiForm.value = { target: '', description: '', duration: '' }
   generatedPlan.value = []
   selectedTaskMap.value = {}
   failedImportItems.value = []
   importProjectId.value = ''
+  clearPersistedDraft()
+}
+
+const clearPlannerContent = () => {
+  showConfirmModal.value = false
+  resetPlannerState()
+  toast.success('已清空当前内容。')
 }
 
 const executeImport = async () => {
@@ -700,6 +820,25 @@ const goToImportedProject = async () => {
   }
   await router.push({ path: '/tasks', query: { projectId: importProjectId.value } })
 }
+
+watch(
+  [aiForm, generatedPlan, selectedTaskMap],
+  () => {
+    if (isDraftPersistencePaused.value) return
+    schedulePersistPlannerDraft()
+  },
+  { deep: true },
+)
+
+onMounted(() => {
+  hydrateDraftFromStorage()
+})
+
+onBeforeUnmount(() => {
+  if (!persistDraftTimer || typeof window === 'undefined') return
+  window.clearTimeout(persistDraftTimer)
+  persistDraftTimer = null
+})
 
 const getFailureTitle = (item: FailedImportItem) => {
   if (item.kind === 'milestone') {

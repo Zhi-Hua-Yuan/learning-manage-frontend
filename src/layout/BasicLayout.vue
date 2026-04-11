@@ -3,7 +3,7 @@
     <button
       v-if="isCompactViewport"
       @click="isSidebarOpen = true"
-      class="fixed left-3 top-3 z-40 rounded-lg border border-gray-200 bg-white/95 p-2 text-gray-700 shadow-sm"
+      class="fixed left-3 top-3 z-50 rounded-lg border border-gray-200 bg-white/95 p-2 text-gray-700 shadow-sm"
       aria-label="打开侧栏"
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,13 +21,13 @@
     >
       <div
         v-if="isCompactViewport && isSidebarOpen"
-        class="fixed inset-0 z-30 bg-gray-900/35 backdrop-blur-[1px]"
+        class="fixed inset-0 z-50 bg-gray-900/35 backdrop-blur-[1px]"
         @click="isSidebarOpen = false"
       ></div>
     </transition>
 
     <aside
-      class="z-40 flex flex-col border-r border-gray-200 bg-gray-50 transition-transform duration-200"
+      class="z-[60] flex flex-col border-r border-gray-200 bg-gray-50 transition-transform duration-200"
       :class="
         isCompactViewport
           ? `fixed inset-y-0 left-0 w-[280px] max-w-[85vw] ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`

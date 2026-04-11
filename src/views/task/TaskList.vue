@@ -31,7 +31,8 @@
               v-model="newTaskTitle"
               @keyup.enter="addTask"
               type="text"
-              placeholder="输入任务标题，按回车保存"
+              maxlength="50"
+              placeholder="输入任务标题（最多 50 字），按回车保存"
               class="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
             />
           </div>
@@ -95,13 +96,18 @@
                   {{ task.title }}
                 </span>
 
-                <span
-                  class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium"
-                  :class="getPriorityOption(task.priority).textClass"
-                >
-                  <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
-                  {{ getPriorityOption(task.priority).text }}
-                </span>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span v-if="task.dueDate" class="mono text-xs text-gray-500">
+                    {{ formatTaskDueDate(task.dueDate) }}
+                  </span>
+                  <span
+                    class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium"
+                    :class="getPriorityOption(task.priority).textClass"
+                  >
+                    <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
+                    {{ getPriorityOption(task.priority).text }}
+                  </span>
+                </div>
               </div>
             </div>
           </section>
@@ -228,13 +234,18 @@
                   {{ task.title }}
                 </span>
 
-                <span
-                  class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium"
-                  :class="getPriorityOption(task.priority).textClass"
-                >
-                  <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
-                  {{ getPriorityOption(task.priority).text }}
-                </span>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span v-if="task.dueDate" class="mono text-xs text-gray-500">
+                    {{ formatTaskDueDate(task.dueDate) }}
+                  </span>
+                  <span
+                    class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium"
+                    :class="getPriorityOption(task.priority).textClass"
+                  >
+                    <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
+                    {{ getPriorityOption(task.priority).text }}
+                  </span>
+                </div>
               </div>
             </div>
           </section>
@@ -321,13 +332,21 @@
         </div>
 
         <div class="flex-1 space-y-4 overflow-y-auto p-4">
-          <input
-            v-model="selectedTask.title"
-            @blur="onTextBlur"
-            type="text"
-            class="w-full bg-transparent text-xl font-bold text-gray-800 outline-none placeholder:text-gray-300"
-            placeholder="输入任务标题"
-          />
+          <div class="space-y-1">
+            <textarea
+              ref="detailTitleInputRef"
+              :value="selectedTask.title"
+              maxlength="50"
+              rows="1"
+              @input="onDetailTitleInput"
+              @blur="onTextBlur"
+              class="w-full resize-none overflow-hidden bg-transparent text-xl font-bold leading-8 text-gray-800 outline-none placeholder:text-gray-300"
+              placeholder="请输入任务标题（最多 50 字）"
+            ></textarea>
+            <p v-if="!selectedTask.title.trim()" class="text-xs text-amber-500">
+              任务标题不能为空，最多 50 字。
+            </p>
+          </div>
 
           <div
             ref="priorityRowRef"
@@ -457,10 +476,14 @@
           </div>
 
           <textarea
+            ref="detailDescriptionInputRef"
             v-model="selectedTask.description"
+            @input="onDetailDescriptionInput"
             @blur="onTextBlur"
-            class="min-h-[140px] w-full resize-none rounded-lg border border-gray-200 bg-[#f7f7f5] p-3 text-sm text-gray-700 outline-none transition-all focus:border-blue-300 focus:bg-white"
-            placeholder="补充任务说明"
+            maxlength="500"
+            rows="6"
+            class="min-h-[140px] w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-[#f7f7f5] p-3 text-sm text-gray-700 outline-none transition-all focus:border-blue-300 focus:bg-white"
+            placeholder="补充任务说明（最多 500 字）"
           ></textarea>
         </div>
       </template>
@@ -505,7 +528,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import { fetchProjectList } from '@/api/project'
@@ -578,6 +601,8 @@ const pendingDeleteMilestone = ref<{ id: string; name: string } | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
 const dueDateInputRef = ref<HTMLInputElement | null>(null)
+const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
+const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 340)
 const isResizingRight = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
@@ -604,8 +629,87 @@ const taskItemPriorityBorderColorMap: Record<number, string> = {
 const getTaskItemBorderColor = (priority: number) =>
   taskItemPriorityBorderColorMap[priority] || taskItemPriorityBorderColorMap[0]
 
+const TASK_TITLE_MAX_LENGTH = 50
+const TASK_DESCRIPTION_MAX_LENGTH = 500
+
+const getTaskDueDateTimestamp = (dueDate?: string | null) => {
+  if (!dueDate) return Number.POSITIVE_INFINITY
+  const timestamp = new Date(dueDate).getTime()
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp
+}
+
+const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
+  const dueDateDiff = getTaskDueDateTimestamp(a.dueDate) - getTaskDueDateTimestamp(b.dueDate)
+  if (dueDateDiff !== 0) return dueDateDiff
+
+  if (a.priority !== b.priority) return b.priority - a.priority
+  return 0
+}
+
+const formatTaskDueDate = (dueDate?: string | null) => {
+  if (!dueDate) return ''
+  return dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate
+}
+
+const resizeTextarea = (
+  textarea: HTMLTextAreaElement | null,
+  options: { minHeight: number; maxHeight?: number },
+) => {
+  if (!textarea) return
+
+  textarea.style.height = 'auto'
+  const desiredHeight = textarea.scrollHeight
+  const maxHeight = options.maxHeight ?? Number.POSITIVE_INFINITY
+  const nextHeight = Math.max(options.minHeight, Math.min(desiredHeight, maxHeight))
+
+  textarea.style.height = `${nextHeight}px`
+  textarea.style.overflowY = desiredHeight > maxHeight ? 'auto' : 'hidden'
+}
+
+const syncDetailTitleHeight = () => {
+  resizeTextarea(detailTitleInputRef.value, { minHeight: 44 })
+}
+
+const syncDetailDescriptionHeight = () => {
+  const textarea = detailDescriptionInputRef.value
+  if (!textarea) return
+
+  const viewportLimit = Math.max(220, window.innerHeight - textarea.getBoundingClientRect().top - 20)
+  resizeTextarea(textarea, { minHeight: 140, maxHeight: viewportLimit })
+}
+
+const syncDetailEditorHeights = () => {
+  syncDetailTitleHeight()
+  syncDetailDescriptionHeight()
+}
+
+const onDetailTitleInput = (event: Event) => {
+  if (!selectedTask.value) return
+
+  const target = event.target as HTMLTextAreaElement
+  const nextTitle = target.value.slice(0, TASK_TITLE_MAX_LENGTH)
+  if (target.value !== nextTitle) {
+    target.value = nextTitle
+  }
+  selectedTask.value.title = nextTitle
+  syncDetailTitleHeight()
+}
+
+const onDetailDescriptionInput = (event: Event) => {
+  if (!selectedTask.value) return
+
+  const target = event.target as HTMLTextAreaElement
+  const nextDescription = target.value.slice(0, TASK_DESCRIPTION_MAX_LENGTH)
+  if (target.value !== nextDescription) {
+    target.value = nextDescription
+  }
+  selectedTask.value.description = nextDescription
+  syncDetailDescriptionHeight()
+}
+
 const updateViewport = () => {
   viewportWidth.value = window.innerWidth
+  syncDetailEditorHeights()
 }
 
 const startResizeRight = () => {
@@ -711,8 +815,9 @@ const addTask = async () => {
   if (!newTaskTitle.value.trim() || !selectedProjectId.value) return
 
   try {
+    const finalTitle = newTaskTitle.value.trim().slice(0, TASK_TITLE_MAX_LENGTH)
     await addTaskApi({
-      title: newTaskTitle.value.trim(),
+      title: finalTitle,
       projectId: selectedProjectId.value,
       priority: 0,
       milestoneId: newTaskMilestoneId.value || undefined,
@@ -1054,7 +1159,11 @@ const groupedTasks = computed(() => {
     }
   })
 
+  result.unassigned.sort(compareTaskByDueDateThenPriority)
+
   result.milestones.forEach((g) => {
+    g.tasks.sort(compareTaskByDueDateThenPriority)
+
     if (g.tasks.length === 0) {
       g.progress = 0
     } else {
@@ -1074,6 +1183,14 @@ watch(
     selectedTask.value = null
     isPriorityMenuOpen.value = false
     await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
+  },
+)
+
+watch(
+  () => selectedTask.value?.id,
+  async () => {
+    await nextTick()
+    syncDetailEditorHeights()
   },
 )
 

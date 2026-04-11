@@ -1,46 +1,46 @@
-<template>
-  <main class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8">
-    <div class="max-w-5xl mx-auto w-full space-y-8">
-      <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">📊 数据仪表盘</h2>
+﻿<template>
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div class="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="flex items-center gap-2 text-xl font-bold text-gray-800 sm:text-2xl">📊 数据仪表盘</h2>
         <span class="text-sm text-gray-500">数据实时更新</span>
       </div>
 
-      <div class="grid grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-6">
         <div
-          class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-white p-5 sm:p-6"
         >
-          <span class="text-gray-500 text-sm font-medium mb-2">进行中项目</span>
-          <span class="text-4xl font-black text-blue-500">{{ statsData.activeProjects || 0 }}</span>
+          <span class="text-sm font-medium text-gray-500">进行中项目</span>
+          <span class="mono text-4xl font-black text-blue-600">{{ statsData.activeProjects || 0 }}</span>
         </div>
         <div
-          class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-white p-5 sm:p-6"
         >
-          <span class="text-gray-500 text-sm font-medium mb-2">今日到期任务</span>
-          <span class="text-4xl font-black text-orange-500">{{ statsData.todayTasks || 0 }}</span>
+          <span class="text-sm font-medium text-gray-500">今日到期任务</span>
+          <span class="mono text-4xl font-black text-amber-500">{{ statsData.todayTasks || 0 }}</span>
         </div>
         <div
-          class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-white p-5 sm:p-6 md:col-span-2 xl:col-span-1"
         >
-          <span class="text-gray-500 text-sm font-medium mb-2">已逾期任务</span>
-          <span class="text-4xl font-black text-red-500">{{ statsData.overdueTasks || 0 }}</span>
+          <span class="text-sm font-medium text-gray-500">已逾期任务</span>
+          <span class="mono text-4xl font-black text-red-500">{{ statsData.overdueTasks || 0 }}</span>
         </div>
       </div>
 
-      <div class="grid grid-cols-3 gap-6">
-        <div class="col-span-2 bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
+        <div class="card-base rounded-2xl bg-white p-5 sm:p-6 xl:col-span-2">
           <h3 class="text-lg font-bold text-gray-700 mb-4">近 7 天完成趋势</h3>
           <div ref="trendChartRef" class="w-full h-64"></div>
         </div>
 
         <div
-          class="col-span-1 bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex flex-col"
+          class="card-base flex max-h-[420px] flex-col rounded-2xl bg-white p-5 sm:p-6 xl:max-h-none"
         >
           <h3 class="text-lg font-bold text-gray-700 mb-4">🏆 完成率 Top 排行</h3>
-          <div class="flex-1 overflow-y-auto space-y-4 pr-2">
+          <div class="flex-1 space-y-4 overflow-y-auto pr-2">
             <div
               v-if="!statsData.topProjects || statsData.topProjects.length === 0"
-              class="text-center text-gray-400 mt-10 text-sm"
+              class="mt-10 text-center text-sm text-gray-400"
             >
               暂无数据
             </div>
@@ -73,6 +73,8 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+
+defineOptions({ name: 'DashboardView' })
 import * as echarts from 'echarts'
 import { fetchStatsOverview } from '@/api/stats'
 
@@ -96,6 +98,10 @@ const statsData = ref<DashboardStats>({
 
 const trendChartRef = ref<HTMLElement | null>(null)
 let trendChart: echarts.ECharts | null = null
+
+const handleResize = () => {
+  trendChart?.resize()
+}
 
 const initTrendChart = () => {
   if (!trendChartRef.value) return
@@ -177,12 +183,15 @@ const loadDashboard = async () => {
 
 onMounted(() => {
   loadDashboard()
+  window.addEventListener('resize', handleResize)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
   if (trendChart) {
     trendChart.dispose()
     trendChart = null
   }
 })
 </script>
+

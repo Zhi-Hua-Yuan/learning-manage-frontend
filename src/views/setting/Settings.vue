@@ -1,11 +1,11 @@
-<template>
-  <main class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8">
-    <div class="max-w-3xl mx-auto w-full space-y-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">⚙️ 个人设置</h2>
+﻿<template>
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div class="mx-auto w-full max-w-3xl space-y-6">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="flex items-center gap-2 text-xl font-bold text-gray-800 sm:text-2xl">⚙️ 个人设置</h2>
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="card-base overflow-hidden rounded-2xl bg-white">
         <div class="flex border-b border-gray-100">
           <button
             @click="settingsTab = 'basic'"
@@ -31,7 +31,7 @@
           </button>
         </div>
 
-        <div v-if="settingsTab === 'basic'" class="p-8 space-y-6">
+        <div v-if="settingsTab === 'basic'" class="space-y-6 p-5 sm:p-8">
           <div>
             <label class="block text-sm font-bold text-gray-700 mb-2">登录账号 (不可修改)</label>
             <input
@@ -59,7 +59,7 @@
           </div>
         </div>
 
-        <div v-if="settingsTab === 'security'" class="p-8 space-y-6">
+        <div v-if="settingsTab === 'security'" class="space-y-6 p-5 sm:p-8">
           <div>
             <label class="block text-sm font-bold text-gray-700 mb-2">当前密码</label>
             <input
@@ -179,6 +179,8 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+
+defineOptions({ name: 'SettingsView' })
 import { useRouter } from 'vue-router'
 import { getUserMeApi, updatePasswordApi, updateUserInfoApi } from '@/api/user'
 
@@ -221,31 +223,31 @@ const loadUserInfo = async () => {
 
 const handleUpdateInfo = async () => {
   if (!updateInfoForm.value.username) {
-    showToast('昵称不能为空', 'error')
+    showToast('昵称不能为空，请输入后重试。', 'error')
     return
   }
 
   try {
     await updateUserInfoApi({ username: updateInfoForm.value.username })
-    showToast('信息修改成功！', 'success')
+    showToast('信息已更新。', 'success')
     await loadUserInfo()
   } catch {
-    showToast('修改失败，请重试', 'error')
+    showToast('修改失败，请稍后重试。', 'error')
   }
 }
 
 const handleUpdatePassword = async () => {
   const { oldPassword, newPassword, confirmNewPassword } = updatePwdForm.value
   if (!oldPassword || !newPassword || !confirmNewPassword) {
-    showToast('请完整填写密码信息', 'error')
+    showToast('请完整填写密码信息后重试。', 'error')
     return
   }
   if (newPassword !== confirmNewPassword) {
-    showToast('两次输入的新密码不一致', 'error')
+    showToast('两次输入的新密码不一致，请确认后重试。', 'error')
     return
   }
   if (newPassword.length < 8) {
-    showToast('新密码长度不能少于 8 位', 'error')
+    showToast('新密码长度不能少于 8 位，请修改后重试。', 'error')
     return
   }
 
@@ -260,7 +262,7 @@ const handleUpdatePassword = async () => {
       (error as { response?: { data?: { message?: string } } }).response?.data?.message
         ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
         : undefined
-    const errorMsg = backendMessage || '修改密码失败，请检查旧密码'
+    const errorMsg = backendMessage || '修改密码失败，请检查旧密码后重试。'
     showToast(errorMsg, 'error')
   }
 }
@@ -269,3 +271,4 @@ onMounted(() => {
   loadUserInfo()
 })
 </script>
+

@@ -1,26 +1,26 @@
 <template>
-  <main class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8">
-    <div class="max-w-4xl mx-auto w-full space-y-8">
-      <div class="text-center space-y-2 mb-8">
-        <h2 class="text-3xl font-black text-gray-800 tracking-tight">
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div class="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8">
+      <div class="mb-6 space-y-2 text-center sm:mb-8">
+        <h2 class="text-2xl font-black tracking-tight text-gray-800 sm:text-3xl">
           让
           <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500"
             >AI</span
           >
-          帮你拆解宏大目标
+          帮你拆解目标
         </h2>
         <p class="text-gray-500">只需一句话，自动生成包含阶段与任务的落地执行计划</p>
       </div>
 
       <div
-        class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 space-y-6 relative overflow-hidden"
+        class="card-base relative space-y-6 overflow-hidden rounded-2xl bg-white p-5 sm:p-8"
       >
         <div
           class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500"
         ></div>
 
-        <div class="grid grid-cols-2 gap-6">
-          <div class="col-span-2">
+        <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
+          <div class="md:col-span-2">
             <label class="block text-sm font-bold text-gray-700 mb-2">🎯 你的目标是什么？</label>
             <input
               v-model="aiForm.target"
@@ -29,7 +29,7 @@
               class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all"
             />
           </div>
-          <div class="col-span-1">
+          <div>
             <label class="block text-sm font-bold text-gray-700 mb-2">⏳ 期望周期</label>
             <input
               v-model="aiForm.duration"
@@ -38,7 +38,7 @@
               class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all"
             />
           </div>
-          <div class="col-span-2">
+          <div class="md:col-span-2">
             <label class="block text-sm font-bold text-gray-700 mb-2">📝 补充描述 (可选)</label>
             <textarea
               v-model="aiForm.description"
@@ -77,16 +77,16 @@
               ></path>
             </svg>
             <span v-else>✨</span>
-            {{ isGeneratingPlan ? 'AI 正在疯狂燃烧 GPU...' : '开始智能拆解' }}
+            {{ isGeneratingPlan ? 'AI 正在生成计划...' : '开始智能拆解' }}
           </button>
         </div>
       </div>
 
       <div
         v-if="generatedPlan.length > 0"
-        class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 animate-fade-in-up"
+        class="card-base animate-fade-in-up rounded-2xl bg-white p-5 sm:p-8"
       >
-        <div class="flex items-center justify-between mb-6">
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h3 class="text-xl font-bold text-gray-800">📋 生成的专属计划草稿</h3>
           <button
             @click="openConfirmModal"
@@ -95,7 +95,7 @@
             :class="isApplying ? 'opacity-70 cursor-not-allowed' : ''"
           >
             <span v-if="isApplying">导入中...</span>
-            <span v-else>✅ 一键生成项目并导入系统</span>
+            <span v-else>✅ 生成项目并导入系统</span>
           </button>
         </div>
 
@@ -112,7 +112,7 @@
               >
               {{ milestone.name }}
             </h4>
-            <div class="space-y-2 pl-8">
+            <div class="space-y-2 pl-2 sm:pl-8">
               <div
                 v-for="(task, tIndex) in milestone.tasks"
                 :key="tIndex"
@@ -155,7 +155,7 @@
             ></path>
           </svg>
         </div>
-        <div class="ml-3 text-sm font-bold">🎉 AI 计划已成功导入系统！</div>
+        <div class="ml-3 text-sm font-bold">AI 计划已导入系统。</div>
       </div>
     </transition>
 
@@ -176,7 +176,7 @@
           @click="showConfirmModal = false"
         ></div>
 
-        <div class="relative w-auto max-w-md mx-auto my-6 z-50 transform transition-all">
+        <div class="relative z-50 mx-auto my-6 w-[calc(100%-2rem)] max-w-md transform transition-all">
           <div
             class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
           >
@@ -257,7 +257,7 @@ const showSuccessToast = ref(false)
 
 const generatePlan = async () => {
   if (!aiForm.value.target || !aiForm.value.duration) {
-    alert('请至少填写目标和期望周期！')
+    alert('请先填写目标和期望周期。')
     return
   }
 
@@ -268,7 +268,7 @@ const generatePlan = async () => {
     const res = await aiBreakdownApi(aiForm.value)
     generatedPlan.value = Array.isArray(res) ? (res as DraftMilestone[]) : []
   } catch {
-    alert('AI 拆解失败，请检查网络或后端日志')
+    alert('AI 拆解失败，请检查网络后重试。')
   } finally {
     isGeneratingPlan.value = false
   }
@@ -330,7 +330,7 @@ const executeImport = async () => {
     }, 3000)
     await router.push({ path: '/tasks', query: { projectId: newProjectId } })
   } catch {
-    alert('导入系统时出现异常，请检查网络')
+    alert('导入失败，请检查网络后重试。')
   } finally {
     isApplying.value = false
     aiForm.value = { target: '', description: '', duration: '' }

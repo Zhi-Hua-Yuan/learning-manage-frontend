@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50">
-    <div class="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border border-gray-100">
-      <div class="text-center mb-10">
+  <div class="min-h-screen bg-gray-50 px-4 py-6 sm:flex sm:items-center sm:justify-center">
+    <div class="w-full max-w-md rounded-xl border border-gray-100 bg-white p-6 shadow-lg sm:p-8">
+      <div class="mb-8 text-center sm:mb-10">
         <img
           src="@/assets/logo.png"
           alt="SmartPath Logo"
@@ -58,9 +58,9 @@
 
         <div
           v-if="errorMessage"
-          class="text-red-500 text-sm font-bold text-center mb-4 animate-pulse"
+          class="mb-4 text-center text-sm font-bold text-red-500"
         >
-          ⚠️ {{ errorMessage }}
+          {{ errorMessage }}
         </div>
 
         <button
@@ -163,27 +163,27 @@ const handleSubmit = async () => {
   errorMessage.value = ''
 
   if (!form.value.account) {
-    errorMessage.value = '账号不能为空'
+    errorMessage.value = '账号不能为空，请输入账号后重试。'
     return
   }
 
   if (!form.value.password) {
-    errorMessage.value = '密码不能为空'
+    errorMessage.value = '密码不能为空，请输入密码后重试。'
     return
   }
 
   if (isRegisterMode.value && !form.value.username) {
-    errorMessage.value = '昵称不能为空'
+    errorMessage.value = '昵称不能为空，请输入昵称后重试。'
     return
   }
 
   if (isRegisterMode.value && form.value.password.length < 8) {
-    errorMessage.value = '密码长度不能少于 8 位'
+    errorMessage.value = '密码长度不能少于 8 位，请修改后重试。'
     return
   }
 
   if (isRegisterMode.value && form.value.password !== form.value.confirmPassword) {
-    errorMessage.value = '两次输入的密码不一致'
+    errorMessage.value = '两次输入的密码不一致，请确认后重试。'
     return
   }
 
@@ -192,7 +192,7 @@ const handleSubmit = async () => {
     if (isRegisterMode.value) {
       await registerApi(form.value)
 
-      showToast('注册成功！请登录', 'success')
+      showToast('注册成功，请登录。', 'success')
       isRegisterMode.value = false
       return
     }
@@ -217,7 +217,7 @@ const handleSubmit = async () => {
       err?.response?.data?.message ||
       err?.message ||
       err?.data?.message ||
-      (isRegisterMode.value ? '注册失败，请检查填写内容' : '账号或密码错误')
+      (isRegisterMode.value ? '注册失败，请检查填写信息后重试。' : '登录失败，请检查账号或密码后重试。')
 
     errorMessage.value = backendMsg
   } finally {

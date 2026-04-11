@@ -1,15 +1,15 @@
-<template>
-  <main class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8">
-    <div class="max-w-6xl mx-auto w-full space-y-6">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">📅 周报回顾与规划</h2>
+﻿<template>
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div class="mx-auto w-full max-w-6xl space-y-6">
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="flex items-center gap-2 text-xl font-bold text-gray-800 sm:text-2xl">📅 周报回顾与规划</h2>
         <span class="text-sm text-gray-500">温故而知新</span>
       </div>
 
-      <div class="grid grid-cols-3 gap-6">
-        <div class="col-span-2 space-y-6">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
+        <div class="space-y-6 xl:col-span-2">
           <div
-            class="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl p-6 text-white shadow-md flex justify-between items-center"
+            class="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 p-5 text-white shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-6"
           >
             <div>
               <div class="text-blue-100 text-sm font-medium mb-1">
@@ -18,12 +18,12 @@
               </div>
               <div class="text-2xl font-bold">本周高光时刻</div>
             </div>
-            <div class="flex gap-6 text-center">
-              <div class="bg-white/20 rounded-lg px-4 py-2 backdrop-blur-sm">
+            <div class="flex gap-3 text-center sm:gap-6">
+              <div class="rounded-lg bg-white/20 px-4 py-2 backdrop-blur-sm">
                 <div class="text-3xl font-black">{{ currentReview.completedTaskCount || 0 }}</div>
                 <div class="text-xs text-blue-100 mt-1">完成任务数</div>
               </div>
-              <div class="bg-white/20 rounded-lg px-4 py-2 backdrop-blur-sm min-w-[100px]">
+              <div class="min-w-[100px] rounded-lg bg-white/20 px-4 py-2 backdrop-blur-sm">
                 <div class="text-xl font-bold truncate mt-1">
                   {{ currentReview.focusProjectName || '暂无重点' }}
                 </div>
@@ -32,11 +32,11 @@
             </div>
           </div>
 
-          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+          <div class="card-base space-y-6 rounded-2xl bg-white p-5 sm:p-6">
             <div>
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-bold text-gray-700 flex items-center gap-2">
-                  <span>🧠</span> 本周复盘 (Reflection)
+                  <span>🧠</span> 本周复盘
                 </label>
 
                 <button
@@ -71,7 +71,7 @@
                     ></path>
                   </svg>
                   <span v-else>✨</span>
-                  {{ isPolishing ? 'AI 思考中...' : 'AI 一键润色' }}
+                  {{ isPolishing ? 'AI 处理中...' : 'AI 润色复盘' }}
                 </button>
               </div>
               <textarea
@@ -83,7 +83,7 @@
 
             <div>
               <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                <span>🎯</span> 下周计划 (Next Plan)
+                <span>🎯</span> 下周计划
               </label>
               <textarea
                 v-model="currentReview.nextPlan"
@@ -95,7 +95,7 @@
             <div class="flex justify-end pt-2">
               <button
                 @click="openSaveModal"
-                class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-7 rounded-2xl transition-all shadow-lg shadow-blue-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2"
+                class="btn-primary flex items-center gap-2 rounded-2xl px-7 py-3 font-bold shadow-lg shadow-blue-200"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -112,7 +112,7 @@
         </div>
 
         <div
-          class="col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-[calc(100vh-12rem)]"
+          class="card-base flex max-h-[420px] flex-col rounded-2xl bg-white p-5 sm:p-6 xl:max-h-[calc(100vh-12rem)]"
         >
           <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <span>🕰️</span> 历史轨迹
@@ -356,7 +356,7 @@ const currentReview = ref<ReviewItem>({})
 const historyReviews = ref<ReviewItem[]>([])
 const isPolishing = ref(false)
 const showDetailModal = ref(false)
-const selectedReview = ref<any>(null)
+const selectedReview = ref<ReviewItem | null>(null)
 const showSaveConfirmModal = ref(false)
 const showDeleteConfirmModal = ref(false)
 const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
@@ -410,17 +410,25 @@ const executeSave = async () => {
     showToast('保存成功')
     await loadHistory()
   } catch {
-    showToast('保存失败，请检查网络', 'error')
+    showToast('保存失败，请检查网络后重试。', 'error')
   }
 }
 
 const viewDetail = async (id: number | string) => {
   try {
     const res = await getReviewDetailApi(id)
-    selectedReview.value = res
+    const responseData =
+      res &&
+      typeof res === 'object' &&
+      'data' in (res as { data?: unknown }) &&
+      (res as { data?: unknown }).data &&
+      typeof (res as { data?: unknown }).data === 'object'
+        ? ((res as { data?: ReviewItem }).data ?? null)
+        : (res as ReviewItem)
+    selectedReview.value = responseData
     showDetailModal.value = true
-  } catch (error) {
-    showToast('获取详情失败', 'error')
+  } catch {
+    showToast('获取详情失败，请稍后重试。', 'error')
   }
 }
 
@@ -438,8 +446,8 @@ const executeDelete = async () => {
     selectedReview.value = null
     showToast('删除成功', 'success')
     await loadHistory()
-  } catch (error) {
-    showToast('删除失败', 'error')
+  } catch {
+    showToast('删除失败，请稍后重试。', 'error')
   }
 }
 
@@ -492,12 +500,12 @@ ${review.nextPlan || '无计划内容'}
 
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
-  showToast('Markdown 文件导出成功！', 'success')
+  showToast('Markdown 导出成功。', 'success')
 }
 
 const handleAiPolish = async () => {
   if (!currentReview.value.reflection || currentReview.value.reflection.trim() === '') {
-    showToast('请先写几句简单的复盘内容，AI 才能帮你润色哦！', 'error')
+    showToast('请先填写复盘内容，再进行 AI 润色。', 'error')
     return
   }
 
@@ -522,17 +530,17 @@ const handleAiPolish = async () => {
           currentReview.value.nextPlan = parsedData.plan
         }
 
-        showToast('✨ AI 润色与计划推导完成！', 'success')
-      } catch (parseError) {
+        showToast('AI 润色完成。', 'success')
+      } catch {
         console.error('JSON 解析失败, AI 返回的原始数据为:', res)
         // 兜底策略：如果解析失败（说明 AI 还是输出了废话），就全部塞进复盘框里，防止数据丢失
         currentReview.value.reflection = res
-        showToast('AI 数据格式异常，已将全部内容填入复盘区', 'error')
+        showToast('AI 返回格式异常，内容已填入复盘区，请手动调整。', 'error')
       }
     }
   } catch (error) {
     console.error('AI 润色失败:', error)
-    showToast('AI 润色失败，请检查网络或后端日志', 'error')
+    showToast('AI 润色失败，请检查网络后重试。', 'error')
   } finally {
     isPolishing.value = false
   }
@@ -542,3 +550,4 @@ onMounted(() => {
   loadReviewData()
 })
 </script>
+

@@ -1,10 +1,41 @@
-<template>
-  <div class="flex h-screen w-screen bg-white overflow-hidden text-gray-800">
-    <aside
-      class="relative bg-gray-50 border-r border-gray-200 flex flex-col z-10"
-      :style="{ width: sidebarWidth + 'px' }"
+﻿<template>
+  <div class="relative flex h-screen w-screen overflow-hidden bg-white text-gray-800">
+    <button
+      v-if="isCompactViewport"
+      @click="isSidebarOpen = true"
+      class="fixed left-3 top-3 z-40 rounded-lg border border-gray-200 bg-white/95 p-2 text-gray-700 shadow-sm"
+      aria-label="打开侧栏"
     >
-      <div class="p-6 border-b border-gray-100 flex items-center justify-center gap-3">
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+
+    <transition
+      enter-active-class="transition-opacity duration-200"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-200"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isCompactViewport && isSidebarOpen"
+        class="fixed inset-0 z-30 bg-gray-900/35 backdrop-blur-[1px]"
+        @click="isSidebarOpen = false"
+      ></div>
+    </transition>
+
+    <aside
+      class="z-40 flex flex-col border-r border-gray-200 bg-gray-50 transition-transform duration-200"
+      :class="
+        isCompactViewport
+          ? `fixed inset-y-0 left-0 w-[280px] max-w-[85vw] ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+          : 'relative translate-x-0'
+      "
+      :style="sidebarStyle"
+    >
+      <div class="flex items-center justify-center gap-3 border-b border-gray-100 p-6">
         <img
           src="@/assets/logo.png"
           alt="SmartPath Logo"
@@ -15,7 +46,7 @@
 
       <div class="px-2 py-3 border-b border-gray-100">
         <div
-          @click="router.push('/dashboard')"
+          @click="navigateTo('/dashboard')"
           class="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-colors"
           :class="
             route.path === '/dashboard'
@@ -28,7 +59,7 @@
         </div>
 
         <div
-          @click="router.push('/review')"
+          @click="navigateTo('/review')"
           class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
           :class="
             route.path === '/review'
@@ -41,7 +72,7 @@
         </div>
 
         <div
-          @click="router.push('/ai-planner')"
+          @click="navigateTo('/ai-planner')"
           class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
           :class="
             route.path === '/ai-planner'
@@ -177,12 +208,17 @@
       </div>
 
       <div
+        v-if="!isCompactViewport"
         class="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-400 active:bg-blue-500 transition-all z-20"
         @mousedown="startResizeLeft"
       ></div>
     </aside>
 
-    <router-view class="flex-1 overflow-y-auto bg-gray-50" @refresh-projects="loadProjects" />
+    <router-view
+      class="flex-1 overflow-y-auto bg-gray-50"
+      :class="isCompactViewport ? 'pt-14' : ''"
+      @refresh-projects="loadProjects"
+    />
 
     <transition
       enter-active-class="ease-out duration-300"
@@ -266,8 +302,34 @@ const showLogoutModal = ref(false)
 const currentUserInfo = ref<CurrentUserInfo>({})
 const sidebarWidth = ref(Number(localStorage.getItem('tick_sidebarWidth')) || 256)
 const isResizingLeft = ref(false)
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const isSidebarOpen = ref(false)
+
+const isCompactViewport = computed(() => viewportWidth.value < 1024)
+const sidebarStyle = computed(() =>
+  isCompactViewport.value ? undefined : { width: `${sidebarWidth.value}px` },
+)
+
+const updateViewport = () => {
+  viewportWidth.value = window.innerWidth
+  if (!isCompactViewport.value) {
+    isSidebarOpen.value = false
+  }
+}
+
+const closeSidebar = () => {
+  if (isCompactViewport.value) {
+    isSidebarOpen.value = false
+  }
+}
+
+const navigateTo = async (path: string) => {
+  await router.push(path)
+  closeSidebar()
+}
 
 const startResizeLeft = () => {
+  if (isCompactViewport.value) return
   isResizingLeft.value = true
   document.addEventListener('mousemove', handleMouseMoveLeft)
   document.addEventListener('mouseup', stopResizeLeft)
@@ -332,6 +394,7 @@ const loadProjects = async () => {
 const selectProject = async (id: string) => {
   localStorage.setItem('tick_selectedProjectId', id)
   await router.push({ path: '/tasks', query: { projectId: id } })
+  closeSidebar()
 }
 
 const submitNewProject = async () => {
@@ -346,14 +409,17 @@ const submitNewProject = async () => {
     newProjectName.value = ''
     isAddingProject.value = false
     await loadProjects()
-  } catch (error) {
-    alert('创建清单失败，请检查控制台')
+  } catch {
+    alert('创建清单失败，请检查网络后重试。')
   }
 }
 
 const openAddProjectInput = () => {
   isAddingProject.value = true
   newProjectName.value = ''
+  if (isCompactViewport.value) {
+    isSidebarOpen.value = true
+  }
 }
 
 const deleteProject = async (id: string, name: string) => {
@@ -369,14 +435,14 @@ const deleteProject = async (id: string, name: string) => {
     }
 
     await loadProjects()
-  } catch (error) {
-    alert('删除清单失败，请检查控制台报错')
+  } catch {
+    alert('删除清单失败，请检查网络后重试。')
   }
 }
 
 const goToSettings = async () => {
   isUserMenuOpen.value = false
-  await router.push('/settings')
+  await navigateTo('/settings')
 }
 
 const openLogoutModal = () => {
@@ -399,15 +465,20 @@ watch(
   () => route.fullPath,
   () => {
     isUserMenuOpen.value = false
+    closeSidebar()
   },
 )
 
 onMounted(() => {
   loadUserInfo()
   loadProjects()
+  updateViewport()
+  window.addEventListener('resize', updateViewport)
 })
 
 onBeforeUnmount(() => {
   stopResizeLeft()
+  window.removeEventListener('resize', updateViewport)
 })
 </script>
+

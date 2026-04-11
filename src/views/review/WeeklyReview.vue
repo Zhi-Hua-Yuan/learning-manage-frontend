@@ -155,43 +155,19 @@
       </div>
     </div>
 
-    <div
-      v-if="showSaveConfirmModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
-    >
-      <div
-        class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden transform transition-all"
-      >
-        <div class="h-1.5 w-full bg-blue-500"></div>
-        <div class="p-6 text-center">
-          <div
-            class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
-          >
-            💾
-          </div>
-          <h3 class="text-xl font-bold text-gray-800 mb-2">确认保存本周总结？</h3>
-          <p class="text-sm text-gray-500">保存后，您可以在历史记录中随时查看本次复盘内容。</p>
-        </div>
-        <div class="flex p-4 gap-3">
-          <button
-            @click="showSaveConfirmModal = false"
-            class="btn-secondary flex-1 rounded-xl"
-          >
-            取消
-          </button>
-          <button
-            @click="executeSave"
-            class="btn-primary flex-1 rounded-xl"
-          >
-            确认保存
-          </button>
-        </div>
-      </div>
-    </div>
+    <AppConfirmDialog
+      v-model="showSaveConfirmModal"
+      icon="💾"
+      title="确认保存本周总结？"
+      message="保存后，您可以在历史记录中随时查看本次复盘内容。"
+      confirm-text="确认保存"
+      cancel-text="取消"
+      @confirm="executeSave"
+    />
 
     <div
       v-if="showDetailModal && selectedReview"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
+      class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
     >
       <div
         class="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
@@ -274,45 +250,23 @@
       </div>
     </div>
 
-    <div
-      v-if="showDeleteConfirmModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
-    >
-      <div
-        class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden transform transition-all"
-      >
-        <div class="h-1.5 w-full bg-red-500"></div>
-        <div class="p-6 text-center">
-          <div
-            class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
-          >
-            🗑️
-          </div>
-          <h3 class="text-xl font-bold text-gray-800 mb-2">确认删除这条周总结？</h3>
-          <p class="text-sm text-gray-500">删除后将无法恢复，建议确认内容已经不再需要。</p>
-        </div>
-        <div class="flex p-4 gap-3">
-          <button
-            @click="showDeleteConfirmModal = false"
-            class="btn-secondary flex-1 rounded-xl"
-          >
-            取消
-          </button>
-          <button
-            @click="executeDelete"
-            class="btn-danger flex-1 rounded-xl"
-          >
-            确认删除
-          </button>
-        </div>
-      </div>
-    </div>
+    <AppConfirmDialog
+      v-model="showDeleteConfirmModal"
+      variant="danger"
+      icon="🗑️"
+      title="确认删除这条周总结？"
+      message="删除后将无法恢复，建议确认内容已经不再需要。"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      @confirm="executeDelete"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import { aiPolishApi } from '@/api/ai'
 import { fetchProjectList } from '@/api/project'
 import {

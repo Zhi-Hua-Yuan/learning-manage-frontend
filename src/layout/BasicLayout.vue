@@ -275,6 +275,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { addProjectApi, deleteProjectApi, fetchProjectList } from '@/api/project'
 import { getUserMeApi, logoutApi } from '@/api/user'
+import { useToast } from '@/composables/useToast'
+import { useUndoDelete } from '@/composables/useUndoDelete'
 
 interface Project {
   id: string
@@ -289,6 +291,8 @@ interface CurrentUserInfo {
 
 const router = useRouter()
 const route = useRoute()
+const toast = useToast()
+const undoDelete = useUndoDelete()
 
 const projectList = ref<Project[]>([])
 const isAddingProject = ref(false)
@@ -406,7 +410,7 @@ const submitNewProject = async () => {
     isAddingProject.value = false
     await loadProjects()
   } catch {
-    alert('创建清单失败，请检查网络后重试。')
+    toast.error('创建清单失败，请检查网络后重试。')
   }
 }
 
@@ -422,18 +426,44 @@ const deleteProject = async (id: string, name: string) => {
   const isConfirm = window.confirm(`确定要删除清单 "${name}" 吗？相关的任务可能会一并丢失！`)
   if (!isConfirm) return
 
-  try {
-    await deleteProjectApi(id)
+  const snapshot = [...projectList.value]
+  const removedIndex = snapshot.findIndex((item) => item.id === id)
+  const removedProject = snapshot.find((item) => item.id === id)
+  if (!removedProject) return
 
-    if (selectedProjectId.value === id) {
-      localStorage.removeItem('tick_selectedProjectId')
-      await router.push('/tasks')
-    }
+  const wasSelected = selectedProjectId.value === id
+  projectList.value = snapshot.filter((item) => item.id !== id)
 
-    await loadProjects()
-  } catch {
-    alert('删除清单失败，请检查网络后重试。')
+  if (wasSelected) {
+    localStorage.removeItem('tick_selectedProjectId')
+    await router.push('/tasks')
   }
+
+  undoDelete.scheduleUndoDelete({
+    label: `清单「${name}」`,
+    pendingMessage: `清单「${name}」已移除，5 秒内可撤销。`,
+    onCommit: async () => {
+      await deleteProjectApi(id)
+    },
+    onCommitSuccess: async () => {
+      await loadProjects()
+    },
+    onRollback: async () => {
+      if (!projectList.value.some((item) => item.id === id)) {
+        const next = [...projectList.value]
+        const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
+        next.splice(insertIndex, 0, removedProject)
+        projectList.value = next
+      }
+
+      if (wasSelected) {
+        localStorage.setItem('tick_selectedProjectId', id)
+        if (route.path === '/tasks') {
+          await router.push({ path: '/tasks', query: { projectId: id } })
+        }
+      }
+    },
+  })
 }
 
 const goToSettings = async () => {

@@ -452,6 +452,8 @@ import {
   fetchMilestoneList,
   updateMilestoneApi,
 } from '@/api/milestone'
+import { useToast } from '@/composables/useToast'
+import { useUndoDelete } from '@/composables/useUndoDelete'
 
 interface Task {
   id: string
@@ -487,6 +489,8 @@ interface PriorityOption {
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
+const undoDelete = useUndoDelete()
 
 const projectList = ref<Project[]>([])
 const taskList = ref<Task[]>([])
@@ -634,7 +638,7 @@ const addTask = async () => {
     newTaskTitle.value = ''
     await loadTasks()
   } catch {
-    alert('添加任务失败，请检查网络后重试。')
+    toast.error('添加任务失败，请检查网络后重试。')
   }
 }
 
@@ -647,7 +651,7 @@ const toggleTaskStatus = async (task: Task) => {
     await updateTaskApi({ ...task, status: newStatus })
   } catch {
     task.status = oldStatus
-    alert('更新状态失败，请检查网络后重试。')
+    toast.error('更新状态失败，请检查网络后重试。')
   }
 }
 
@@ -677,7 +681,7 @@ const selectPriority = async (val: number) => {
     await updateTaskApi({ ...selectedTask.value, priority: val })
   } catch {
     selectedTask.value.priority = oldPriority
-    alert('更新优先级失败，请检查网络后重试。')
+    toast.error('更新优先级失败，请检查网络后重试。')
   }
 }
 
@@ -694,7 +698,7 @@ const onDueDateChange = async (event: Event) => {
     await loadTasks()
   } catch {
     selectedTask.value.dueDate = oldDate
-    alert('更新日期失败，请检查网络后重试。')
+    toast.error('更新日期失败，请检查网络后重试。')
   }
 }
 
@@ -711,7 +715,7 @@ const onMilestoneChange = async (event: Event) => {
     await loadTasks()
   } catch {
     selectedTask.value.milestoneId = oldMilestoneId
-    alert('更新所属阶段失败，请检查网络后重试。')
+    toast.error('更新所属阶段失败，请检查网络后重试。')
   }
 }
 
@@ -723,23 +727,40 @@ const onTextBlur = async () => {
     await loadTasks()
   } catch (error) {
     console.error('保存任务失败', error)
-    alert('保存失败，请检查网络后重试。')
+    toast.error('保存失败，请检查网络后重试。')
   }
 }
 
 const deleteTask = async () => {
   if (!selectedTask.value) return
 
-  const isConfirm = window.confirm(`确定要删除任务 "${selectedTask.value.title}" 吗？`)
+  const taskToDelete = { ...selectedTask.value }
+  const isConfirm = window.confirm(`确定要删除任务 "${taskToDelete.title}" 吗？`)
   if (!isConfirm) return
 
-  try {
-    await deleteTaskApi(selectedTask.value.id)
-    selectedTask.value = null
-    await loadTasks()
-  } catch {
-    alert('删除任务失败，请检查网络后重试。')
-  }
+  const originalIndex = taskList.value.findIndex((task) => task.id === taskToDelete.id)
+  taskList.value = taskList.value.filter((task) => task.id !== taskToDelete.id)
+  selectedTask.value = null
+
+  undoDelete.scheduleUndoDelete({
+    label: `任务「${taskToDelete.title}」`,
+    pendingMessage: `任务「${taskToDelete.title}」已移除，5 秒内可撤销。`,
+    onCommit: async () => {
+      await deleteTaskApi(taskToDelete.id)
+    },
+    onCommitSuccess: async () => {
+      await loadTasks()
+    },
+    onRollback: async () => {
+      if (!taskList.value.some((task) => task.id === taskToDelete.id)) {
+        const nextTasks = [...taskList.value]
+        const insertIndex =
+          originalIndex >= 0 && originalIndex <= nextTasks.length ? originalIndex : nextTasks.length
+        nextTasks.splice(insertIndex, 0, taskToDelete)
+        taskList.value = nextTasks
+      }
+    },
+  })
 }
 
 const submitNewMilestone = async () => {
@@ -759,7 +780,7 @@ const submitNewMilestone = async () => {
     isAddingMilestone.value = false
     await loadMilestones()
   } catch {
-    alert('创建阶段失败，请检查网络后重试。')
+    toast.error('创建阶段失败，请检查网络后重试。')
   }
 }
 
@@ -786,7 +807,7 @@ const saveMilestone = async (milestone: Milestone) => {
     editingMilestoneId.value = ''
     await loadMilestones()
   } catch {
-    alert('重命名失败，请检查网络后重试。')
+    toast.error('重命名失败，请检查网络后重试。')
   }
 }
 
@@ -796,12 +817,30 @@ const deleteMilestone = async (id: string, name: string) => {
   )
   if (!isConfirm) return
 
-  try {
-    await deleteMilestoneApi(id)
-    await Promise.all([loadMilestones(), loadTasks()])
-  } catch {
-    alert('删除阶段失败，请检查网络后重试。')
-  }
+  const snapshot = [...milestoneList.value]
+  const removedIndex = snapshot.findIndex((milestone) => milestone.id === id)
+  const removedMilestone = snapshot.find((milestone) => milestone.id === id)
+  if (!removedMilestone) return
+  milestoneList.value = snapshot.filter((milestone) => milestone.id !== id)
+
+  undoDelete.scheduleUndoDelete({
+    label: `阶段「${name}」`,
+    pendingMessage: `阶段「${name}」已移除，5 秒内可撤销。`,
+    onCommit: async () => {
+      await deleteMilestoneApi(id)
+    },
+    onCommitSuccess: async () => {
+      await Promise.all([loadMilestones(), loadTasks()])
+    },
+    onRollback: () => {
+      if (!milestoneList.value.some((milestone) => milestone.id === id)) {
+        const next = [...milestoneList.value]
+        const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
+        next.splice(insertIndex, 0, removedMilestone)
+        milestoneList.value = next.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
+      }
+    },
+  })
 }
 
 const projectProgress = computed(() => {

@@ -100,32 +100,6 @@
     </div>
 
     <transition
-      enter-active-class="transform ease-out duration-300 transition"
-      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="toast.show"
-        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-xl border-l-4"
-        :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
-      >
-        <div
-          class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg"
-          :class="
-            toast.type === 'success' ? 'text-emerald-500 bg-emerald-100' : 'text-red-500 bg-red-100'
-          "
-        >
-          <span v-if="toast.type === 'success'">✅</span>
-          <span v-else>⚠️</span>
-        </div>
-        <div class="ml-3 text-sm font-bold">{{ toast.message }}</div>
-      </div>
-    </transition>
-
-    <transition
       enter-active-class="ease-out duration-300"
       enter-from-class="opacity-0"
       enter-to-class="opacity-100"
@@ -183,6 +157,7 @@ import { onMounted, ref } from 'vue'
 defineOptions({ name: 'SettingsView' })
 import { useRouter } from 'vue-router'
 import { getUserMeApi, updatePasswordApi, updateUserInfoApi } from '@/api/user'
+import { useToast } from '@/composables/useToast'
 
 interface CurrentUserInfo {
   username?: string
@@ -190,16 +165,8 @@ interface CurrentUserInfo {
 }
 
 const router = useRouter()
-
-const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
+const toast = useToast()
 const showReLoginModal = ref(false)
-
-const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-  toast.value = { show: true, message: msg, type }
-  setTimeout(() => {
-    toast.value.show = false
-  }, 3000)
-}
 
 const confirmReLogin = async () => {
   localStorage.removeItem('token')
@@ -223,31 +190,31 @@ const loadUserInfo = async () => {
 
 const handleUpdateInfo = async () => {
   if (!updateInfoForm.value.username) {
-    showToast('昵称不能为空，请输入后重试。', 'error')
+    toast.error('昵称不能为空，请输入后重试。')
     return
   }
 
   try {
     await updateUserInfoApi({ username: updateInfoForm.value.username })
-    showToast('信息已更新。', 'success')
+    toast.success('信息已更新。')
     await loadUserInfo()
   } catch {
-    showToast('修改失败，请稍后重试。', 'error')
+    toast.error('修改失败，请稍后重试。')
   }
 }
 
 const handleUpdatePassword = async () => {
   const { oldPassword, newPassword, confirmNewPassword } = updatePwdForm.value
   if (!oldPassword || !newPassword || !confirmNewPassword) {
-    showToast('请完整填写密码信息后重试。', 'error')
+    toast.error('请完整填写密码信息后重试。')
     return
   }
   if (newPassword !== confirmNewPassword) {
-    showToast('两次输入的新密码不一致，请确认后重试。', 'error')
+    toast.error('两次输入的新密码不一致，请确认后重试。')
     return
   }
   if (newPassword.length < 8) {
-    showToast('新密码长度不能少于 8 位，请修改后重试。', 'error')
+    toast.error('新密码长度不能少于 8 位，请修改后重试。')
     return
   }
 
@@ -263,7 +230,7 @@ const handleUpdatePassword = async () => {
         ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
         : undefined
     const errorMsg = backendMessage || '修改密码失败，请检查旧密码后重试。'
-    showToast(errorMsg, 'error')
+    toast.error(errorMsg)
   }
 }
 

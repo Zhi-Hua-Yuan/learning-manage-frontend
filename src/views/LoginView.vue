@@ -84,31 +84,6 @@
       </form>
     </div>
 
-    <transition
-      enter-active-class="transform ease-out duration-300 transition"
-      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="toast.show"
-        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-xl border-l-4"
-        :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
-      >
-        <div
-          class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg"
-          :class="
-            toast.type === 'success' ? 'text-emerald-500 bg-emerald-100' : 'text-red-500 bg-red-100'
-          "
-        >
-          <span v-if="toast.type === 'success'">✅</span>
-          <span v-else>⚠️</span>
-        </div>
-        <div class="ml-3 text-sm font-bold">{{ toast.message }}</div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -116,19 +91,13 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginApi, registerApi } from '@/api/user'
+import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
+const toast = useToast()
 const loading = ref(false)
 const isRegisterMode = ref(false)
 const errorMessage = ref('')
-const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
-
-const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-  toast.value = { show: true, message: msg, type }
-  setTimeout(() => {
-    toast.value.show = false
-  }, 3000)
-}
 
 type LoginResponse = {
   token: string
@@ -192,7 +161,7 @@ const handleSubmit = async () => {
     if (isRegisterMode.value) {
       await registerApi(form.value)
 
-      showToast('注册成功，请登录。', 'success')
+      toast.success('注册成功，请登录。')
       isRegisterMode.value = false
       return
     }

@@ -11,14 +11,15 @@
           <div
             class="card-base flex flex-col gap-4 rounded-2xl border-blue-200 bg-[#fcfcfa] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
           >
-            <div>
+            <div class="min-w-0">
               <div class="mb-1 text-sm font-medium text-gray-500">
                 第 {{ currentReview.weekNo || '?' }} 周 ({{ currentReview.startDate }} ~
                 {{ currentReview.endDate }})
               </div>
-              <div class="text-2xl font-bold text-gray-800">本周高光时刻</div>
+              <div class="text-2xl font-bold text-gray-800">本周任务来源摘要</div>
+              <p class="mt-1 text-sm text-gray-500">聚合本周完成任务与核心推进项目，并支持快速回到任务页。</p>
             </div>
-            <div class="flex gap-3 text-center sm:gap-6">
+            <div class="flex flex-wrap items-center gap-3 text-center sm:gap-6">
               <div class="rounded-lg bg-[#f0f0ed] px-4 py-2">
                 <div class="text-3xl font-black text-gray-800">{{ currentReview.completedTaskCount || 0 }}</div>
                 <div class="mt-1 text-xs text-gray-500">完成任务数</div>
@@ -29,6 +30,12 @@
                 </div>
                 <div class="mt-1 text-xs text-gray-500">核心推进项目</div>
               </div>
+              <button
+                @click="jumpToRelatedTasks"
+                class="btn-secondary rounded-lg px-4 py-2 text-sm font-bold"
+              >
+                查看对应任务
+              </button>
             </div>
           </div>
 
@@ -147,31 +154,6 @@
         </div>
       </div>
     </div>
-
-    <transition
-      enter-active-class="transform ease-out duration-300 transition"
-      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="toast.show"
-        class="fixed top-6 right-6 z-[100] flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-xl border-l-4"
-        :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
-      >
-        <div
-          class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg"
-          :class="
-            toast.type === 'success' ? 'text-emerald-500 bg-emerald-100' : 'text-red-500 bg-red-100'
-          "
-        >
-          <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
-        </div>
-        <div class="ml-3 text-sm font-bold">{{ toast.message }}</div>
-      </div>
-    </transition>
 
     <div
       v-if="showSaveConfirmModal"
@@ -330,7 +312,9 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { aiPolishApi } from '@/api/ai'
+import { fetchProjectList } from '@/api/project'
 import {
   deleteReviewApi,
   fetchCurrentReview,
@@ -339,6 +323,8 @@ import {
   updateReviewApi,
   saveReviewApi,
 } from '@/api/review'
+import { useToast } from '@/composables/useToast'
+import { useUndoDelete } from '@/composables/useUndoDelete'
 
 interface ReviewItem {
   id?: string | number
@@ -352,6 +338,15 @@ interface ReviewItem {
   nextPlan?: string
 }
 
+interface ProjectItem {
+  id: string | number
+  name: string
+}
+
+const router = useRouter()
+const toast = useToast()
+const undoDelete = useUndoDelete()
+
 const currentReview = ref<ReviewItem>({})
 const historyReviews = ref<ReviewItem[]>([])
 const isPolishing = ref(false)
@@ -359,11 +354,27 @@ const showDetailModal = ref(false)
 const selectedReview = ref<ReviewItem | null>(null)
 const showSaveConfirmModal = ref(false)
 const showDeleteConfirmModal = ref(false)
-const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
 
-const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-  toast.value = { show: true, message: msg, type }
-  setTimeout(() => (toast.value.show = false), 3000)
+const jumpToRelatedTasks = async () => {
+  try {
+    const targetName = (currentReview.value.focusProjectName || '').trim()
+    const res = await fetchProjectList()
+    const records = (res as { records?: ProjectItem[] })?.records || []
+    const matched = targetName ? records.find((item) => item.name === targetName) : undefined
+
+    if (matched?.id) {
+      const projectId = String(matched.id)
+      localStorage.setItem('tick_selectedProjectId', projectId)
+      await router.push({ path: '/tasks', query: { projectId } })
+      return
+    }
+
+    await router.push('/tasks')
+    toast.warning('未匹配到同名清单，已跳转任务总览。')
+  } catch (error) {
+    console.error('周报跳转失败', error)
+    toast.error('跳转失败，请检查网络后重试。')
+  }
 }
 
 const loadReviewData = async () => {
@@ -407,10 +418,10 @@ const executeSave = async () => {
     }
 
     showSaveConfirmModal.value = false
-    showToast('保存成功')
+    toast.success('保存成功。')
     await loadHistory()
   } catch {
-    showToast('保存失败，请检查网络后重试。', 'error')
+    toast.error('保存失败，请检查网络后重试。')
   }
 }
 
@@ -428,7 +439,7 @@ const viewDetail = async (id: number | string) => {
     selectedReview.value = responseData
     showDetailModal.value = true
   } catch {
-    showToast('获取详情失败，请稍后重试。', 'error')
+    toast.error('获取详情失败，请稍后重试。')
   }
 }
 
@@ -438,17 +449,38 @@ const handleDeleteReview = async () => {
 }
 
 const executeDelete = async () => {
-  try {
-    if (!selectedReview.value?.id) return
-    await deleteReviewApi(selectedReview.value.id)
-    showDeleteConfirmModal.value = false
-    showDetailModal.value = false
-    selectedReview.value = null
-    showToast('删除成功', 'success')
-    await loadHistory()
-  } catch {
-    showToast('删除失败，请稍后重试。', 'error')
-  }
+  if (!selectedReview.value?.id) return
+
+  const reviewToDelete = { ...selectedReview.value }
+  const reviewId = reviewToDelete.id
+  if (reviewId === undefined) return
+  const reviewTitle = `${reviewToDelete.year}年第${reviewToDelete.weekNo}周总结`
+  const snapshot = [...historyReviews.value]
+  const removedIndex = snapshot.findIndex((item) => item.id === reviewId)
+
+  historyReviews.value = snapshot.filter((item) => item.id !== reviewId)
+  showDeleteConfirmModal.value = false
+  showDetailModal.value = false
+  selectedReview.value = null
+
+  undoDelete.scheduleUndoDelete({
+    label: `周报「${reviewTitle}」`,
+    pendingMessage: `周报「${reviewTitle}」已移除，5 秒内可撤销。`,
+    onCommit: async () => {
+      await deleteReviewApi(reviewId)
+    },
+    onCommitSuccess: async () => {
+      await loadHistory()
+    },
+    onRollback: async () => {
+      if (!historyReviews.value.some((item) => item.id === reviewId)) {
+        const next = [...historyReviews.value]
+        const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
+        next.splice(insertIndex, 0, reviewToDelete)
+        historyReviews.value = next
+      }
+    },
+  })
 }
 
 const handleEditReview = () => {
@@ -462,7 +494,7 @@ const handleEditReview = () => {
   currentReview.value.nextPlan = selectedReview.value.nextPlan
   showDetailModal.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
-  showToast('已加载至编辑器，修改后点击保存即可', 'success')
+  toast.success('已加载至编辑器，修改后点击保存即可。')
 }
 
 const exportToMarkdown = () => {
@@ -500,12 +532,12 @@ ${review.nextPlan || '无计划内容'}
 
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
-  showToast('Markdown 导出成功。', 'success')
+  toast.success('Markdown 导出成功。')
 }
 
 const handleAiPolish = async () => {
   if (!currentReview.value.reflection || currentReview.value.reflection.trim() === '') {
-    showToast('请先填写复盘内容，再进行 AI 润色。', 'error')
+    toast.error('请先填写复盘内容，再进行 AI 润色。')
     return
   }
 
@@ -530,17 +562,17 @@ const handleAiPolish = async () => {
           currentReview.value.nextPlan = parsedData.plan
         }
 
-        showToast('AI 润色完成。', 'success')
+        toast.success('AI 润色完成。')
       } catch {
         console.error('JSON 解析失败, AI 返回的原始数据为:', res)
         // 兜底策略：如果解析失败（说明 AI 还是输出了废话），就全部塞进复盘框里，防止数据丢失
         currentReview.value.reflection = res
-        showToast('AI 返回格式异常，内容已填入复盘区，请手动调整。', 'error')
+        toast.error('AI 返回格式异常，内容已填入复盘区，请手动调整。')
       }
     }
   } catch (error) {
     console.error('AI 润色失败:', error)
-    showToast('AI 润色失败，请检查网络后重试。', 'error')
+    toast.error('AI 润色失败，请检查网络后重试。')
   } finally {
     isPolishing.value = false
   }

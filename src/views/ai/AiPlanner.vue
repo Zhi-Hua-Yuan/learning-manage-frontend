@@ -144,7 +144,7 @@
                 />
                 <span class="flex items-center gap-2 font-bold">
                   <span
-                    class="flex h-6 w-6 items-center justify-center rounded bg-emerald-200 text-xs text-emerald-800"
+                    class="inline-flex h-6 min-w-[56px] items-center justify-center whitespace-nowrap rounded bg-emerald-200 px-2 text-xs text-emerald-800"
                     >阶段 {{ mIndex + 1 }}</span
                   >
                   {{ milestone.name }}

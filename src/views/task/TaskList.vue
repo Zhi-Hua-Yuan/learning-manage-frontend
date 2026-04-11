@@ -319,7 +319,11 @@
             placeholder="输入任务标题"
           />
 
-          <div class="relative flex items-center gap-3 border-y border-gray-100 py-3">
+          <div
+            ref="priorityRowRef"
+            class="relative flex cursor-pointer items-center gap-3 border-y border-gray-100 py-3"
+            @click="togglePriorityMenuFromRow"
+          >
             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
@@ -332,8 +336,8 @@
 
             <button
               type="button"
-              @click="isPriorityMenuOpen = !isPriorityMenuOpen"
-              class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 hover:bg-gray-50"
+              @click.stop="togglePriorityMenu"
+              class="flex items-center gap-2 px-1 py-1"
             >
               <span class="priority-dot" :class="currentPriorityObj.dotClass"></span>
               <span class="text-sm font-medium" :class="currentPriorityObj.textClass">
@@ -343,6 +347,7 @@
 
             <div
               v-if="isPriorityMenuOpen"
+              @click.stop
               class="absolute left-24 top-12 z-20 w-40 overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg"
             >
               <button
@@ -366,7 +371,11 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-3 border-b border-gray-100 py-3">
+          <div
+            ref="dueDateRowRef"
+            class="flex cursor-pointer items-center gap-3 border-b border-gray-100 py-3"
+            @click="openDueDatePicker"
+          >
             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
@@ -379,9 +388,16 @@
 
             <div class="relative flex-1">
               <input
+                ref="dueDateInputRef"
                 type="date"
                 :value="selectedTask.dueDate || ''"
                 @change="onDueDateChange"
+                @keydown="onDueDateKeydown"
+                @paste.prevent
+                @drop.prevent
+                @click.stop
+                @focus="onDueDateFocus"
+                @blur="onDueDateBlur"
                 class="w-full cursor-pointer bg-transparent text-sm outline-none [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                 :class="!selectedTask.dueDate ? 'text-transparent' : 'text-gray-700'"
               />
@@ -394,7 +410,9 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-3 border-b border-gray-100 py-3">
+          <div
+            class="relative flex cursor-pointer items-center gap-3 border-b border-gray-100 py-3"
+          >
             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
@@ -405,10 +423,17 @@
             </svg>
             <label class="w-20 text-sm font-medium text-gray-600">所属阶段</label>
 
+            <div class="flex min-w-0 flex-1 items-center justify-between text-sm text-gray-700">
+              <span class="truncate">{{ currentMilestoneLabel }}</span>
+              <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </div>
+
             <select
               :value="selectedTask.milestoneId || ''"
               @change="onMilestoneChange"
-              class="flex-1 cursor-pointer bg-transparent text-sm text-gray-700 outline-none"
+              class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
             >
               <option value="">默认列表（未分配）</option>
               <option v-for="m in milestoneList" :key="m.id" :value="m.id">🚩 {{ m.name }}</option>
@@ -506,6 +531,10 @@ const editingMilestoneId = ref('')
 const editMilestoneName = ref('')
 
 const isPriorityMenuOpen = ref(false)
+const isDueDatePickerOpen = ref(false)
+const priorityRowRef = ref<HTMLElement | null>(null)
+const dueDateRowRef = ref<HTMLElement | null>(null)
+const dueDateInputRef = ref<HTMLInputElement | null>(null)
 const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 340)
 const isResizingRight = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
@@ -658,9 +687,11 @@ const toggleTaskStatus = async (task: Task) => {
 const selectTask = (task: Task) => {
   selectedTask.value = task
   isPriorityMenuOpen.value = false
+  isDueDatePickerOpen.value = false
 }
 
 const closeDetail = () => {
+  closeDueDatePicker()
   selectedTask.value = null
   isPriorityMenuOpen.value = false
 }
@@ -669,6 +700,86 @@ const currentPriorityObj = computed(() => {
   if (!selectedTask.value) return priorityOptions[priorityOptions.length - 1]!
   return getPriorityOption(selectedTask.value.priority)
 })
+
+const currentMilestoneLabel = computed(() => {
+  const milestoneId = selectedTask.value?.milestoneId
+  if (!milestoneId || String(milestoneId) === '0') return '默认列表（未分配）'
+
+  const milestone = milestoneList.value.find((item) => item.id === String(milestoneId))
+  if (!milestone) return '默认列表（未分配）'
+
+  return `🚩 ${milestone.name}`
+})
+
+const togglePriorityMenuFromRow = () => {
+  isPriorityMenuOpen.value = !isPriorityMenuOpen.value
+}
+
+const togglePriorityMenu = () => {
+  isPriorityMenuOpen.value = !isPriorityMenuOpen.value
+}
+
+const closeDueDatePicker = () => {
+  isDueDatePickerOpen.value = false
+  dueDateInputRef.value?.blur()
+}
+
+const openDueDatePicker = () => {
+  const input = dueDateInputRef.value
+  if (!input) return
+
+  if (isDueDatePickerOpen.value) {
+    closeDueDatePicker()
+    return
+  }
+
+  isDueDatePickerOpen.value = true
+  const inputWithPicker = input as HTMLInputElement & { showPicker?: () => void }
+  if (typeof inputWithPicker.showPicker === 'function') {
+    try {
+      inputWithPicker.showPicker()
+      return
+    } catch {
+      // no-op and fallback to native click
+    }
+  }
+
+  input.focus()
+  input.click()
+}
+
+const onDueDateFocus = () => {
+  isDueDatePickerOpen.value = true
+}
+
+const onDueDateBlur = () => {
+  isDueDatePickerOpen.value = false
+}
+
+const onDueDateKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Tab') return
+
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    openDueDatePicker()
+    return
+  }
+
+  event.preventDefault()
+}
+
+const handleDocumentPointerDown = (event: PointerEvent) => {
+  const targetNode = event.target as Node | null
+  if (!targetNode) return
+
+  if (isPriorityMenuOpen.value && priorityRowRef.value && !priorityRowRef.value.contains(targetNode)) {
+    isPriorityMenuOpen.value = false
+  }
+
+  if (isDueDatePickerOpen.value && dueDateRowRef.value && !dueDateRowRef.value.contains(targetNode)) {
+    closeDueDatePicker()
+  }
+}
 
 const selectPriority = async (val: number) => {
   if (!selectedTask.value) return
@@ -692,6 +803,7 @@ const onDueDateChange = async (event: Event) => {
   const finalDate = target.value === '' ? null : target.value
   const oldDate = selectedTask.value.dueDate
   selectedTask.value.dueDate = finalDate
+  isDueDatePickerOpen.value = false
 
   try {
     await updateTaskApi({ ...selectedTask.value, dueDate: finalDate })
@@ -888,6 +1000,7 @@ watch(
   () => route.query.projectId,
   async () => {
     syncSelectedProject()
+    closeDueDatePicker()
     selectedTask.value = null
     isPriorityMenuOpen.value = false
     await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
@@ -896,12 +1009,14 @@ watch(
 
 onMounted(async () => {
   updateViewport()
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
   syncSelectedProject()
   await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
   stopResizeRight()
   window.removeEventListener('resize', updateViewport)
 })

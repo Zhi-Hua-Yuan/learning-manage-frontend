@@ -4,20 +4,16 @@
       <div class="mb-6 space-y-2 text-center sm:mb-8">
         <h2 class="text-2xl font-black tracking-tight text-gray-800 sm:text-3xl">
           让
-          <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500"
-            >AI</span
-          >
+          <span class="text-emerald-600">AI</span>
           帮你拆解目标
         </h2>
         <p class="text-gray-500">只需一句话，自动生成包含阶段与任务的落地执行计划</p>
       </div>
 
       <div
-        class="card-base relative space-y-6 overflow-hidden rounded-2xl bg-white p-5 sm:p-8"
+        class="card-base relative space-y-6 overflow-hidden rounded-2xl bg-[#fcfcfa] p-5 sm:p-8"
       >
-        <div
-          class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500"
-        ></div>
+        <div class="absolute top-0 left-0 h-1 w-full bg-emerald-500"></div>
 
         <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           <div class="md:col-span-2">
@@ -26,7 +22,7 @@
               v-model="aiForm.target"
               type="text"
               placeholder="例如：三个月内通过英语六级 / 独立开发一款小程序"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div>
@@ -35,7 +31,7 @@
               v-model="aiForm.duration"
               type="text"
               placeholder="例如：12周 / 1个月"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div class="md:col-span-2">
@@ -43,7 +39,7 @@
             <textarea
               v-model="aiForm.description"
               placeholder="例如：我目前的基础比较薄弱，希望前两周以背单词和基础语法为主..."
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm outline-none focus:bg-white focus:border-purple-400 transition-all min-h-[80px] resize-none"
+              class="min-h-[80px] w-full resize-none rounded-xl border border-gray-200 bg-[#f7f7f5] p-4 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             ></textarea>
           </div>
         </div>
@@ -52,7 +48,7 @@
           <button
             @click="generatePlan"
             :disabled="isGeneratingPlan"
-            class="bg-gray-900 hover:bg-black text-white px-8 py-3 rounded-full font-bold transition-all flex items-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+            class="btn-ai flex items-center gap-2 rounded-full px-8 py-3 font-bold"
             :class="isGeneratingPlan ? 'opacity-70 cursor-not-allowed' : ''"
           >
             <svg
@@ -84,14 +80,14 @@
 
       <div
         v-if="generatedPlan.length > 0"
-        class="card-base animate-fade-in-up rounded-2xl bg-white p-5 sm:p-8"
+        class="card-base animate-fade-in-up rounded-2xl bg-[#fcfcfa] p-5 sm:p-8"
       >
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h3 class="text-xl font-bold text-gray-800">📋 生成的专属计划草稿</h3>
           <button
             @click="openConfirmModal"
             :disabled="isApplying"
-            class="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-5 py-2 rounded-lg font-bold transition-all shadow-sm flex items-center gap-2 text-sm"
+            class="btn-ai flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-bold"
             :class="isApplying ? 'opacity-70 cursor-not-allowed' : ''"
           >
             <span v-if="isApplying">导入中...</span>
@@ -103,11 +99,11 @@
           <div
             v-for="(milestone, mIndex) in generatedPlan"
             :key="mIndex"
-            class="border border-purple-100 rounded-xl p-5 bg-purple-50/30"
+            class="rounded-xl border border-emerald-100 bg-emerald-50/30 p-5"
           >
-            <h4 class="font-bold text-purple-700 mb-3 flex items-center gap-2">
+            <h4 class="mb-3 flex items-center gap-2 font-bold text-emerald-700">
               <span
-                class="bg-purple-200 text-purple-800 w-6 h-6 rounded flex items-center justify-center text-xs"
+                class="flex h-6 w-6 items-center justify-center rounded bg-emerald-200 text-xs text-emerald-800"
                 >阶段 {{ mIndex + 1 }}</span
               >
               {{ milestone.name }}
@@ -116,7 +112,7 @@
               <div
                 v-for="(task, tIndex) in milestone.tasks"
                 :key="tIndex"
-                class="flex items-start gap-2 text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-100 shadow-sm"
+                class="flex items-start gap-2 rounded-lg border border-gray-200 bg-[#f7f7f5] p-3 text-sm text-gray-700"
               >
                 <span class="text-gray-400 mt-0.5">▪</span>
                 <div>
@@ -142,7 +138,7 @@
     >
       <div
         v-if="showSuccessToast"
-        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4 border-emerald-500"
+        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-xl border-l-4 border-emerald-500"
       >
         <div
           class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-emerald-500 bg-emerald-100 rounded-lg"
@@ -178,17 +174,17 @@
 
         <div class="relative z-50 mx-auto my-6 w-[calc(100%-2rem)] max-w-md transform transition-all">
           <div
-            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+            class="relative flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-[#fcfcfa] shadow-lg outline-none focus:outline-none"
           >
-            <div class="h-1 w-full bg-gradient-to-r from-purple-500 to-blue-500"></div>
+            <div class="h-1 w-full bg-emerald-500"></div>
             <div class="p-6 pb-0 flex flex-col items-center text-center">
-              <div class="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+              <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
                 <span class="text-2xl">✨</span>
               </div>
               <h3 class="text-xl font-black text-gray-800 mb-2">确认导入计划？</h3>
               <p class="text-sm text-gray-500 leading-relaxed px-4">
                 此操作将根据 AI 生成的草稿，在您的系统中创建一个名为 <br />
-                <span class="font-bold text-blue-600 border-b border-blue-200"
+                <span class="font-bold text-emerald-700 border-b border-emerald-200"
                   >"[AI] {{ aiForm.target }}"</span
                 >
                 的新清单项目。
@@ -196,14 +192,14 @@
             </div>
             <div class="flex items-center justify-center p-6 gap-3 rounded-b">
               <button
-                class="px-6 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-colors outline-none focus:outline-none"
+                class="btn-secondary px-6 py-2.5 text-sm font-bold outline-none focus:outline-none"
                 type="button"
                 @click="showConfirmModal = false"
               >
                 取消
               </button>
               <button
-                class="px-6 py-2.5 text-sm font-bold text-white bg-gray-900 rounded-xl shadow hover:bg-black hover:shadow-lg transition-all outline-none focus:outline-none flex items-center gap-2"
+                class="btn-ai flex items-center gap-2 px-6 py-2.5 text-sm font-bold outline-none focus:outline-none"
                 type="button"
                 @click="executeImport"
               >

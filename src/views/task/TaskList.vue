@@ -56,14 +56,14 @@
                 :key="task.id"
                 @click="selectTask(task)"
                 class="card-base group flex cursor-pointer items-center gap-3 bg-white px-3 py-3"
-                :class="selectedTask?.id === task.id ? 'border-blue-300 bg-blue-50' : ''"
+                :class="selectedTask?.id === task.id ? 'border-gray-300 bg-gray-100' : ''"
               >
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
                       ? 'border-emerald-500 bg-emerald-500'
-                      : 'border-gray-300 group-hover:border-blue-600'
+                      : 'border-gray-300 group-hover:border-gray-500'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
@@ -111,7 +111,7 @@
                 v-if="editingMilestoneId === group.milestone.id"
                 class="flex min-w-0 flex-1 items-center gap-2"
               >
-                <span class="text-blue-500">🚩</span>
+                <span class="text-gray-500">🚩</span>
                 <input
                   v-model="editMilestoneName"
                   @keyup.enter="saveMilestone(group.milestone)"
@@ -123,7 +123,7 @@
               </div>
 
               <h3 v-else class="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-gray-800">
-                <span class="text-blue-500">🚩</span>
+                <span class="text-gray-500">🚩</span>
                 <span class="truncate">{{ group.milestone.name }}</span>
 
                 <div
@@ -131,7 +131,7 @@
                 >
                   <button
                     @click="startEditMilestone(group.milestone)"
-                    class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-500"
+                    class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
                     title="重命名"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +164,7 @@
                 <span class="mono text-xs text-gray-500">{{ group.progress }}%</span>
                 <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200">
                   <div
-                    class="h-full bg-blue-500 transition-all duration-500"
+                    class="h-full bg-blue-400 transition-all duration-500"
                     :style="{ width: group.progress + '%' }"
                   ></div>
                 </div>
@@ -184,14 +184,14 @@
                 :key="task.id"
                 @click="selectTask(task)"
                 class="card-base group flex cursor-pointer items-center gap-3 bg-white px-3 py-3"
-                :class="selectedTask?.id === task.id ? 'border-blue-300 bg-blue-50' : ''"
+                :class="selectedTask?.id === task.id ? 'border-gray-300 bg-gray-100' : ''"
               >
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
                       ? 'border-emerald-500 bg-emerald-500'
-                      : 'border-gray-300 group-hover:border-blue-600'
+                      : 'border-gray-300 group-hover:border-gray-500'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
@@ -230,7 +230,7 @@
           </section>
 
           <div class="pt-1">
-            <div v-if="isAddingMilestone" class="card-base border-blue-300 bg-white p-1">
+            <div v-if="isAddingMilestone" class="card-base border-gray-400 bg-white p-1">
               <input
                 v-model="newMilestoneName"
                 @keyup.enter="submitNewMilestone"
@@ -245,7 +245,7 @@
             <button
               v-else
               @click="openAddMilestoneInput"
-              class="card-base w-full border-dashed border-gray-300 bg-white py-3 text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600"
+              class="card-base w-full border-dashed border-gray-300 bg-[#f7f7f5] py-3 text-sm font-medium text-gray-700 hover:border-gray-400 hover:bg-[#ecece8]"
             >
               + 添加阶段
             </button>
@@ -256,7 +256,7 @@
 
     <div
       v-if="!isMobile"
-      class="-ml-1 z-20 w-1 cursor-col-resize bg-transparent transition-all hover:w-1.5 hover:bg-blue-400"
+      class="-ml-1 z-20 w-1 cursor-col-resize bg-transparent transition-all hover:w-1.5 hover:bg-gray-400"
       @mousedown="startResizeRight"
     ></div>
 
@@ -355,7 +355,7 @@
                 <span class="font-medium" :class="option.textClass">{{ option.text }}</span>
                 <svg
                   v-if="selectedTask.priority === option.value"
-                  class="ml-auto h-4 w-4 text-blue-500"
+                  class="ml-auto h-4 w-4 text-gray-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -418,7 +418,7 @@
           <textarea
             v-model="selectedTask.description"
             @blur="onTextBlur"
-            class="min-h-[140px] w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 outline-none transition-all focus:border-blue-300 focus:bg-blue-50"
+            class="min-h-[140px] w-full resize-none rounded-lg border border-gray-200 bg-[#f7f7f5] p-3 text-sm text-gray-700 outline-none transition-all focus:border-blue-300 focus:bg-white"
             placeholder="补充任务说明"
           ></textarea>
         </div>

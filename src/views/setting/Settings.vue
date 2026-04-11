@@ -5,13 +5,13 @@
         <h2 class="flex items-center gap-2 text-xl font-bold text-gray-800 sm:text-2xl">⚙️ 个人设置</h2>
       </div>
 
-      <div class="card-base overflow-hidden rounded-2xl bg-white">
+      <div class="card-base overflow-hidden rounded-2xl bg-[#fcfcfa]">
         <div class="flex border-b border-gray-100">
           <button
             @click="settingsTab = 'basic'"
             :class="
               settingsTab === 'basic'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-gray-400 text-gray-800'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             "
             class="flex-1 py-4 text-sm font-bold border-b-2 transition-colors"
@@ -22,7 +22,7 @@
             @click="settingsTab = 'security'"
             :class="
               settingsTab === 'security'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-gray-400 text-gray-800'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             "
             class="flex-1 py-4 text-sm font-bold border-b-2 transition-colors"
@@ -46,13 +46,13 @@
             <input
               v-model="updateInfoForm.username"
               type="text"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div class="pt-4">
             <button
               @click="handleUpdateInfo"
-              class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+              class="btn-primary px-6"
             >
               保存修改
             </button>
@@ -66,7 +66,7 @@
               v-model="updatePwdForm.oldPassword"
               type="password"
               placeholder="请输入旧密码"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div>
@@ -75,7 +75,7 @@
               v-model="updatePwdForm.newPassword"
               type="password"
               placeholder="至少 8 位"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div>
@@ -84,13 +84,13 @@
               v-model="updatePwdForm.confirmNewPassword"
               type="password"
               placeholder="再次输入新密码"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div class="pt-4">
             <button
               @click="handleUpdatePassword"
-              class="bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+              class="btn-danger px-6"
             >
               更新密码
             </button>
@@ -109,7 +109,7 @@
     >
       <div
         v-if="toast.show"
-        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4"
+        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-xl border-l-4"
         :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
       >
         <div
@@ -141,11 +141,11 @@
 
         <div class="relative w-auto max-w-sm mx-auto my-6 z-50 transform transition-all">
           <div
-            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-xl outline-none focus:outline-none overflow-hidden"
           >
-            <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-green-500"></div>
+            <div class="h-1 w-full bg-blue-500"></div>
             <div class="p-8 pb-4 flex flex-col items-center text-center">
-              <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+              <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
                 <span class="text-3xl">🔒</span>
               </div>
               <h3 class="text-xl font-black text-gray-800 mb-2">密码修改成功</h3>
@@ -155,7 +155,7 @@
             </div>
             <div class="flex items-center justify-center p-6 pt-2">
               <button
-                class="w-full px-6 py-3 text-sm font-bold text-white bg-green-500 rounded-xl shadow-md hover:bg-green-600 hover:shadow-lg transition-all outline-none focus:outline-none flex items-center justify-center gap-2"
+                class="btn-primary w-full gap-2 rounded-xl px-6 py-3 text-sm font-bold outline-none focus:outline-none"
                 type="button"
                 @click="confirmReLogin"
               >
@@ -271,4 +271,3 @@ onMounted(() => {
   loadUserInfo()
 })
 </script>
-

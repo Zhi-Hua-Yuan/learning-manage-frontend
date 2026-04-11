@@ -9,25 +9,25 @@
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
         <div class="space-y-6 xl:col-span-2">
           <div
-            class="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 p-5 text-white shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-6"
+            class="card-base flex flex-col gap-4 rounded-2xl border-blue-200 bg-[#fcfcfa] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
           >
             <div>
-              <div class="text-blue-100 text-sm font-medium mb-1">
+              <div class="mb-1 text-sm font-medium text-gray-500">
                 第 {{ currentReview.weekNo || '?' }} 周 ({{ currentReview.startDate }} ~
                 {{ currentReview.endDate }})
               </div>
-              <div class="text-2xl font-bold">本周高光时刻</div>
+              <div class="text-2xl font-bold text-gray-800">本周高光时刻</div>
             </div>
             <div class="flex gap-3 text-center sm:gap-6">
-              <div class="rounded-lg bg-white/20 px-4 py-2 backdrop-blur-sm">
-                <div class="text-3xl font-black">{{ currentReview.completedTaskCount || 0 }}</div>
-                <div class="text-xs text-blue-100 mt-1">完成任务数</div>
+              <div class="rounded-lg bg-[#f0f0ed] px-4 py-2">
+                <div class="text-3xl font-black text-gray-800">{{ currentReview.completedTaskCount || 0 }}</div>
+                <div class="mt-1 text-xs text-gray-500">完成任务数</div>
               </div>
-              <div class="min-w-[100px] rounded-lg bg-white/20 px-4 py-2 backdrop-blur-sm">
-                <div class="text-xl font-bold truncate mt-1">
+              <div class="min-w-[100px] rounded-lg bg-[#f0f0ed] px-4 py-2">
+                <div class="mt-1 truncate text-xl font-bold text-gray-800">
                   {{ currentReview.focusProjectName || '暂无重点' }}
                 </div>
-                <div class="text-xs text-blue-100 mt-1">核心推进项目</div>
+                <div class="mt-1 text-xs text-gray-500">核心推进项目</div>
               </div>
             </div>
           </div>
@@ -42,11 +42,11 @@
                 <button
                   @click="handleAiPolish"
                   :disabled="isPolishing"
-                  class="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all"
+                  class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all"
                   :class="
                     isPolishing
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-md hover:scale-105'
+                      : 'btn-ai'
                   "
                 >
                   <svg
@@ -95,7 +95,7 @@
             <div class="flex justify-end pt-2">
               <button
                 @click="openSaveModal"
-                class="btn-primary flex items-center gap-2 rounded-2xl px-7 py-3 font-bold shadow-lg shadow-blue-200"
+                class="btn-primary flex items-center gap-2 rounded-2xl px-7 py-3 font-bold"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -126,15 +126,15 @@
               v-for="item in historyReviews"
               :key="item.id"
               @click="item.id && viewDetail(item.id)"
-              class="border-l-2 border-blue-200 pl-4 py-2 relative group cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all"
+              class="relative group cursor-pointer border-l-2 border-gray-300 py-2 pl-4 transition-all hover:-translate-y-0.5 hover:shadow-sm"
             >
               <div
-                class="absolute w-3 h-3 bg-blue-500 rounded-full -left-[7px] top-3 border-2 border-white"
+                class="absolute -left-[7px] top-3 h-3 w-3 rounded-full border-2 border-white bg-gray-500"
               ></div>
               <div class="text-xs text-gray-400 font-medium mb-1">
                 {{ item.year }} 年 • 第 {{ item.weekNo }} 周
               </div>
-              <div class="bg-gray-50 rounded-lg p-3 group-hover:bg-blue-50 transition-colors">
+              <div class="rounded-lg bg-[#f7f7f5] p-3 transition-colors group-hover:bg-[#ecece8]">
                 <div class="text-sm font-bold text-gray-700 mb-1 line-clamp-1">
                   {{ item.focusProjectName || '日常推进' }}
                 </div>
@@ -158,7 +158,7 @@
     >
       <div
         v-if="toast.show"
-        class="fixed top-6 right-6 z-[100] flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4"
+        class="fixed top-6 right-6 z-[100] flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-xl border-l-4"
         :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
       >
         <div
@@ -178,7 +178,7 @@
       class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
     >
       <div
-        class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform transition-all"
+        class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden transform transition-all"
       >
         <div class="h-1.5 w-full bg-blue-500"></div>
         <div class="p-6 text-center">
@@ -193,13 +193,13 @@
         <div class="flex p-4 gap-3">
           <button
             @click="showSaveConfirmModal = false"
-            class="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
+            class="btn-secondary flex-1 rounded-xl"
           >
             取消
           </button>
           <button
             @click="executeSave"
-            class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all"
+            class="btn-primary flex-1 rounded-xl"
           >
             确认保存
           </button>
@@ -212,7 +212,7 @@
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
     >
       <div
-        class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        class="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
       >
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
@@ -230,24 +230,24 @@
         <div class="flex-1 overflow-y-auto p-8 space-y-8">
           <section>
             <h4
-              class="flex items-center gap-2 text-sm font-black text-blue-600 mb-3 tracking-widest uppercase"
+              class="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-widest text-gray-700"
             >
               / 本周复盘 /
             </h4>
             <div
-              class="text-gray-700 leading-relaxed bg-blue-50/30 p-5 rounded-2xl border border-blue-50 whitespace-pre-wrap"
+              class="whitespace-pre-wrap rounded-2xl border border-gray-200 bg-[#f7f7f5] p-5 leading-relaxed text-gray-700"
             >
               {{ selectedReview.reflection || '无内容' }}
             </div>
           </section>
           <section>
             <h4
-              class="flex items-center gap-2 text-sm font-black text-emerald-600 mb-3 tracking-widest uppercase"
+              class="flex items-center gap-2 text-sm font-black text-gray-700 mb-3 tracking-widest uppercase"
             >
               / 下周计划 /
             </h4>
             <div
-              class="text-gray-700 leading-relaxed bg-emerald-50/30 p-5 rounded-2xl border border-emerald-50 whitespace-pre-wrap"
+              class="text-gray-700 leading-relaxed bg-[#f7f7f5] p-5 rounded-2xl border border-gray-200 whitespace-pre-wrap"
             >
               {{ selectedReview.nextPlan || '无内容' }}
             </div>
@@ -257,7 +257,7 @@
           <div class="flex items-center justify-center gap-4">
             <button
               @click="handleEditReview"
-              class="px-6 py-2.5 text-blue-600 bg-blue-50 rounded-xl font-bold hover:bg-blue-100 transition-all"
+              class="btn-secondary px-6 py-2.5 rounded-xl font-bold text-gray-800 transition-all"
             >
               修改
             </button>
@@ -269,7 +269,7 @@
             </button>
             <button
               @click="exportToMarkdown"
-              class="px-6 py-2.5 text-gray-700 bg-white border border-gray-200 rounded-xl font-bold hover:bg-gray-50 hover:shadow-sm transition-all flex items-center gap-2"
+              class="btn-secondary flex items-center gap-2 rounded-xl px-6 py-2.5 font-bold text-gray-700 transition-all"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -283,7 +283,7 @@
             </button>
             <button
               @click="showDetailModal = false"
-              class="px-8 py-2.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-md"
+              class="btn-secondary px-8 py-2.5 rounded-xl font-bold text-gray-800 transition-all"
             >
               阅读完毕
             </button>
@@ -297,7 +297,7 @@
       class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
     >
       <div
-        class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform transition-all"
+        class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden transform transition-all"
       >
         <div class="h-1.5 w-full bg-red-500"></div>
         <div class="p-6 text-center">
@@ -312,13 +312,13 @@
         <div class="flex p-4 gap-3">
           <button
             @click="showDeleteConfirmModal = false"
-            class="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
+            class="btn-secondary flex-1 rounded-xl"
           >
             取消
           </button>
           <button
             @click="executeDelete"
-            class="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-all"
+            class="btn-danger flex-1 rounded-xl"
           >
             确认删除
           </button>
@@ -550,4 +550,3 @@ onMounted(() => {
   loadReviewData()
 })
 </script>
-

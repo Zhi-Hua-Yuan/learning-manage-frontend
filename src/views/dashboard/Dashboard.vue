@@ -11,7 +11,7 @@
           class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-white p-5 sm:p-6"
         >
           <span class="text-sm font-medium text-gray-500">进行中项目</span>
-          <span class="mono text-4xl font-black text-blue-600">{{ statsData.activeProjects || 0 }}</span>
+          <span class="mono text-4xl font-black text-gray-800">{{ statsData.activeProjects || 0 }}</span>
         </div>
         <div
           class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-white p-5 sm:p-6"
@@ -194,4 +194,3 @@ onBeforeUnmount(() => {
   }
 })
 </script>
-

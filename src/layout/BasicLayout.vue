@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="relative flex h-screen w-screen overflow-hidden bg-white text-gray-800">
+  <div class="relative flex h-screen w-screen overflow-hidden bg-[#f6f6f4] text-gray-800">
     <button
       v-if="isCompactViewport"
       @click="isSidebarOpen = true"
@@ -50,7 +50,7 @@
           class="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-colors"
           :class="
             route.path === '/dashboard'
-              ? 'bg-indigo-100 text-indigo-700 font-medium'
+              ? 'bg-gray-200 text-gray-800 font-medium'
               : 'text-gray-600 hover:bg-gray-200'
           "
         >
@@ -63,7 +63,7 @@
           class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
           :class="
             route.path === '/review'
-              ? 'bg-indigo-100 text-indigo-700 font-medium'
+              ? 'bg-gray-200 text-gray-800 font-medium'
               : 'text-gray-600 hover:bg-gray-200'
           "
         >
@@ -76,16 +76,12 @@
           class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
           :class="
             route.path === '/ai-planner'
-              ? 'bg-indigo-100 text-indigo-700 font-medium'
+              ? 'bg-emerald-50 text-emerald-600 font-medium'
               : 'text-gray-600 hover:bg-gray-200'
           "
         >
           <span class="text-xl">✨</span>
-          <span
-            class="flex-1 text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-indigo-500"
-          >
-            AI 智能规划
-          </span>
+          <span class="flex-1 text-sm font-semibold text-emerald-500">AI 智能规划</span>
         </div>
       </div>
 
@@ -97,7 +93,7 @@
           class="flex items-center gap-3 px-4 py-2 mx-2 rounded-lg cursor-pointer transition-colors group"
           :class="
             (route.path === '/tasks' || route.path === '/') && selectedProjectId === project.id
-              ? 'bg-blue-100 text-blue-700 font-medium'
+              ? 'bg-gray-200 text-gray-800 font-medium'
               : 'text-gray-600 hover:bg-gray-200'
           "
         >
@@ -122,7 +118,7 @@
 
         <div v-if="isAddingProject" class="px-4 py-2 mx-2 mt-1">
           <div
-            class="flex items-center bg-white rounded border border-blue-400 overflow-hidden shadow-sm"
+            class="flex items-center overflow-hidden rounded border border-gray-300 bg-[#f7f7f5] shadow-sm"
           >
             <input
               v-model="newProjectName"
@@ -141,7 +137,7 @@
         <button
           v-if="!isAddingProject"
           @click="openAddProjectInput"
-          class="w-full flex items-center gap-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors text-sm font-medium"
+          class="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -162,7 +158,7 @@
         >
           <div class="flex items-center gap-2 overflow-hidden">
             <div
-              class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-sm"
+              class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold text-sm shadow-sm"
             >
               {{
                 currentUserInfo.username ? currentUserInfo.username.charAt(0).toUpperCase() : 'U'
@@ -189,7 +185,7 @@
 
         <div
           v-if="isUserMenuOpen"
-          class="absolute bottom-16 left-4 w-[calc(100%-2rem)] bg-white border border-gray-100 rounded-lg shadow-xl z-50 py-1 overflow-hidden"
+          class="absolute bottom-16 left-4 w-[calc(100%-2rem)] bg-white border border-gray-100 rounded-lg shadow-lg z-50 py-1 overflow-hidden"
         >
           <div
             @click="goToSettings"
@@ -239,9 +235,9 @@
 
         <div class="relative w-auto max-w-sm mx-auto my-6 z-[101] transform transition-all">
           <div
-            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-xl outline-none focus:outline-none overflow-hidden"
           >
-            <div class="h-1 w-full bg-gradient-to-r from-red-500 to-rose-500"></div>
+            <div class="h-1 w-full bg-red-500"></div>
             <div class="p-6 pb-0 flex flex-col items-center text-center">
               <div class="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
                 <span class="text-2xl">🚪</span>
@@ -253,14 +249,14 @@
             </div>
             <div class="flex items-center justify-center p-6 gap-3 rounded-b mt-2">
               <button
-                class="flex-1 px-4 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors outline-none focus:outline-none"
+                class="btn-secondary flex-1 rounded-xl outline-none focus:outline-none"
                 type="button"
                 @click="showLogoutModal = false"
               >
                 取消
               </button>
               <button
-                class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-500 rounded-xl shadow hover:bg-red-600 hover:shadow-lg transition-all outline-none focus:outline-none"
+                class="btn-danger flex-1 rounded-xl outline-none focus:outline-none"
                 type="button"
                 @click="executeLogout"
               >
@@ -481,4 +477,3 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateViewport)
 })
 </script>
-

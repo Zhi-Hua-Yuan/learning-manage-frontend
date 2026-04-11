@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-50 px-4 py-6 sm:flex sm:items-center sm:justify-center">
-    <div class="w-full max-w-md rounded-xl border border-gray-100 bg-white p-6 shadow-lg sm:p-8">
+    <div class="w-full max-w-md rounded-xl border border-gray-100 bg-[#fcfcfa] p-6 shadow-sm sm:p-8">
       <div class="mb-8 text-center sm:mb-10">
         <img
           src="@/assets/logo.png"
@@ -65,7 +65,7 @@
 
         <button
           type="submit"
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex justify-center items-center"
+          class="btn-primary flex w-full items-center justify-center rounded-lg py-2.5 font-medium"
           :disabled="loading"
         >
           <span v-if="loading">{{ isRegisterMode ? '注册中...' : '登录中...' }}</span>
@@ -75,7 +75,7 @@
         <div class="text-center text-sm">
           <button
             type="button"
-            class="text-blue-600 hover:text-blue-700 font-medium"
+            class="font-medium text-gray-700 hover:text-gray-900"
             @click="toggleMode"
           >
             {{ isRegisterMode ? '已有账号？返回登录' : '没有账号？点击注册' }}
@@ -94,7 +94,7 @@
     >
       <div
         v-if="toast.show"
-        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4"
+        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-xl border-l-4"
         :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
       >
         <div

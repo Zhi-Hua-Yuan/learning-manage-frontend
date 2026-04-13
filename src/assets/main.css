@@ -63,6 +63,15 @@
   --color-scrollbar-track: #e9edf4;
   --color-scrollbar-thumb: #a8b7cf;
   --color-scrollbar-thumb-hover: #8ea2c4;
+  --z-resizer: 20;
+  --z-content-sticky: 30;
+  --z-dropdown: 40;
+  --z-popover: 50;
+  --z-drawer: 60;
+  --z-overlay: 100;
+  --z-modal: 110;
+  --z-modal-panel: 111;
+  --z-toast: 120;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -225,7 +234,7 @@ body {
 .btn-primary {
   background: var(--color-primary);
   border: 1px solid transparent;
-  color: #fff;
+  color: var(--color-text-on-accent);
   border-radius: var(--radius-md);
   min-height: 40px;
   padding: 0 14px;
@@ -263,7 +272,7 @@ body {
 .btn-ai {
   background: var(--color-success);
   border: 1px solid transparent;
-  color: #fff;
+  color: var(--color-text-on-accent);
   border-radius: var(--radius-md);
   min-height: 40px;
   padding: 0 14px;
@@ -282,7 +291,7 @@ body {
 .btn-danger {
   background: var(--color-danger-strong);
   border: 1px solid transparent;
-  color: #fff;
+  color: var(--color-text-on-accent);
   border-radius: var(--radius-md);
   min-height: 40px;
   padding: 0 14px;
@@ -317,6 +326,28 @@ body {
   box-shadow: 0 0 0 3px var(--color-input-ring);
 }
 
+.focus-ring {
+  outline: none;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+.focus-ring:focus,
+.focus-ring:focus-visible {
+  outline: none;
+  border-color: var(--color-input-border-focus);
+  box-shadow: 0 0 0 3px var(--color-input-ring);
+}
+
+.ui-disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-text);
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
 .surface-panel {
   background: var(--color-popover-bg);
   border: 1px solid var(--color-popover-border);
@@ -324,6 +355,7 @@ body {
 }
 
 .interactive-row {
+  cursor: pointer;
   transition:
     background-color var(--motion-fast) var(--ease-standard),
     color var(--motion-fast) var(--ease-standard);
@@ -334,9 +366,21 @@ body {
   color: var(--color-text-body);
 }
 
+.interactive-row:active {
+  background: var(--color-menu-active);
+  color: var(--color-text-primary);
+}
+
 .interactive-row.is-active {
   background: var(--color-menu-active);
   color: var(--color-text-primary);
+}
+
+.interactive-row.is-disabled {
+  background: transparent;
+  color: var(--color-disabled-text);
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 .task-detail-select-trigger {
@@ -366,6 +410,12 @@ body {
   outline: none;
   border-color: var(--color-input-border-focus);
   box-shadow: 0 0 0 3px var(--color-input-ring);
+}
+
+.task-detail-select-trigger:disabled {
+  cursor: not-allowed;
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-text);
 }
 
 .danger-soft {

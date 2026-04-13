@@ -22,7 +22,7 @@
               v-model="aiForm.target"
               type="text"
               placeholder="例如：三个月内通过英语六级 / 独立开发一款小程序"
-              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+              class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
           </div>
           <div>
@@ -31,7 +31,7 @@
               v-model="aiForm.duration"
               type="text"
               placeholder="例如：12周 / 1个月"
-              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+              class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
           </div>
           <div class="md:col-span-2">
@@ -39,7 +39,7 @@
             <textarea
               v-model="aiForm.description"
               placeholder="例如：我目前的基础比较薄弱，希望前两周以背单词和基础语法为主..."
-              class="min-h-[80px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+              class="focus-ring min-h-[80px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
             ></textarea>
           </div>
         </div>
@@ -53,7 +53,7 @@
           >
             <svg
               v-if="isGeneratingPlan"
-              class="h-5 w-5 animate-spin text-white"
+              class="h-5 w-5 animate-spin text-[var(--color-text-on-accent)]"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -228,14 +228,14 @@
     >
       <div
         v-if="showConfirmModal"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
       >
         <div
           class="fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm transition-opacity"
           @click="showConfirmModal = false"
         ></div>
 
-        <div class="relative z-50 mx-auto my-6 w-[calc(100%-2rem)] max-w-md transform transition-all">
+        <div class="relative z-[var(--z-modal-panel)] mx-auto my-6 w-[calc(100%-2rem)] max-w-md transform transition-all">
           <div
             class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl outline-none focus:outline-none"
           >

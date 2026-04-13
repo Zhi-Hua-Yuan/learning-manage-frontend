@@ -3,7 +3,7 @@
     <button
       v-if="isCompactViewport"
       @click="isSidebarOpen = true"
-      class="fixed left-3 top-3 z-50 rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-popover-bg)] p-2 text-[var(--color-text-body)] shadow-[var(--shadow-card)]"
+      class="fixed left-3 top-3 z-[var(--z-popover)] rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-popover-bg)] p-2 text-[var(--color-text-body)] shadow-[var(--shadow-card)]"
       aria-label="打开侧栏"
     >
       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,13 +21,13 @@
     >
       <div
         v-if="isCompactViewport && isSidebarOpen"
-        class="fixed inset-0 z-50 bg-[var(--color-bg-mask)] backdrop-blur-[1px]"
+        class="fixed inset-0 z-[var(--z-popover)] bg-[var(--color-bg-mask)] backdrop-blur-[1px]"
         @click="isSidebarOpen = false"
       ></div>
     </transition>
 
     <aside
-      class="z-[60] flex flex-col border-r border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] transition-transform duration-200"
+      class="z-[var(--z-drawer)] flex flex-col border-r border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] transition-transform duration-200"
       :class="
         isCompactViewport
           ? `fixed inset-y-0 left-0 w-[280px] max-w-[85vw] ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
@@ -193,7 +193,7 @@
 
               <div
                 v-if="activeProjectActionId === project.id"
-                class="surface-panel absolute right-0 top-9 z-50 w-36 overflow-hidden rounded-lg py-1"
+                class="surface-panel absolute right-0 top-9 z-[var(--z-popover)] w-36 overflow-hidden rounded-lg py-1"
               >
                 <button
                   type="button"
@@ -276,7 +276,7 @@
 
         <div
           v-if="isUserMenuOpen"
-          class="surface-panel absolute bottom-16 left-4 z-50 w-[calc(100%-2rem)] overflow-hidden rounded-lg py-1"
+          class="surface-panel absolute bottom-16 left-4 z-[var(--z-popover)] w-[calc(100%-2rem)] overflow-hidden rounded-lg py-1"
         >
           <div
             @click="goToSettings"
@@ -296,7 +296,7 @@
 
       <div
         v-if="!isCompactViewport"
-        class="absolute top-0 right-0 z-20 h-full w-1 cursor-col-resize bg-transparent transition-all hover:bg-[var(--color-primary-soft-2)] active:bg-[var(--color-primary)]"
+        class="absolute top-0 right-0 z-[var(--z-resizer)] h-full w-1 cursor-col-resize bg-transparent transition-all hover:bg-[var(--color-primary-soft-2)] active:bg-[var(--color-primary)]"
         @mousedown="startResizeLeft"
       ></div>
     </aside>
@@ -328,14 +328,14 @@
     >
       <div
         v-if="showLogoutModal"
-        class="fixed inset-0 z-[100] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
       >
         <div
           class="fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm transition-opacity"
           @click="showLogoutModal = false"
         ></div>
 
-        <div class="relative w-auto max-w-sm mx-auto my-6 z-[101] transform transition-all">
+        <div class="relative w-auto max-w-sm mx-auto my-6 z-[var(--z-modal-panel)] transform transition-all">
           <div
             class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl border-0 outline-none focus:outline-none"
           >

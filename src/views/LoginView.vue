@@ -18,7 +18,7 @@
             v-model="form.account"
             type="text"
             required
-            class="w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请输入账号"
           />
         </div>
@@ -29,7 +29,7 @@
             v-model="form.username"
             type="text"
             required
-            class="w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请输入昵称"
           />
         </div>
@@ -40,7 +40,7 @@
             v-model="form.password"
             type="password"
             required
-            class="w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请输入密码"
           />
         </div>
@@ -51,7 +51,7 @@
             v-model="form.confirmPassword"
             type="password"
             required
-            class="w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请再次输入密码"
           />
         </div>

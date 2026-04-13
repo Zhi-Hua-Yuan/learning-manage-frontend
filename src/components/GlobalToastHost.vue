@@ -1,7 +1,7 @@
 <template>
   <TransitionGroup
     tag="div"
-    class="pointer-events-none fixed top-4 right-4 z-[120] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3 sm:top-6 sm:right-6"
+    class="pointer-events-none fixed top-4 right-4 z-[var(--z-toast)] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3 sm:top-6 sm:right-6"
     enter-active-class="transform ease-out duration-200 transition"
     enter-from-class="translate-y-2 opacity-0"
     enter-to-class="translate-y-0 opacity-100"

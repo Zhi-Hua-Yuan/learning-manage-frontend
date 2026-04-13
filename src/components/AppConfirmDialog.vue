@@ -2,7 +2,7 @@
   <transition name="confirm-overlay">
     <div
       v-if="modelValue"
-      class="fixed inset-0 z-[110] flex items-center justify-center p-4"
+      class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       :aria-label="title"
@@ -16,7 +16,7 @@
       </div>
 
       <div
-        class="confirm-panel surface-panel relative z-[111] w-full max-w-sm overflow-hidden rounded-2xl"
+        class="confirm-panel surface-panel relative z-[var(--z-modal-panel)] w-full max-w-sm overflow-hidden rounded-2xl"
         @click.stop
       >
         <div class="h-1.5 w-full" :class="headerClass"></div>

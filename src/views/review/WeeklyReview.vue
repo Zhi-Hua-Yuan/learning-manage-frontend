@@ -83,7 +83,7 @@
               </div>
               <textarea
                 v-model="currentReview.reflection"
-                class="min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+                class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
                 placeholder="这周做的好与不好的地方？有什么感悟？..."
               ></textarea>
             </div>
@@ -94,7 +94,7 @@
               </label>
               <textarea
                 v-model="currentReview.nextPlan"
-                class="min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+                class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
                 placeholder="下周的核心目标是什么？打算怎么安排时间？..."
               ></textarea>
             </div>
@@ -167,7 +167,7 @@
 
     <div
       v-if="showDetailModal && selectedReview"
-      class="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--color-backdrop-strong)] p-4 backdrop-blur-md"
+      class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-backdrop-strong)] p-4 backdrop-blur-md"
     >
       <div
         class="surface-panel flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl"

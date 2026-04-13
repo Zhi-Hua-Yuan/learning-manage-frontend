@@ -23,7 +23,7 @@
         </div>
       </div>
 
-      <div class="relative z-30 border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5">
+      <div class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5">
         <div class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center">
           <div class="flex min-w-0 flex-1 items-center">
             <span class="mr-2 text-lg font-bold text-[var(--color-text-tertiary)]">+</span>
@@ -52,7 +52,7 @@
             <div
               v-if="isNewTaskMilestoneMenuOpen"
               @click.stop
-              class="surface-panel absolute left-0 top-full z-40 mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
+              class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
             >
               <button
                 v-for="option in newTaskMilestoneOptions"
@@ -104,7 +104,7 @@
                 >
                   <svg
                     v-if="task.status === 2"
-                    class="h-3 w-3 text-white"
+                    class="h-3 w-3 text-[var(--color-text-on-accent)]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -162,7 +162,7 @@
                   @blur="saveMilestone(group.milestone)"
                   v-focus
                   type="text"
-                  class="w-full rounded border border-[var(--color-input-border-focus)] px-2 py-1 text-sm font-semibold text-[var(--color-text-primary)] outline-none focus:ring-2 focus:ring-[var(--color-input-ring)]"
+                  class="focus-ring w-full rounded border border-[var(--color-input-border-focus)] px-2 py-1 text-sm font-semibold text-[var(--color-text-primary)]"
                 />
               </div>
 
@@ -246,7 +246,7 @@
                 >
                   <svg
                     v-if="task.status === 2"
-                    class="h-3 w-3 text-white"
+                    class="h-3 w-3 text-[var(--color-text-on-accent)]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -314,13 +314,13 @@
 
     <div
       v-if="!isMobile"
-      class="-ml-1 z-20 w-1 cursor-col-resize bg-transparent transition-all hover:w-1.5 hover:bg-[var(--color-primary-soft-2)]"
+      class="-ml-1 z-[var(--z-resizer)] w-1 cursor-col-resize bg-transparent transition-all hover:w-1.5 hover:bg-[var(--color-primary-soft-2)]"
       @mousedown="startResizeRight"
     ></div>
 
     <aside
       v-if="selectedTask || !isMobile"
-      class="z-30 flex flex-col bg-[var(--color-bg-surface)]"
+      class="z-[var(--z-content-sticky)] flex flex-col bg-[var(--color-bg-surface)]"
       :class="
         isMobile
           ? 'fixed inset-0 w-full border-l-0'
@@ -422,7 +422,7 @@
               <div
                 v-if="isPriorityMenuOpen"
                 @click.stop
-                class="surface-panel absolute left-0 top-full z-40 mt-2 w-full overflow-hidden rounded-lg py-1"
+                class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 w-full overflow-hidden rounded-lg py-1"
               >
                 <button
                   v-for="option in priorityOptions"
@@ -489,7 +489,7 @@
               <div
                 v-if="isDueDatePickerOpen"
                 @click.stop
-                class="surface-panel absolute left-0 top-full z-40 mt-2 w-[280px] max-w-full rounded-lg p-3"
+                class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 w-[280px] max-w-full rounded-lg p-3"
               >
                 <div class="mb-3 flex items-center justify-between">
                   <button
@@ -591,7 +591,7 @@
               <div
                 v-if="isMilestoneMenuOpen"
                 @click.stop
-                class="surface-panel absolute left-0 top-full z-40 mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
+                class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
               >
                 <button
                   v-for="option in milestoneOptions"
@@ -621,7 +621,7 @@
             @blur="onTextBlur"
             maxlength="500"
             rows="6"
-            class="min-h-[140px] w-full resize-none overflow-hidden rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+            class="focus-ring min-h-[140px] w-full resize-none overflow-hidden rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-3 text-sm text-[var(--color-text-body)]"
             placeholder="补充任务说明（最多 500 字）"
           ></textarea>
         </div>

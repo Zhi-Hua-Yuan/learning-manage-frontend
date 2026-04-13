@@ -38,7 +38,7 @@
               :value="currentUserInfo.account"
               disabled
               type="text"
-              class="w-full cursor-not-allowed rounded-xl border border-[var(--color-input-border)] bg-[var(--color-disabled-bg)] px-4 py-3 text-sm text-[var(--color-disabled-text)]"
+              class="ui-disabled w-full rounded-xl border border-[var(--color-input-border)] px-4 py-3 text-sm"
             />
           </div>
           <div>
@@ -47,7 +47,7 @@
               v-model="updateInfoForm.username"
               type="text"
               maxlength="20"
-              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+              class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
             <p
               class="mt-2 text-xs"
@@ -95,7 +95,7 @@
               v-model="updatePwdForm.oldPassword"
               type="password"
               placeholder="请输入旧密码"
-              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+              class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
           </div>
           <div>
@@ -104,7 +104,7 @@
               v-model="updatePwdForm.newPassword"
               type="password"
               placeholder="至少 8 位"
-              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+              class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
           </div>
           <div>
@@ -113,7 +113,7 @@
               v-model="updatePwdForm.confirmNewPassword"
               type="password"
               placeholder="再次输入新密码"
-              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
+              class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
           </div>
           <div class="pt-4">
@@ -138,11 +138,11 @@
     >
       <div
         v-if="showReLoginModal"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
       >
         <div class="fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm transition-opacity"></div>
 
-        <div class="relative w-auto max-w-sm mx-auto my-6 z-50 transform transition-all">
+        <div class="relative w-auto max-w-sm mx-auto my-6 z-[var(--z-modal-panel)] transform transition-all">
           <div
             class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl border-0 outline-none focus:outline-none"
           >

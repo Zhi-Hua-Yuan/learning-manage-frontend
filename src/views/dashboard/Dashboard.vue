@@ -75,9 +75,14 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 defineOptions({ name: 'DashboardView' })
-import * as echarts from 'echarts'
+import { BarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import { use, init, graphic, type ECharts, type EChartsCoreOption } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
 import { fetchStatsOverview } from '@/api/stats'
 import { useTheme } from '@/composables/useTheme'
+
+use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 interface DashboardStats {
   activeProjects: number
@@ -99,7 +104,7 @@ const statsData = ref<DashboardStats>({
 
 const { resolvedTheme } = useTheme()
 const trendChartRef = ref<HTMLElement | null>(null)
-let trendChart: echarts.ECharts | null = null
+let trendChart: ECharts | null = null
 
 const handleResize = () => {
   trendChart?.resize()
@@ -111,7 +116,7 @@ const getCssVar = (name: string, fallback: string) => {
   return value || fallback
 }
 
-const buildTrendChartOption = (): echarts.EChartsCoreOption => {
+const buildTrendChartOption = (): EChartsCoreOption => {
   const axisColor = getCssVar('--color-chart-axis', '#9CA3AF')
   const gridColor = getCssVar('--color-chart-grid', '#F3F4F6')
   const tooltipBg = getCssVar('--color-chart-tooltip-bg', 'rgba(255, 255, 255, 0.95)')
@@ -149,7 +154,7 @@ const buildTrendChartOption = (): echarts.EChartsCoreOption => {
         type: 'bar',
         barWidth: '25%',
         itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          color: new graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: gradientStart },
             { offset: 1, color: gradientEnd },
           ]),
@@ -163,7 +168,7 @@ const buildTrendChartOption = (): echarts.EChartsCoreOption => {
 const initTrendChart = () => {
   if (!trendChartRef.value) return
   if (!trendChart) {
-    trendChart = echarts.init(trendChartRef.value)
+    trendChart = init(trendChartRef.value)
   }
 
   trendChart.setOption(buildTrendChartOption(), true)

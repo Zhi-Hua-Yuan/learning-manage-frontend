@@ -12,7 +12,7 @@
     <div
       v-for="toast in toastStore.toasts"
       :key="toast.id"
-      class="pointer-events-auto flex items-start gap-3 rounded-xl border-l-4 bg-white p-4 text-gray-700 shadow-xl"
+      class="toast-item pointer-events-auto flex items-start gap-3 rounded-xl border-l-4 p-4"
       :class="getContainerClass(toast.type)"
       role="status"
       aria-live="polite"
@@ -38,7 +38,7 @@
       </div>
       <button
         type="button"
-        class="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+        class="toast-close rounded-md p-1 transition-colors"
         @click="toastStore.dismiss(toast.id)"
       >
         ✕
@@ -68,39 +68,136 @@ const getIcon = (type: ToastType) => {
 const getContainerClass = (type: ToastType) => {
   switch (type) {
     case 'success':
-      return 'border-emerald-500'
+      return 'toast-item--success'
     case 'error':
-      return 'border-red-500'
+      return 'toast-item--error'
     case 'warning':
-      return 'border-amber-500'
+      return 'toast-item--warning'
     default:
-      return 'border-blue-500'
+      return 'toast-item--info'
   }
 }
 
 const getIconClass = (type: ToastType) => {
   switch (type) {
     case 'success':
-      return 'bg-emerald-100 text-emerald-600'
+      return 'toast-icon--success'
     case 'error':
-      return 'bg-red-100 text-red-600'
+      return 'toast-icon--error'
     case 'warning':
-      return 'bg-amber-100 text-amber-600'
+      return 'toast-icon--warning'
     default:
-      return 'bg-blue-100 text-blue-600'
+      return 'toast-icon--info'
   }
 }
 
 const getActionClass = (type: ToastType) => {
   switch (type) {
     case 'success':
-      return 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+      return 'toast-action toast-action--success'
     case 'error':
-      return 'bg-red-50 text-red-700 hover:bg-red-100'
+      return 'toast-action toast-action--error'
     case 'warning':
-      return 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+      return 'toast-action toast-action--warning'
     default:
-      return 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+      return 'toast-action toast-action--info'
   }
 }
 </script>
+
+<style scoped>
+.toast-item {
+  background: var(--color-popover-bg);
+  border-color: var(--color-popover-border);
+  color: var(--color-text-body);
+  box-shadow: var(--shadow-overlay);
+}
+
+.toast-item--success {
+  border-left-color: var(--color-success);
+}
+
+.toast-item--error {
+  border-left-color: var(--color-danger);
+}
+
+.toast-item--warning {
+  border-left-color: var(--color-warning);
+}
+
+.toast-item--info {
+  border-left-color: var(--color-primary);
+}
+
+.toast-icon--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.toast-icon--error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.toast-icon--warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.toast-icon--info {
+  background: var(--color-primary-soft-2);
+  color: var(--color-primary);
+}
+
+.toast-action {
+  color: var(--color-text-primary);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.toast-action--success {
+  background: var(--color-success-soft);
+}
+
+.toast-action--success:hover {
+  background: var(--color-success);
+  color: var(--color-text-on-accent);
+}
+
+.toast-action--error {
+  background: var(--color-danger-soft);
+}
+
+.toast-action--error:hover {
+  background: var(--color-danger);
+  color: var(--color-text-on-accent);
+}
+
+.toast-action--warning {
+  background: var(--color-warning-soft);
+}
+
+.toast-action--warning:hover {
+  background: var(--color-warning);
+  color: var(--color-text-primary);
+}
+
+.toast-action--info {
+  background: var(--color-primary-soft-2);
+}
+
+.toast-action--info:hover {
+  background: var(--color-primary);
+  color: var(--color-text-on-accent);
+}
+
+.toast-close {
+  color: var(--color-text-secondary);
+}
+
+.toast-close:hover {
+  background: var(--color-menu-hover);
+  color: var(--color-text-body);
+}
+</style>

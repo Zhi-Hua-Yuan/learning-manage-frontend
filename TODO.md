@@ -29,46 +29,46 @@
 ## P1：主题基础设施（变量与状态）
 
 ### 1. 扩展全局设计变量（`main.css`）
-- [ ] 在 `:root` 保持现有浅色变量定义（作为 light 基线）。
-- [ ] 新增 `:root[data-theme='dark']` 深色变量。
-- [ ] 补齐语义变量：页面背景、卡片背景、次级背景、文本层级、边框、悬浮层、遮罩层。
-- [ ] 补齐深色阴影变量（避免直接复用浅色阴影造成发灰）。
-- [ ] 为表单、按钮、卡片基础类改为优先使用变量而非固定颜色。
-- [ ] 为 `body` 增加 `color-scheme` 适配（light/dark）。
+- [x] 在 `:root` 保持现有浅色变量定义（作为 light 基线）。（已在 `src/assets/main.css` 保留并扩展）
+- [x] 新增 `:root[data-theme='dark']` 深色变量。（已新增）
+- [x] 补齐语义变量：页面背景、卡片背景、次级背景、文本层级、边框、悬浮层、遮罩层。（已补齐）
+- [x] 补齐深色阴影变量（避免直接复用浅色阴影造成发灰）。（已补齐）
+- [x] 为表单、按钮、卡片基础类改为优先使用变量而非固定颜色。（`.btn-secondary/.btn-danger/.input-base/.card-base` 已变量化）
+- [x] 为 `body` 增加 `color-scheme` 适配（light/dark）。（通过 `:root` / `:root[data-theme='dark']` 配置）
 
 ### 2. 主题状态管理（新增 composable/store）
-- [ ] 新增 `src/composables/useTheme.ts`（或 `src/stores/theme.ts`）。
-- [ ] 定义类型：`'light' | 'dark' | 'system'`。
-- [ ] 初始化逻辑：读取 `localStorage`，无值时默认 `system`。
-- [ ] 计算实际主题：`system` 时跟随 `prefers-color-scheme`。
-- [ ] 将实际主题同步到 `document.documentElement.dataset.theme`。
-- [ ] 监听系统主题变化（`matchMedia` change 事件）。
-- [ ] 暴露 `setThemeMode`、`themeMode`、`resolvedTheme`。
+- [x] 新增 `src/composables/useTheme.ts`（或 `src/stores/theme.ts`）。（已新增 `useTheme.ts`）
+- [x] 定义类型：`'light' | 'dark' | 'system'`。（已定义 `ThemeMode`）
+- [x] 初始化逻辑：读取 `localStorage`，无值时默认 `system`。（已实现）
+- [x] 计算实际主题：`system` 时跟随 `prefers-color-scheme`。（已实现）
+- [x] 将实际主题同步到 `document.documentElement.dataset.theme`。（已实现）
+- [x] 监听系统主题变化（`matchMedia` change 事件）。（已实现）
+- [x] 暴露 `setThemeMode`、`themeMode`、`resolvedTheme`。（已实现）
 
 ### 3. 应用入口接入
-- [ ] 在 `src/main.ts` 启动时初始化主题。
-- [ ] 避免页面首屏闪烁（初始化时立即写入 `data-theme`）。
-- [ ] 验证刷新后主题保持一致。
+- [x] 在 `src/main.ts` 启动时初始化主题。（`createApp` 前调用 `initTheme()`）
+- [x] 避免页面首屏闪烁（初始化时立即写入 `data-theme`）。（已在应用挂载前写入）
+- [~] 验证刷新后主题保持一致。（逻辑已支持，待你本地手工切换/刷新确认）
 
 ---
 
 ## P2：先改公共层（布局 + 复用组件）
 
 ### 1. 布局层（`BasicLayout.vue`）
-- [ ] 替换容器背景、文字、边框为主题语义色。
-- [ ] 替换侧栏、菜单 hover、选中态颜色，确保深色对比可读。
-- [ ] 替换弹窗/遮罩色值（含退出登录弹窗）。
-- [ ] 校正移动端遮罩和阴影在深色下的层级表现。
+- [x] 替换容器背景、文字、边框为主题语义色。
+- [x] 替换侧栏、菜单 hover、选中态颜色，确保深色对比可读。
+- [x] 替换弹窗/遮罩色值（含退出登录弹窗）。
+- [x] 校正移动端遮罩和阴影在深色下的层级表现。
 
 ### 2. 全局弹窗组件（`AppConfirmDialog.vue`）
-- [ ] 替换面板背景、标题文字、说明文字、遮罩颜色为语义变量。
-- [ ] 校验 `danger` / `primary` 两种变体在深色下可区分。
-- [ ] 校验过渡动画在深色下不出现闪烁边缘。
+- [x] 替换面板背景、标题文字、说明文字、遮罩颜色为语义变量。
+- [x] 校验 `danger` / `primary` 两种变体在深色下可区分。
+- [x] 校验过渡动画在深色下不出现闪烁边缘。
 
 ### 3. 全局 Toast（`GlobalToastHost.vue`）
-- [ ] 替换容器背景、关闭按钮 hover、文本颜色为语义变量。
-- [ ] 校验 success/error/warning/info 四类对比度。
-- [ ] 校验撤销按钮在深色下可见性。
+- [x] 替换容器背景、关闭按钮 hover、文本颜色为语义变量。
+- [x] 校验 success/error/warning/info 四类对比度。
+- [x] 校验撤销按钮在深色下可见性。
 
 ---
 

@@ -24,9 +24,18 @@
   --color-bg-surface: #fcfcfa;
   --color-bg-surface-secondary: #f2f2ef;
   --color-bg-surface-muted: #f7f7f5;
+  --color-bg-elevated: #ffffff;
   --color-bg-overlay: rgba(17, 24, 39, 0.06);
   --color-bg-mask: rgba(17, 24, 39, 0.38);
   --color-backdrop-strong: rgba(17, 24, 39, 0.48);
+  --color-divider-muted: #edf1f6;
+  --color-disabled-bg: #f3f4f6;
+  --color-disabled-text: #9ca3af;
+  --color-task-selected-bg: #eff6ff;
+  --color-task-selected-ring: #bfdbfe;
+  --color-task-selected-offset: #f6f6f4;
+  --color-timeline-line: #d1d5db;
+  --color-timeline-dot: #6b7280;
   --color-sidebar-bg: #f7f7f5;
   --color-sidebar-border: #e5e7eb;
   --color-menu-hover: #ededea;
@@ -44,6 +53,16 @@
   --color-warning-soft: #fef3c7;
   --color-danger-soft: #fee2e2;
   --color-text-on-accent: #ffffff;
+  --color-chart-axis: #9ca3af;
+  --color-chart-grid: #f3f4f6;
+  --color-chart-tooltip-bg: rgba(255, 255, 255, 0.95);
+  --color-chart-tooltip-text: #374151;
+  --color-chart-tooltip-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --color-chart-gradient-start: #60a5fa;
+  --color-chart-gradient-end: #3b82f6;
+  --color-scrollbar-track: #e9edf4;
+  --color-scrollbar-thumb: #a8b7cf;
+  --color-scrollbar-thumb-hover: #8ea2c4;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -84,9 +103,18 @@
   --color-bg-surface: #1f2937;
   --color-bg-surface-secondary: #283548;
   --color-bg-surface-muted: #1b2432;
+  --color-bg-elevated: #111827;
   --color-bg-overlay: rgba(148, 163, 184, 0.16);
   --color-bg-mask: rgba(3, 7, 18, 0.68);
   --color-backdrop-strong: rgba(2, 6, 23, 0.78);
+  --color-divider-muted: #334155;
+  --color-disabled-bg: #273244;
+  --color-disabled-text: #6b7280;
+  --color-task-selected-bg: #1f355a;
+  --color-task-selected-ring: #60a5fa;
+  --color-task-selected-offset: #111827;
+  --color-timeline-line: #475569;
+  --color-timeline-dot: #94a3b8;
   --color-sidebar-bg: #172030;
   --color-sidebar-border: #334155;
   --color-menu-hover: #223146;
@@ -104,6 +132,16 @@
   --color-warning-soft: #78350f;
   --color-danger-soft: #4c1d1d;
   --color-text-on-accent: #f8fafc;
+  --color-chart-axis: #94a3b8;
+  --color-chart-grid: #334155;
+  --color-chart-tooltip-bg: rgba(15, 23, 42, 0.94);
+  --color-chart-tooltip-text: #e5e7eb;
+  --color-chart-tooltip-shadow: 0 8px 20px rgba(2, 6, 23, 0.55);
+  --color-chart-gradient-start: #93c5fd;
+  --color-chart-gradient-end: #3b82f6;
+  --color-scrollbar-track: #182435;
+  --color-scrollbar-thumb: #3f5676;
+  --color-scrollbar-thumb-hover: #55719a;
   --shadow-card: 0 1px 2px rgba(2, 6, 23, 0.58);
   --shadow-card-hover: 0 8px 20px rgba(2, 6, 23, 0.5);
   --shadow-overlay: 0 12px 32px rgba(2, 6, 23, 0.65);
@@ -132,6 +170,35 @@ body {
 
 :root[data-theme='dark'] body {
   color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border: 2px solid var(--color-scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .mono {
@@ -270,6 +337,35 @@ body {
 .interactive-row.is-active {
   background: var(--color-menu-active);
   color: var(--color-text-primary);
+}
+
+.task-detail-select-trigger {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+  color: var(--color-text-body);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.task-detail-select-trigger:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-surface-secondary);
+}
+
+.task-detail-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-input-border-focus);
+  box-shadow: 0 0 0 3px var(--color-input-ring);
 }
 
 .danger-soft {

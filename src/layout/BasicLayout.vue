@@ -398,6 +398,8 @@ interface CurrentUserInfo {
   account?: string
 }
 
+const USER_INFO_UPDATED_EVENT = 'tick:user-updated'
+
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
@@ -605,6 +607,13 @@ const loadUserInfo = async () => {
   }
 }
 
+const handleUserInfoUpdated = (event: Event) => {
+  const customEvent = event as CustomEvent<CurrentUserInfo>
+  const nextUserInfo = customEvent.detail
+  if (!nextUserInfo || typeof nextUserInfo !== 'object') return
+  currentUserInfo.value = { ...currentUserInfo.value, ...nextUserInfo }
+}
+
 const ensureDefaultProject = async () => {
   if (selectedProjectId.value || projectList.value.length === 0) return
 
@@ -769,11 +778,13 @@ onMounted(() => {
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
+  window.addEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })
 
 onBeforeUnmount(() => {
   stopResizeLeft()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   window.removeEventListener('resize', updateViewport)
+  window.removeEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })
 </script>

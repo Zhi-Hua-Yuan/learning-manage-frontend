@@ -1,10 +1,10 @@
 ﻿<template>
-  <div class="relative flex min-h-full flex-1 bg-gray-50">
-    <main class="flex min-w-0 flex-1 flex-col bg-gray-50">
+  <div class="relative flex min-h-full flex-1 bg-[var(--color-bg-page)]">
+    <main class="flex min-w-0 flex-1 flex-col bg-[var(--color-bg-page)]">
       <div
-        class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-5"
+        class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-3 sm:px-5"
       >
-        <span class="text-lg font-semibold text-gray-900 sm:text-xl">
+        <span class="text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
           {{ projectList.find((p) => p.id === selectedProjectId)?.icon }}
           {{ projectList.find((p) => p.id === selectedProjectId)?.name || '请选择清单' }}
         </span>
@@ -13,53 +13,82 @@
           v-if="selectedProjectId && taskList.length > 0"
           class="flex w-full items-center gap-3 sm:w-56"
         >
-          <span class="mono text-xs text-gray-500">完成度 {{ projectProgress }}%</span>
-          <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+          <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
+          <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]">
             <div
-              class="h-full bg-emerald-500 transition-all duration-500"
+              class="h-full bg-[var(--color-success)] transition-all duration-500"
               :style="{ width: projectProgress + '%' }"
             ></div>
           </div>
         </div>
       </div>
 
-      <div class="border-b border-gray-200 px-4 py-3 sm:px-5">
-        <div class="card-base flex flex-col gap-2 bg-white p-3 sm:flex-row sm:items-center">
+      <div class="relative z-30 border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5">
+        <div class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center">
           <div class="flex min-w-0 flex-1 items-center">
-            <span class="mr-2 text-lg font-bold text-gray-400">+</span>
+            <span class="mr-2 text-lg font-bold text-[var(--color-text-tertiary)]">+</span>
             <input
               v-model="newTaskTitle"
               @keyup.enter="addTask"
               type="text"
               maxlength="50"
               placeholder="输入任务标题（最多 50 字），按回车保存"
-              class="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+              class="w-full min-w-0 bg-transparent text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
             />
           </div>
 
-          <select
-            v-model="newTaskMilestoneId"
-            class="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 outline-none focus:border-blue-400"
-          >
-            <option value="">默认列表</option>
-            <option v-for="m in milestoneList" :key="m.id" :value="m.id">阶段：{{ m.name }}</option>
-          </select>
+          <div ref="newTaskMilestoneMenuRef" class="relative w-full sm:w-56">
+            <button
+              type="button"
+              class="task-detail-select-trigger"
+              @click.stop="toggleNewTaskMilestoneMenu"
+            >
+              <span class="truncate text-sm text-[var(--color-text-body)]">{{ newTaskMilestoneLabel }}</span>
+              <svg class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+
+            <div
+              v-if="isNewTaskMilestoneMenuOpen"
+              @click.stop
+              class="surface-panel absolute left-0 top-full z-40 mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
+            >
+              <button
+                v-for="option in newTaskMilestoneOptions"
+                :key="option.value || 'new-task-milestone-default'"
+                @click="selectNewTaskMilestone(option.value)"
+                class="interactive-row flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+              >
+                <span class="truncate text-[var(--color-text-body)]">{{ option.label }}</span>
+                <svg
+                  v-if="newTaskMilestoneId === option.value"
+                  class="ml-auto h-4 w-4 text-[var(--color-text-secondary)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="flex-1 overflow-y-auto p-3 sm:p-4">
         <div class="space-y-4">
           <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
-            <h3 class="px-1 text-xs font-semibold tracking-wide text-gray-500">默认列表</h3>
+            <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">默认列表</h3>
             <div class="space-y-2">
               <div
                 v-for="task in groupedTasks.unassigned"
                 :key="task.id"
                 @click="selectTask(task)"
-                class="card-base group flex cursor-pointer items-center gap-3 bg-white px-3 py-3"
+                class="card-base group flex cursor-pointer items-center gap-3 bg-[var(--color-bg-surface)] px-3 py-3"
                 :class="
                   selectedTask?.id === task.id
-                    ? 'bg-gray-100 ring-2 ring-blue-200 ring-offset-1 ring-offset-gray-50'
+                    ? 'bg-[var(--color-task-selected-bg)] ring-2 ring-[var(--color-task-selected-ring)] ring-offset-1 ring-offset-[var(--color-task-selected-offset)]'
                     : ''
                 "
                 :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
@@ -68,8 +97,8 @@
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
-                      ? 'border-emerald-500 bg-emerald-500'
-                      : 'border-gray-300 group-hover:border-gray-500'
+                      ? 'border-[var(--color-success)] bg-[var(--color-success)]'
+                      : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
@@ -91,17 +120,21 @@
 
                 <span
                   class="min-w-0 flex-1 text-sm transition-colors"
-                  :class="task.status === 2 ? 'text-gray-400 line-through' : 'text-gray-800'"
+                  :class="
+                    task.status === 2
+                      ? 'text-[var(--color-text-tertiary)] line-through'
+                      : 'text-[var(--color-text-primary)]'
+                  "
                 >
                   {{ task.title }}
                 </span>
 
                 <div class="flex shrink-0 items-center gap-2">
-                  <span v-if="task.dueDate" class="mono text-xs text-gray-500">
+                  <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
                     {{ formatTaskDueDate(task.dueDate) }}
                   </span>
                   <span
-                    class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium"
+                    class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs font-medium"
                     :class="getPriorityOption(task.priority).textClass"
                   >
                     <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
@@ -115,26 +148,26 @@
           <section
             v-for="group in groupedTasks.milestones"
             :key="group.milestone.id"
-            class="card-base space-y-3 bg-white p-3 sm:p-4"
+            class="card-base space-y-3 bg-[var(--color-bg-surface)] p-3 sm:p-4"
           >
             <div class="group relative flex flex-wrap items-center justify-between gap-3">
               <div
                 v-if="editingMilestoneId === group.milestone.id"
                 class="flex min-w-0 flex-1 items-center gap-2"
               >
-                <span class="text-gray-500">🚩</span>
+                <span class="text-[var(--color-text-secondary)]">🚩</span>
                 <input
                   v-model="editMilestoneName"
                   @keyup.enter="saveMilestone(group.milestone)"
                   @blur="saveMilestone(group.milestone)"
                   v-focus
                   type="text"
-                  class="w-full rounded border border-blue-400 px-2 py-1 text-sm font-semibold text-gray-800 outline-none"
+                  class="w-full rounded border border-[var(--color-input-border-focus)] px-2 py-1 text-sm font-semibold text-[var(--color-text-primary)] outline-none focus:ring-2 focus:ring-[var(--color-input-ring)]"
                 />
               </div>
 
-              <h3 v-else class="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-gray-800">
-                <span class="text-gray-500">🚩</span>
+              <h3 v-else class="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-[var(--color-text-primary)]">
+                <span class="text-[var(--color-text-secondary)]">🚩</span>
                 <span class="truncate">{{ group.milestone.name }}</span>
 
                 <div
@@ -142,7 +175,7 @@
                 >
                   <button
                     @click="startEditMilestone(group.milestone)"
-                    class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    class="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
                     title="重命名"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,7 +189,7 @@
                   </button>
                   <button
                     @click="requestDeleteMilestone(group.milestone.id, group.milestone.name)"
-                    class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500"
+                    class="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
                     title="删除阶段"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,10 +205,10 @@
               </h3>
 
               <div class="flex w-full items-center gap-2 sm:w-28">
-                <span class="mono text-xs text-gray-500">{{ group.progress }}%</span>
-                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200">
+                <span class="mono text-xs text-[var(--color-text-secondary)]">{{ group.progress }}%</span>
+                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]">
                   <div
-                    class="h-full bg-blue-400 transition-all duration-500"
+                    class="h-full bg-[var(--color-primary)] transition-all duration-500"
                     :style="{ width: group.progress + '%' }"
                   ></div>
                 </div>
@@ -185,7 +218,7 @@
             <div class="space-y-2">
               <div
                 v-if="group.tasks.length === 0"
-                class="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-4 text-center text-sm text-gray-500"
+                class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] px-3 py-4 text-center text-sm text-[var(--color-text-secondary)]"
               >
                 该阶段暂无任务
               </div>
@@ -194,10 +227,10 @@
                 v-for="task in group.tasks"
                 :key="task.id"
                 @click="selectTask(task)"
-                class="card-base group flex cursor-pointer items-center gap-3 bg-white px-3 py-3"
+                class="card-base group flex cursor-pointer items-center gap-3 bg-[var(--color-bg-surface)] px-3 py-3"
                 :class="
                   selectedTask?.id === task.id
-                    ? 'bg-gray-100 ring-2 ring-blue-200 ring-offset-1 ring-offset-gray-50'
+                    ? 'bg-[var(--color-task-selected-bg)] ring-2 ring-[var(--color-task-selected-ring)] ring-offset-1 ring-offset-[var(--color-task-selected-offset)]'
                     : ''
                 "
                 :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
@@ -206,8 +239,8 @@
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
-                      ? 'border-emerald-500 bg-emerald-500'
-                      : 'border-gray-300 group-hover:border-gray-500'
+                      ? 'border-[var(--color-success)] bg-[var(--color-success)]'
+                      : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
@@ -229,17 +262,21 @@
 
                 <span
                   class="min-w-0 flex-1 text-sm transition-colors"
-                  :class="task.status === 2 ? 'text-gray-400 line-through' : 'text-gray-800'"
+                  :class="
+                    task.status === 2
+                      ? 'text-[var(--color-text-tertiary)] line-through'
+                      : 'text-[var(--color-text-primary)]'
+                  "
                 >
                   {{ task.title }}
                 </span>
 
                 <div class="flex shrink-0 items-center gap-2">
-                  <span v-if="task.dueDate" class="mono text-xs text-gray-500">
+                  <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
                     {{ formatTaskDueDate(task.dueDate) }}
                   </span>
                   <span
-                    class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium"
+                    class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs font-medium"
                     :class="getPriorityOption(task.priority).textClass"
                   >
                     <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
@@ -251,7 +288,7 @@
           </section>
 
           <div class="pt-1">
-            <div v-if="isAddingMilestone" class="card-base border-gray-400 bg-white p-1">
+            <div v-if="isAddingMilestone" class="card-base border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] p-1">
               <input
                 v-model="newMilestoneName"
                 @keyup.enter="submitNewMilestone"
@@ -259,14 +296,14 @@
                 autofocus
                 type="text"
                 placeholder="输入阶段名称，按回车保存"
-                class="w-full bg-transparent px-3 py-2 text-sm text-gray-700 outline-none"
+                class="w-full bg-transparent px-3 py-2 text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
               />
             </div>
 
             <button
               v-else
               @click="openAddMilestoneInput"
-              class="card-base w-full border-dashed border-gray-300 bg-[#f7f7f5] py-3 text-sm font-medium text-gray-700 hover:border-gray-400 hover:bg-[#ecece8]"
+              class="card-base w-full border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] py-3 text-sm font-medium text-[var(--color-text-body)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-surface-secondary)]"
             >
               + 添加阶段
             </button>
@@ -277,23 +314,27 @@
 
     <div
       v-if="!isMobile"
-      class="-ml-1 z-20 w-1 cursor-col-resize bg-transparent transition-all hover:w-1.5 hover:bg-gray-400"
+      class="-ml-1 z-20 w-1 cursor-col-resize bg-transparent transition-all hover:w-1.5 hover:bg-[var(--color-primary-soft-2)]"
       @mousedown="startResizeRight"
     ></div>
 
     <aside
       v-if="selectedTask || !isMobile"
-      class="z-30 flex flex-col bg-white"
-      :class="isMobile ? 'fixed inset-0 w-full border-l-0' : 'border-l border-gray-200 shadow-sm'"
+      class="z-30 flex flex-col bg-[var(--color-bg-surface)]"
+      :class="
+        isMobile
+          ? 'fixed inset-0 w-full border-l-0'
+          : 'border-l border-[var(--color-border-default)] shadow-[var(--shadow-card)]'
+      "
       :style="isMobile ? undefined : { width: detailWidth + 'px' }"
     >
       <template v-if="selectedTask">
-        <div class="flex items-center justify-between border-b border-gray-100 p-4 text-gray-600">
+        <div class="flex items-center justify-between border-b border-[var(--color-divider-muted)] p-4 text-[var(--color-text-body)]">
           <div class="flex items-center gap-2">
             <button
               v-if="isMobile"
               @click="closeDetail"
-              class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              class="rounded-md p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
               title="返回列表"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -306,7 +347,7 @@
           <div class="flex items-center gap-1">
             <button
               @click="requestDeleteTask"
-              class="rounded p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
+              class="rounded p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
               title="删除任务"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -321,7 +362,7 @@
 
             <button
               @click="closeDetail"
-              class="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+              class="rounded p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
               title="关闭详情"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,20 +381,19 @@
               rows="1"
               @input="onDetailTitleInput"
               @blur="onTextBlur"
-              class="w-full resize-none overflow-hidden bg-transparent text-xl font-bold leading-8 text-gray-800 outline-none placeholder:text-gray-300"
+              class="w-full resize-none overflow-hidden bg-transparent text-xl font-bold leading-8 text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)]"
               placeholder="请输入任务标题（最多 50 字）"
             ></textarea>
-            <p v-if="!selectedTask.title.trim()" class="text-xs text-amber-500">
+            <p v-if="!selectedTask.title.trim()" class="text-xs text-[var(--color-warning)]">
               任务标题不能为空，最多 50 字。
             </p>
           </div>
 
           <div
             ref="priorityRowRef"
-            class="relative flex cursor-pointer items-center gap-3 border-y border-gray-100 py-3"
-            @click="togglePriorityMenuFromRow"
+            class="relative flex items-center gap-3 border-y border-[var(--color-divider-muted)] py-3"
           >
-            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-5 w-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -361,51 +401,56 @@
                 d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-1 6-1 1H11.5l-1-1H5v12"
               ></path>
             </svg>
-            <label class="w-20 text-sm font-medium text-gray-600">优先级</label>
-
-            <button
-              type="button"
-              @click.stop="togglePriorityMenu"
-              class="flex items-center gap-2 px-1 py-1"
-            >
-              <span class="priority-dot" :class="currentPriorityObj.dotClass"></span>
-              <span class="text-sm font-medium" :class="currentPriorityObj.textClass">
-                {{ currentPriorityObj.text }}
-              </span>
-            </button>
-
-            <div
-              v-if="isPriorityMenuOpen"
-              @click.stop
-              class="absolute left-24 top-12 z-20 w-40 overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg"
-            >
+            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]">优先级</label>
+            <div class="relative min-w-0 flex-1">
               <button
-                v-for="option in priorityOptions"
-                :key="option.value"
-                @click="selectPriority(option.value)"
-                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                type="button"
+                @click.stop="togglePriorityMenu"
+                class="task-detail-select-trigger"
               >
-                <span class="priority-dot" :class="option.dotClass"></span>
-                <span class="font-medium" :class="option.textClass">{{ option.text }}</span>
-                <svg
-                  v-if="selectedTask.priority === option.value"
-                  class="ml-auto h-4 w-4 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                <span class="flex min-w-0 items-center gap-2">
+                  <span class="priority-dot" :class="currentPriorityObj.dotClass"></span>
+                  <span class="truncate text-sm font-medium" :class="currentPriorityObj.textClass">
+                    {{ currentPriorityObj.text }}
+                  </span>
+                </span>
+                <svg class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
               </button>
+
+              <div
+                v-if="isPriorityMenuOpen"
+                @click.stop
+                class="surface-panel absolute left-0 top-full z-40 mt-2 w-full overflow-hidden rounded-lg py-1"
+              >
+                <button
+                  v-for="option in priorityOptions"
+                  :key="option.value"
+                  @click="selectPriority(option.value)"
+                  class="interactive-row flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                >
+                  <span class="priority-dot" :class="option.dotClass"></span>
+                  <span class="font-medium" :class="option.textClass">{{ option.text }}</span>
+                  <svg
+                    v-if="selectedTask.priority === option.value"
+                    class="ml-auto h-4 w-4 text-[var(--color-text-secondary)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
           <div
             ref="dueDateRowRef"
-            class="flex cursor-pointer items-center gap-3 border-b border-gray-100 py-3"
-            @click="openDueDatePicker"
+            class="flex items-center gap-3 border-b border-[var(--color-divider-muted)] py-3"
           >
-            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-5 w-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -413,42 +458,115 @@
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               ></path>
             </svg>
-            <label class="w-20 text-sm font-medium text-gray-600">截止日期</label>
+            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]">截止日期</label>
 
-            <div class="relative flex min-w-0 flex-1 items-center justify-between gap-2 pr-1 text-sm">
-              <span class="truncate" :class="selectedTask.dueDate ? 'text-gray-700' : 'text-gray-400'">
-                {{ selectedTask.dueDate || '设置截止日期' }}
-              </span>
-              <svg
-                class="pointer-events-none h-4 w-4 shrink-0 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div class="relative min-w-0 flex-1">
+              <button
+                type="button"
+                @click="openDueDatePicker"
+                class="task-detail-select-trigger text-left"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                ></path>
-              </svg>
-              <input
-                ref="dueDateInputRef"
-                type="date"
-                tabindex="-1"
-                :value="selectedTask.dueDate || ''"
-                @change="onDueDateChange"
-                @focus="onDueDateFocus"
-                @blur="onDueDateBlur"
-                class="pointer-events-none absolute h-0 w-0 opacity-0"
-              />
+                <span
+                  class="min-w-0 flex-1 truncate text-sm"
+                  :class="
+                    currentDueDateLabel !== '设置截止日期'
+                      ? 'text-[var(--color-text-body)]'
+                      : 'text-[var(--color-text-tertiary)]'
+                  "
+                >
+                  {{ currentDueDateLabel }}
+                </span>
+                <svg
+                  class="pointer-events-none h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+
+              <div
+                v-if="isDueDatePickerOpen"
+                @click.stop
+                class="surface-panel absolute left-0 top-full z-40 mt-2 w-[280px] max-w-full rounded-lg p-3"
+              >
+                <div class="mb-3 flex items-center justify-between">
+                  <button
+                    type="button"
+                    @click="shiftCalendarMonth(-1)"
+                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
+                    aria-label="上个月"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                  </button>
+                  <span class="mono text-sm font-medium text-[var(--color-text-primary)]">
+                    {{ currentCalendarMonthLabel }}
+                  </span>
+                  <button
+                    type="button"
+                    @click="shiftCalendarMonth(1)"
+                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
+                    aria-label="下个月"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                  </button>
+                </div>
+
+                <div class="mb-1 grid grid-cols-7 gap-1 text-center text-xs text-[var(--color-text-tertiary)]">
+                  <span v-for="weekday in calendarWeekdayLabels" :key="weekday" class="py-1">{{ weekday }}</span>
+                </div>
+
+                <div class="grid grid-cols-7 gap-1">
+                  <button
+                    v-for="cell in calendarCells"
+                    :key="cell.key"
+                    type="button"
+                    @click="selectDueDate(cell.iso)"
+                    class="h-8 rounded-md text-sm transition-colors"
+                    :class="
+                      cell.isSelected
+                        ? 'bg-[var(--color-primary)] text-[var(--color-text-on-accent)]'
+                        : cell.isToday
+                          ? 'border border-[var(--color-primary)] text-[var(--color-primary)]'
+                          : cell.inCurrentMonth
+                            ? 'text-[var(--color-text-body)] hover:bg-[var(--color-menu-hover)]'
+                            : 'text-[var(--color-text-tertiary)] opacity-60 hover:bg-[var(--color-bg-surface-muted)]'
+                    "
+                  >
+                    {{ cell.day }}
+                  </button>
+                </div>
+
+                <div class="mt-3 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    @click="clearDueDate"
+                    class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
+                  >
+                    清空
+                  </button>
+                  <button
+                    type="button"
+                    @click="selectTodayDueDate"
+                    class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
+                  >
+                    今天
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           <div
-            class="relative flex cursor-pointer items-center gap-3 border-b border-gray-100 py-3"
+            ref="milestoneRowRef"
+            class="relative flex items-center gap-3 border-b border-[var(--color-divider-muted)] py-3"
           >
-            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-5 w-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -456,23 +574,44 @@
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               ></path>
             </svg>
-            <label class="w-20 text-sm font-medium text-gray-600">所属阶段</label>
+            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]">所属阶段</label>
 
-            <div class="flex min-w-0 flex-1 items-center justify-between text-sm text-gray-700">
-              <span class="truncate">{{ currentMilestoneLabel }}</span>
-              <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-              </svg>
+            <div class="relative min-w-0 flex-1">
+              <button
+                type="button"
+                @click.stop="toggleMilestoneMenu"
+                class="task-detail-select-trigger"
+              >
+                <span class="truncate text-sm text-[var(--color-text-body)]">{{ currentMilestoneLabel }}</span>
+                <svg class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+
+              <div
+                v-if="isMilestoneMenuOpen"
+                @click.stop
+                class="surface-panel absolute left-0 top-full z-40 mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
+              >
+                <button
+                  v-for="option in milestoneOptions"
+                  :key="option.value || 'milestone-default'"
+                  @click="selectMilestone(option.value)"
+                  class="interactive-row flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                >
+                  <span class="truncate text-[var(--color-text-body)]">{{ option.label }}</span>
+                  <svg
+                    v-if="selectedMilestoneValue === option.value"
+                    class="ml-auto h-4 w-4 text-[var(--color-text-secondary)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
-
-            <select
-              :value="selectedTask.milestoneId || ''"
-              @change="onMilestoneChange"
-              class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-            >
-              <option value="">默认列表（未分配）</option>
-              <option v-for="m in milestoneList" :key="m.id" :value="m.id">🚩 {{ m.name }}</option>
-            </select>
           </div>
 
           <textarea
@@ -482,15 +621,15 @@
             @blur="onTextBlur"
             maxlength="500"
             rows="6"
-            class="min-h-[140px] w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-[#f7f7f5] p-3 text-sm text-gray-700 outline-none transition-all focus:border-blue-300 focus:bg-white"
+            class="min-h-[140px] w-full resize-none overflow-hidden rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
             placeholder="补充任务说明（最多 500 字）"
           ></textarea>
         </div>
       </template>
 
       <template v-else>
-        <div class="flex h-full flex-col items-center justify-center px-4 text-gray-400">
-          <svg class="mb-4 h-16 w-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex h-full flex-col items-center justify-center px-4 text-[var(--color-text-tertiary)]">
+          <svg class="mb-4 h-16 w-16 text-[var(--color-text-tertiary)] opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -574,6 +713,15 @@ interface PriorityOption {
   textClass: string
 }
 
+interface CalendarCell {
+  key: string
+  iso: string
+  day: number
+  inCurrentMonth: boolean
+  isToday: boolean
+  isSelected: boolean
+}
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -594,13 +742,16 @@ const editMilestoneName = ref('')
 
 const isPriorityMenuOpen = ref(false)
 const isDueDatePickerOpen = ref(false)
+const isMilestoneMenuOpen = ref(false)
+const isNewTaskMilestoneMenuOpen = ref(false)
 const showDeleteTaskConfirm = ref(false)
 const showDeleteMilestoneConfirm = ref(false)
 const pendingDeleteTask = ref<Task | null>(null)
 const pendingDeleteMilestone = ref<{ id: string; name: string } | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
-const dueDateInputRef = ref<HTMLInputElement | null>(null)
+const milestoneRowRef = ref<HTMLElement | null>(null)
+const newTaskMilestoneMenuRef = ref<HTMLElement | null>(null)
 const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 340)
@@ -646,9 +797,71 @@ const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
   return 0
 }
 
-const formatTaskDueDate = (dueDate?: string | null) => {
+const calendarWeekdayLabels = ['日', '一', '二', '三', '四', '五', '六'] as const
+
+const normalizeTaskDueDate = (dueDate?: string | null) => {
   if (!dueDate) return ''
-  return dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate
+  const normalized = dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
+}
+
+const formatTaskDueDate = (dueDate?: string | null) => normalizeTaskDueDate(dueDate)
+
+const toDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`
+
+const parseDateKey = (dateKey?: string | null) => {
+  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null
+  const [year, month, day] = dateKey.split('-').map(Number)
+  if (!year || !month || !day) return null
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null
+  }
+  return date
+}
+
+const getMonthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1)
+
+const calendarMonthCursor = ref(getMonthStart(new Date()))
+
+const currentDueDateLabel = computed(() => normalizeTaskDueDate(selectedTask.value?.dueDate) || '设置截止日期')
+
+const currentCalendarMonthLabel = computed(
+  () => `${calendarMonthCursor.value.getFullYear()}年${calendarMonthCursor.value.getMonth() + 1}月`,
+)
+
+const calendarCells = computed<CalendarCell[]>(() => {
+  const monthStart = calendarMonthCursor.value
+  const firstWeekday = monthStart.getDay()
+  const gridStart = new Date(monthStart.getFullYear(), monthStart.getMonth(), 1 - firstWeekday)
+  const selectedDateKey = normalizeTaskDueDate(selectedTask.value?.dueDate) || ''
+  const todayKey = toDateKey(new Date())
+  const cells: CalendarCell[] = []
+
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index)
+    const dateKey = toDateKey(date)
+
+    cells.push({
+      key: `${dateKey}-${index}`,
+      iso: dateKey,
+      day: date.getDate(),
+      inCurrentMonth: date.getMonth() === monthStart.getMonth(),
+      isToday: dateKey === todayKey,
+      isSelected: dateKey === selectedDateKey,
+    })
+  }
+
+  return cells
+})
+
+const syncCalendarToDueDate = () => {
+  const selectedDate = parseDateKey(normalizeTaskDueDate(selectedTask.value?.dueDate))
+  const baseDate = selectedDate || new Date()
+  calendarMonthCursor.value = getMonthStart(baseDate)
 }
 
 const resizeTextarea = (
@@ -823,6 +1036,8 @@ const addTask = async () => {
       milestoneId: newTaskMilestoneId.value || undefined,
     })
     newTaskTitle.value = ''
+    newTaskMilestoneId.value = ''
+    isNewTaskMilestoneMenuOpen.value = false
     await loadTasks()
   } catch {
     toast.error('添加任务失败，请检查网络后重试。')
@@ -846,12 +1061,16 @@ const selectTask = (task: Task) => {
   selectedTask.value = task
   isPriorityMenuOpen.value = false
   isDueDatePickerOpen.value = false
+  isMilestoneMenuOpen.value = false
+  isNewTaskMilestoneMenuOpen.value = false
 }
 
 const closeDetail = () => {
   closeDueDatePicker()
   selectedTask.value = null
   isPriorityMenuOpen.value = false
+  isMilestoneMenuOpen.value = false
+  isNewTaskMilestoneMenuOpen.value = false
 }
 
 const currentPriorityObj = computed(() => {
@@ -869,6 +1088,33 @@ const currentMilestoneLabel = computed(() => {
   return `🚩 ${milestone.name}`
 })
 
+const milestoneOptions = computed(() => [
+  { value: null, label: '默认列表（未分配）' },
+  ...milestoneList.value.map((milestone) => ({
+    value: String(milestone.id),
+    label: `🚩 ${milestone.name}`,
+  })),
+])
+
+const selectedMilestoneValue = computed(() => {
+  const milestoneId = selectedTask.value?.milestoneId
+  if (!milestoneId || String(milestoneId) === '0') return null
+  return String(milestoneId)
+})
+
+const newTaskMilestoneOptions = computed(() => [
+  { value: '', label: '默认列表' },
+  ...milestoneList.value.map((milestone) => ({
+    value: String(milestone.id),
+    label: `阶段：${milestone.name}`,
+  })),
+])
+
+const newTaskMilestoneLabel = computed(() => {
+  const option = newTaskMilestoneOptions.value.find((item) => item.value === newTaskMilestoneId.value)
+  return option?.label || '默认列表'
+})
+
 const deleteTaskConfirmTitle = computed(() => {
   if (!pendingDeleteTask.value) return '确认删除任务？'
   return `确认删除任务“${pendingDeleteTask.value.title}”？`
@@ -879,54 +1125,54 @@ const deleteMilestoneConfirmTitle = computed(() => {
   return `确认删除阶段“${pendingDeleteMilestone.value.name}”？`
 })
 
-const togglePriorityMenuFromRow = () => {
-  isPriorityMenuOpen.value = !isPriorityMenuOpen.value
+const toggleNewTaskMilestoneMenu = () => {
+  isPriorityMenuOpen.value = false
+  closeDueDatePicker()
+  isMilestoneMenuOpen.value = false
+  isNewTaskMilestoneMenuOpen.value = !isNewTaskMilestoneMenuOpen.value
+}
+
+const selectNewTaskMilestone = (milestoneId: string) => {
+  newTaskMilestoneId.value = milestoneId
+  isNewTaskMilestoneMenuOpen.value = false
 }
 
 const togglePriorityMenu = () => {
+  isNewTaskMilestoneMenuOpen.value = false
+  closeDueDatePicker()
+  isMilestoneMenuOpen.value = false
   isPriorityMenuOpen.value = !isPriorityMenuOpen.value
+}
+
+const toggleMilestoneMenu = () => {
+  if (!selectedTask.value) return
+  isNewTaskMilestoneMenuOpen.value = false
+  isPriorityMenuOpen.value = false
+  closeDueDatePicker()
+  isMilestoneMenuOpen.value = !isMilestoneMenuOpen.value
 }
 
 const closeDueDatePicker = () => {
   isDueDatePickerOpen.value = false
-  dueDateInputRef.value?.blur()
 }
 
 const openDueDatePicker = () => {
-  const input = dueDateInputRef.value
-  if (!input) return
+  isNewTaskMilestoneMenuOpen.value = false
+  isPriorityMenuOpen.value = false
+  isMilestoneMenuOpen.value = false
 
   if (isDueDatePickerOpen.value) {
     closeDueDatePicker()
     return
   }
 
-  isDueDatePickerOpen.value = true
-
-  const openNativePickerByClick = () => {
-    input.focus()
-    input.click()
-  }
-
-  const inputWithPicker = input as HTMLInputElement & { showPicker?: () => void }
-  if (typeof inputWithPicker.showPicker === 'function') {
-    try {
-      inputWithPicker.showPicker()
-      return
-    } catch {
-      // no-op and fallback to native click
-    }
-  }
-
-  openNativePickerByClick()
-}
-
-const onDueDateFocus = () => {
+  syncCalendarToDueDate()
   isDueDatePickerOpen.value = true
 }
 
-const onDueDateBlur = () => {
-  isDueDatePickerOpen.value = false
+const shiftCalendarMonth = (offset: number) => {
+  const current = calendarMonthCursor.value
+  calendarMonthCursor.value = new Date(current.getFullYear(), current.getMonth() + offset, 1)
 }
 
 const handleDocumentPointerDown = (event: PointerEvent) => {
@@ -939,6 +1185,18 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
 
   if (isDueDatePickerOpen.value && dueDateRowRef.value && !dueDateRowRef.value.contains(targetNode)) {
     closeDueDatePicker()
+  }
+
+  if (isMilestoneMenuOpen.value && milestoneRowRef.value && !milestoneRowRef.value.contains(targetNode)) {
+    isMilestoneMenuOpen.value = false
+  }
+
+  if (
+    isNewTaskMilestoneMenuOpen.value &&
+    newTaskMilestoneMenuRef.value &&
+    !newTaskMilestoneMenuRef.value.contains(targetNode)
+  ) {
+    isNewTaskMilestoneMenuOpen.value = false
   }
 }
 
@@ -957,12 +1215,17 @@ const selectPriority = async (val: number) => {
   }
 }
 
-const onDueDateChange = async (event: Event) => {
+const updateDueDate = async (nextDate: string | null) => {
   if (!selectedTask.value) return
 
-  const target = event.target as HTMLInputElement
-  const finalDate = target.value === '' ? null : target.value
+  const finalDate = nextDate || null
   const oldDate = selectedTask.value.dueDate
+  const oldDateKey = normalizeTaskDueDate(oldDate) || null
+  if (oldDateKey === finalDate) {
+    isDueDatePickerOpen.value = false
+    return
+  }
+
   selectedTask.value.dueDate = finalDate
   isDueDatePickerOpen.value = false
 
@@ -975,13 +1238,29 @@ const onDueDateChange = async (event: Event) => {
   }
 }
 
-const onMilestoneChange = async (event: Event) => {
+const selectDueDate = async (dateKey: string) => {
+  await updateDueDate(dateKey)
+}
+
+const clearDueDate = async () => {
+  await updateDueDate(null)
+}
+
+const selectTodayDueDate = async () => {
+  await updateDueDate(toDateKey(new Date()))
+}
+
+const selectMilestone = async (milestoneId: string | null) => {
   if (!selectedTask.value) return
 
-  const target = event.target as HTMLSelectElement
-  const finalMilestoneId = target.value === '' ? null : target.value
+  const finalMilestoneId = milestoneId && milestoneId !== '0' ? milestoneId : null
   const oldMilestoneId = selectedTask.value.milestoneId
+  if ((oldMilestoneId ?? null) === finalMilestoneId) {
+    isMilestoneMenuOpen.value = false
+    return
+  }
   selectedTask.value.milestoneId = finalMilestoneId
+  isMilestoneMenuOpen.value = false
 
   try {
     await updateTaskApi({ ...selectedTask.value, milestoneId: finalMilestoneId })
@@ -1182,6 +1461,8 @@ watch(
     closeDueDatePicker()
     selectedTask.value = null
     isPriorityMenuOpen.value = false
+    isMilestoneMenuOpen.value = false
+    isNewTaskMilestoneMenuOpen.value = false
     await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
   },
 )

@@ -1,45 +1,45 @@
 <template>
-  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-[var(--color-bg-page)] p-4 sm:p-6 lg:p-8">
     <div class="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8">
       <div class="mb-6 space-y-2 text-center sm:mb-8">
-        <h2 class="text-2xl font-black tracking-tight text-gray-800 sm:text-3xl">
+        <h2 class="text-2xl font-black tracking-tight text-[var(--color-text-primary)] sm:text-3xl">
           让
-          <span class="text-emerald-600">AI</span>
+          <span class="text-[var(--color-ai)]">AI</span>
           帮你拆解目标
         </h2>
-        <p class="text-gray-500">只需一句话，自动生成包含阶段与任务的落地执行计划</p>
+        <p class="text-[var(--color-text-secondary)]">只需一句话，自动生成包含阶段与任务的落地执行计划</p>
       </div>
 
       <div
-        class="card-base relative space-y-6 overflow-hidden rounded-2xl bg-[#fcfcfa] p-5 sm:p-8"
+        class="card-base relative space-y-6 overflow-hidden rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-8"
       >
-        <div class="absolute top-0 left-0 h-1 w-full bg-emerald-500"></div>
+        <div class="absolute top-0 left-0 h-1 w-full bg-[var(--color-ai)]"></div>
 
         <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           <div class="md:col-span-2">
-            <label class="mb-2 block text-sm font-bold text-gray-700">🎯 你的目标是什么？</label>
+            <label class="mb-2 block text-sm font-bold text-[var(--color-text-body)]">🎯 你的目标是什么？</label>
             <input
               v-model="aiForm.target"
               type="text"
               placeholder="例如：三个月内通过英语六级 / 独立开发一款小程序"
-              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
+              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
             />
           </div>
           <div>
-            <label class="mb-2 block text-sm font-bold text-gray-700">⏳ 期望周期</label>
+            <label class="mb-2 block text-sm font-bold text-[var(--color-text-body)]">⏳ 期望周期</label>
             <input
               v-model="aiForm.duration"
               type="text"
               placeholder="例如：12周 / 1个月"
-              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
+              class="w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
             />
           </div>
           <div class="md:col-span-2">
-            <label class="mb-2 block text-sm font-bold text-gray-700">📝 补充描述 (可选)</label>
+            <label class="mb-2 block text-sm font-bold text-[var(--color-text-body)]">📝 补充描述 (可选)</label>
             <textarea
               v-model="aiForm.description"
               placeholder="例如：我目前的基础比较薄弱，希望前两周以背单词和基础语法为主..."
-              class="min-h-[80px] w-full resize-none rounded-xl border border-gray-200 bg-[#f7f7f5] p-4 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
+              class="min-h-[80px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)] outline-none transition-all focus:border-[var(--color-input-border-focus)] focus:ring-2 focus:ring-[var(--color-input-ring)]"
             ></textarea>
           </div>
         </div>
@@ -92,10 +92,10 @@
 
       <div
         v-if="generatedPlan.length > 0"
-        class="card-base animate-fade-in-up space-y-6 rounded-2xl bg-[#fcfcfa] p-5 sm:p-8"
+        class="card-base animate-fade-in-up space-y-6 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-8"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h3 class="text-xl font-bold text-gray-800">📋 生成的专属计划草稿</h3>
+          <h3 class="text-xl font-bold text-[var(--color-text-primary)]">📋 生成的专属计划草稿</h3>
           <div class="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -123,7 +123,7 @@
           </div>
         </div>
 
-        <div class="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-600">
+        <div class="rounded-xl border border-[var(--color-input-border)] bg-[var(--color-bg-elevated)] p-3 text-sm text-[var(--color-text-secondary)]">
           已选 {{ selectedMilestoneCount }} 个阶段，{{ selectedTaskCount }} / {{ totalTaskCount }} 个任务
         </div>
 
@@ -131,26 +131,26 @@
           <div
             v-for="(milestone, mIndex) in generatedPlan"
             :key="`milestone-${mIndex}`"
-            class="rounded-xl border border-emerald-100 bg-emerald-50/30 p-5"
+            class="rounded-xl border border-[var(--color-success)]/35 bg-[var(--color-success-soft)]/35 p-5"
           >
             <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <label class="flex cursor-pointer items-center gap-3 text-emerald-700">
+              <label class="flex cursor-pointer items-center gap-3 text-[var(--color-ai)]">
                 <input
                   type="checkbox"
-                  class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-300"
+                  class="h-4 w-4 rounded border-[var(--color-input-border)] text-[var(--color-ai)] focus:ring-[var(--color-input-ring)]"
                   :checked="isMilestoneChecked(mIndex)"
                   :indeterminate.prop="isMilestoneIndeterminate(mIndex)"
                   @change="toggleMilestoneSelection(mIndex, $event)"
                 />
                 <span class="flex items-center gap-2 font-bold">
                   <span
-                    class="inline-flex h-6 min-w-[56px] items-center justify-center whitespace-nowrap rounded bg-emerald-200 px-2 text-xs text-emerald-800"
+                    class="inline-flex h-6 min-w-[56px] items-center justify-center whitespace-nowrap rounded bg-[var(--color-success)]/20 px-2 text-xs text-[var(--color-ai)]"
                     >阶段 {{ mIndex + 1 }}</span
                   >
                   {{ milestone.name }}
                 </span>
               </label>
-              <span class="text-xs text-emerald-700">
+              <span class="text-xs text-[var(--color-ai)]">
                 已选 {{ getSelectedTaskCountByMilestone(mIndex) }} / {{ milestone.tasks.length }} 任务
               </span>
             </div>
@@ -159,17 +159,17 @@
               <label
                 v-for="(task, tIndex) in milestone.tasks"
                 :key="`task-${mIndex}-${tIndex}`"
-                class="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-[#f7f7f5] p-3 text-sm text-gray-700"
+                class="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] p-3 text-sm text-[var(--color-text-body)]"
               >
                 <input
                   type="checkbox"
-                  class="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-300"
+                  class="mt-0.5 h-4 w-4 rounded border-[var(--color-input-border)] text-[var(--color-ai)] focus:ring-[var(--color-input-ring)]"
                   :checked="isTaskChecked(mIndex, tIndex)"
                   @change="toggleTaskSelection(mIndex, tIndex, $event)"
                 />
                 <div>
                   <div class="font-medium">{{ getTaskTitle(task) }}</div>
-                  <div v-if="task.description" class="mt-1 text-xs text-gray-500">
+                  <div v-if="task.description" class="mt-1 text-xs text-[var(--color-text-secondary)]">
                     {{ task.description }}
                   </div>
                 </div>
@@ -181,10 +181,10 @@
 
       <div
         v-if="failedImportItems.length > 0"
-        class="card-base space-y-4 rounded-2xl border-amber-200 bg-amber-50/50 p-5 sm:p-6"
+        class="card-base space-y-4 rounded-2xl border-[var(--color-warning)]/45 bg-[var(--color-warning-soft)]/45 p-5 sm:p-6"
       >
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="text-lg font-bold text-amber-800">⚠️ 导入存在失败项（{{ failedImportItems.length }}）</h3>
+          <h3 class="text-lg font-bold text-[var(--color-warning)]">⚠️ 导入存在失败项（{{ failedImportItems.length }}）</h3>
           <div class="flex items-center gap-2">
             <button
               type="button"
@@ -205,14 +205,14 @@
           </div>
         </div>
 
-        <div class="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-amber-200 bg-white p-3">
+        <div class="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-[var(--color-warning)]/45 bg-[var(--color-bg-elevated)] p-3">
           <div
             v-for="(item, index) in failedImportItems"
             :key="`failed-${index}`"
-            class="rounded-lg border border-amber-100 bg-amber-50/40 p-3"
+            class="rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning-soft)]/35 p-3"
           >
-            <div class="text-sm font-semibold text-amber-800">{{ getFailureTitle(item) }}</div>
-            <div class="mt-1 text-xs text-amber-700">{{ item.reason }}</div>
+            <div class="text-sm font-semibold text-[var(--color-warning)]">{{ getFailureTitle(item) }}</div>
+            <div class="mt-1 text-xs text-[var(--color-text-secondary)]">{{ item.reason }}</div>
           </div>
         </div>
       </div>
@@ -231,24 +231,24 @@
         class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
       >
         <div
-          class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
+          class="fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm transition-opacity"
           @click="showConfirmModal = false"
         ></div>
 
         <div class="relative z-50 mx-auto my-6 w-[calc(100%-2rem)] max-w-md transform transition-all">
           <div
-            class="relative flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-[#fcfcfa] shadow-lg outline-none focus:outline-none"
+            class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl outline-none focus:outline-none"
           >
-            <div class="h-1 w-full bg-emerald-500"></div>
+            <div class="h-1 w-full bg-[var(--color-ai)]"></div>
             <div class="flex flex-col items-center p-6 pb-0 text-center">
-              <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+              <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-success-soft)]">
                 <span class="text-2xl">✨</span>
               </div>
-              <h3 class="mb-2 text-xl font-black text-gray-800">确认导入计划？</h3>
-              <div class="space-y-2 px-4 text-sm leading-relaxed text-gray-600">
+              <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">确认导入计划？</h3>
+              <div class="space-y-2 px-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
                 <p>
                   将创建项目
-                  <span class="font-bold text-emerald-700">“{{ projectDisplayName }}”</span>
+                  <span class="font-bold text-[var(--color-ai)]">“{{ projectDisplayName }}”</span>
                 </p>
                 <p>已选阶段：{{ selectedMilestoneCount }} 个</p>
                 <p>已选任务：{{ selectedTaskCount }} 个</p>

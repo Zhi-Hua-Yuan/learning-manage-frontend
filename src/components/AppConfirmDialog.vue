@@ -2,7 +2,7 @@
   <transition name="confirm-overlay">
     <div
       v-if="modelValue"
-      class="fixed inset-0 z-[110] flex items-center justify-center p-4"
+      class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       :aria-label="title"
@@ -16,7 +16,7 @@
       </div>
 
       <div
-        class="confirm-panel relative z-[111] w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl"
+        class="confirm-panel surface-panel relative z-[var(--z-modal-panel)] w-full max-w-sm overflow-hidden rounded-2xl"
         @click.stop
       >
         <div class="h-1.5 w-full" :class="headerClass"></div>
@@ -27,8 +27,8 @@
           >
             {{ icon }}
           </div>
-          <h3 class="mb-2 text-xl font-bold text-gray-800">{{ title }}</h3>
-          <p v-if="message" class="whitespace-pre-line text-sm leading-relaxed text-gray-500">
+          <h3 class="mb-2 text-xl font-bold text-[var(--color-text-primary)]">{{ title }}</h3>
+          <p v-if="message" class="whitespace-pre-line text-sm leading-relaxed text-[var(--color-text-secondary)]">
             {{ message }}
           </p>
         </div>
@@ -92,8 +92,8 @@ const emit = defineEmits<{
 
 const isDanger = computed(() => props.variant === 'danger')
 
-const headerClass = computed(() => (isDanger.value ? 'bg-red-500' : 'bg-blue-500'))
-const iconContainerClass = computed(() => (isDanger.value ? 'bg-red-50' : 'bg-blue-50'))
+const headerClass = computed(() => (isDanger.value ? 'confirm-header-danger' : 'confirm-header-primary'))
+const iconContainerClass = computed(() => (isDanger.value ? 'confirm-icon-danger' : 'confirm-icon-primary'))
 const confirmButtonClass = computed(() => {
   const baseClass = isDanger.value ? 'btn-danger' : 'btn-primary'
   if (props.loading) return `${baseClass} cursor-not-allowed opacity-70`
@@ -136,7 +136,7 @@ onBeforeUnmount(() => {
 }
 
 .confirm-backdrop-base {
-  background-color: rgb(17 24 39 / 40%);
+  background-color: var(--color-backdrop-strong);
   opacity: 1;
 }
 
@@ -149,6 +149,24 @@ onBeforeUnmount(() => {
 .confirm-panel {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+.confirm-header-primary {
+  background: var(--color-primary);
+}
+
+.confirm-header-danger {
+  background: var(--color-danger-strong);
+}
+
+.confirm-icon-primary {
+  background: var(--color-primary-soft-2);
+  color: var(--color-primary);
+}
+
+.confirm-icon-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
 
 .confirm-overlay-enter-active .confirm-backdrop-base,

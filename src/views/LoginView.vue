@@ -1,64 +1,64 @@
 <template>
-  <div class="min-h-screen bg-gray-50 px-4 py-6 sm:flex sm:items-center sm:justify-center">
-    <div class="w-full max-w-md rounded-xl border border-gray-100 bg-[#fcfcfa] p-6 shadow-sm sm:p-8">
+  <div class="min-h-screen bg-[var(--color-bg-page)] px-4 py-6 sm:flex sm:items-center sm:justify-center">
+    <div class="w-full max-w-md rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] p-6 shadow-[var(--shadow-card)] sm:p-8">
       <div class="mb-8 text-center sm:mb-10">
         <img
           src="@/assets/logo.png"
           alt="SmartPath Logo"
           class="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-md object-cover transform hover:scale-105 transition-transform"
         />
-        <h2 class="text-3xl font-black text-gray-800 mb-2 tracking-tight">欢迎使用智径</h2>
-        <p class="text-sm text-gray-500 font-medium">大学生的智能成长路径管理系统</p>
+        <h2 class="mb-2 text-3xl font-black tracking-tight text-[var(--color-text-primary)]">欢迎使用智径</h2>
+        <p class="text-sm font-medium text-[var(--color-text-secondary)]">大学生的智能成长路径管理系统</p>
       </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-6">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">账号</label>
+          <label class="mb-2 block text-sm font-medium text-[var(--color-text-body)]">账号</label>
           <input
             v-model="form.account"
             type="text"
             required
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请输入账号"
           />
         </div>
 
         <div v-if="isRegisterMode">
-          <label class="block text-sm font-medium text-gray-700 mb-2">昵称</label>
+          <label class="mb-2 block text-sm font-medium text-[var(--color-text-body)]">昵称</label>
           <input
             v-model="form.username"
             type="text"
             required
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请输入昵称"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+          <label class="mb-2 block text-sm font-medium text-[var(--color-text-body)]">密码</label>
           <input
             v-model="form.password"
             type="password"
             required
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请输入密码"
           />
         </div>
 
         <div v-if="isRegisterMode">
-          <label class="block text-sm font-medium text-gray-700 mb-2">确认密码</label>
+          <label class="mb-2 block text-sm font-medium text-[var(--color-text-body)]">确认密码</label>
           <input
             v-model="form.confirmPassword"
             type="password"
             required
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+            class="focus-ring w-full rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-2 text-[var(--color-text-body)]"
             placeholder="请再次输入密码"
           />
         </div>
 
         <div
           v-if="errorMessage"
-          class="mb-4 text-center text-sm font-bold text-red-500"
+          class="mb-4 text-center text-sm font-bold text-[var(--color-danger)]"
         >
           {{ errorMessage }}
         </div>
@@ -75,7 +75,7 @@
         <div class="text-center text-sm">
           <button
             type="button"
-            class="font-medium text-gray-700 hover:text-gray-900"
+            class="font-medium text-[var(--color-text-body)] transition-colors hover:text-[var(--color-text-primary)]"
             @click="toggleMode"
           >
             {{ isRegisterMode ? '已有账号？返回登录' : '没有账号？点击注册' }}

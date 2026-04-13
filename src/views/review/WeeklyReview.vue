@@ -1,34 +1,34 @@
 ﻿<template>
-  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-[var(--color-bg-page)] p-4 sm:p-6 lg:p-8">
     <div class="mx-auto w-full max-w-6xl space-y-6">
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="flex items-center gap-2 text-xl font-bold text-gray-800 sm:text-2xl">📅 周报回顾与规划</h2>
-        <span class="text-sm text-gray-500">温故而知新</span>
+        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">📅 周报回顾与规划</h2>
+        <span class="text-sm text-[var(--color-text-secondary)]">温故而知新</span>
       </div>
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
         <div class="space-y-6 xl:col-span-2">
           <div
-            class="card-base flex flex-col gap-4 rounded-2xl border-blue-200 bg-[#fcfcfa] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+            class="card-base flex flex-col gap-4 rounded-2xl border-[var(--color-primary-soft-2)] bg-[var(--color-bg-surface)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
           >
             <div class="min-w-0">
-              <div class="mb-1 text-sm font-medium text-gray-500">
+              <div class="mb-1 text-sm font-medium text-[var(--color-text-secondary)]">
                 第 {{ currentReview.weekNo || '?' }} 周 ({{ currentReview.startDate }} ~
                 {{ currentReview.endDate }})
               </div>
-              <div class="text-2xl font-bold text-gray-800">本周任务来源摘要</div>
-              <p class="mt-1 text-sm text-gray-500">聚合本周完成任务与核心推进项目，并支持快速回到任务页。</p>
+              <div class="text-2xl font-bold text-[var(--color-text-primary)]">本周任务来源摘要</div>
+              <p class="mt-1 text-sm text-[var(--color-text-secondary)]">聚合本周完成任务与核心推进项目，并支持快速回到任务页。</p>
             </div>
             <div class="flex flex-wrap items-center gap-3 text-center sm:gap-6">
-              <div class="rounded-lg bg-[#f0f0ed] px-4 py-2">
-                <div class="text-3xl font-black text-gray-800">{{ currentReview.completedTaskCount || 0 }}</div>
-                <div class="mt-1 text-xs text-gray-500">完成任务数</div>
+              <div class="rounded-lg bg-[var(--color-bg-surface-secondary)] px-4 py-2">
+                <div class="text-3xl font-black text-[var(--color-text-primary)]">{{ currentReview.completedTaskCount || 0 }}</div>
+                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">完成任务数</div>
               </div>
-              <div class="min-w-[100px] rounded-lg bg-[#f0f0ed] px-4 py-2">
-                <div class="mt-1 truncate text-xl font-bold text-gray-800">
+              <div class="min-w-[100px] rounded-lg bg-[var(--color-bg-surface-secondary)] px-4 py-2">
+                <div class="mt-1 truncate text-xl font-bold text-[var(--color-text-primary)]">
                   {{ currentReview.focusProjectName || '暂无重点' }}
                 </div>
-                <div class="mt-1 text-xs text-gray-500">核心推进项目</div>
+                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">核心推进项目</div>
               </div>
               <button
                 @click="jumpToRelatedTasks"
@@ -39,10 +39,10 @@
             </div>
           </div>
 
-          <div class="card-base space-y-6 rounded-2xl bg-white p-5 sm:p-6">
+          <div class="card-base space-y-6 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6">
             <div>
               <div class="flex items-center justify-between mb-2">
-                <label class="block text-sm font-bold text-gray-700 flex items-center gap-2">
+                <label class="block text-sm font-bold text-[var(--color-text-body)] flex items-center gap-2">
                   <span>🧠</span> 本周复盘
                 </label>
 
@@ -52,13 +52,13 @@
                   class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all"
                   :class="
                     isPolishing
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      ? 'bg-[var(--color-disabled-bg)] text-[var(--color-disabled-text)] cursor-not-allowed'
                       : 'btn-ai'
                   "
                 >
                   <svg
                     v-if="isPolishing"
-                    class="animate-spin h-3 w-3 text-gray-400"
+                    class="animate-spin h-3 w-3 text-[var(--color-disabled-text)]"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -83,18 +83,18 @@
               </div>
               <textarea
                 v-model="currentReview.reflection"
-                class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all min-h-[120px] resize-none"
+                class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
                 placeholder="这周做的好与不好的地方？有什么感悟？..."
               ></textarea>
             </div>
 
             <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <label class="block text-sm font-bold text-[var(--color-text-body)] mb-2 flex items-center gap-2">
                 <span>🎯</span> 下周计划
               </label>
               <textarea
                 v-model="currentReview.nextPlan"
-                class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all min-h-[120px] resize-none"
+                class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
                 placeholder="下周的核心目标是什么？打算怎么安排时间？..."
               ></textarea>
             </div>
@@ -119,13 +119,13 @@
         </div>
 
         <div
-          class="card-base flex max-h-[420px] flex-col rounded-2xl bg-white p-5 sm:p-6 xl:max-h-[calc(100vh-12rem)]"
+          class="card-base flex max-h-[420px] flex-col rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6 xl:max-h-[calc(100vh-12rem)]"
         >
-          <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <h3 class="text-lg font-bold text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
             <span>🕰️</span> 历史轨迹
           </h3>
           <div class="flex-1 overflow-y-auto space-y-4 pr-2">
-            <div v-if="historyReviews.length === 0" class="text-center text-gray-400 mt-10 text-sm">
+            <div v-if="historyReviews.length === 0" class="mt-10 text-center text-sm text-[var(--color-text-tertiary)]">
               暂无历史记录
             </div>
 
@@ -133,19 +133,19 @@
               v-for="item in historyReviews"
               :key="item.id"
               @click="item.id && viewDetail(item.id)"
-              class="relative group cursor-pointer border-l-2 border-gray-300 py-2 pl-4 transition-all hover:-translate-y-0.5 hover:shadow-sm"
+              class="relative group cursor-pointer border-l-2 border-[var(--color-timeline-line)] py-2 pl-4 transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
             >
               <div
-                class="absolute -left-[7px] top-3 h-3 w-3 rounded-full border-2 border-white bg-gray-500"
+                class="absolute -left-[7px] top-3 h-3 w-3 rounded-full border-2 border-[var(--color-bg-surface)] bg-[var(--color-timeline-dot)]"
               ></div>
-              <div class="text-xs text-gray-400 font-medium mb-1">
+              <div class="text-xs font-medium text-[var(--color-text-tertiary)] mb-1">
                 {{ item.year }} 年 • 第 {{ item.weekNo }} 周
               </div>
-              <div class="rounded-lg bg-[#f7f7f5] p-3 transition-colors group-hover:bg-[#ecece8]">
-                <div class="text-sm font-bold text-gray-700 mb-1 line-clamp-1">
+              <div class="rounded-lg bg-[var(--color-bg-surface-muted)] p-3 transition-colors group-hover:bg-[var(--color-bg-surface-secondary)]">
+                <div class="text-sm font-bold text-[var(--color-text-body)] mb-1 line-clamp-1">
                   {{ item.focusProjectName || '日常推进' }}
                 </div>
-                <div class="text-xs text-gray-500 line-clamp-2">
+                <div class="text-xs text-[var(--color-text-secondary)] line-clamp-2">
                   {{ item.reflection || '无复盘内容' }}
                 </div>
               </div>
@@ -167,67 +167,70 @@
 
     <div
       v-if="showDetailModal && selectedReview"
-      class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
+      class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-backdrop-strong)] p-4 backdrop-blur-md"
     >
       <div
-        class="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        class="surface-panel flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl"
       >
-        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div class="flex items-center justify-between border-b border-[var(--color-divider-muted)] bg-[var(--color-bg-surface-muted)]/60 p-6">
           <div>
-            <h3 class="text-xl font-black text-gray-800">
+            <h3 class="text-xl font-black text-[var(--color-text-primary)]">
               {{ selectedReview.year }} 年 第 {{ selectedReview.weekNo }} 周总结
             </h3>
-            <p class="text-xs text-gray-400 mt-1">
+            <p class="mt-1 text-xs text-[var(--color-text-tertiary)]">
               {{ selectedReview.startDate }} ~ {{ selectedReview.endDate }}
             </p>
           </div>
-          <button @click="showDetailModal = false" class="text-gray-400 hover:text-gray-600 p-2">
+          <button
+            @click="showDetailModal = false"
+            class="rounded p-2 text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+          >
             ✕
           </button>
         </div>
         <div class="flex-1 overflow-y-auto p-8 space-y-8">
           <section>
             <h4
-              class="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-widest text-gray-700"
+              class="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[var(--color-text-body)]"
             >
               / 本周复盘 /
             </h4>
             <div
-              class="whitespace-pre-wrap rounded-2xl border border-gray-200 bg-[#f7f7f5] p-5 leading-relaxed text-gray-700"
+              class="whitespace-pre-wrap rounded-2xl border border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] p-5 leading-relaxed text-[var(--color-text-body)]"
             >
               {{ selectedReview.reflection || '无内容' }}
             </div>
           </section>
           <section>
             <h4
-              class="flex items-center gap-2 text-sm font-black text-gray-700 mb-3 tracking-widest uppercase"
+              class="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[var(--color-text-body)]"
             >
               / 下周计划 /
             </h4>
             <div
-              class="text-gray-700 leading-relaxed bg-[#f7f7f5] p-5 rounded-2xl border border-gray-200 whitespace-pre-wrap"
+              class="whitespace-pre-wrap rounded-2xl border border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] p-5 leading-relaxed text-[var(--color-text-body)]"
             >
               {{ selectedReview.nextPlan || '无内容' }}
             </div>
           </section>
         </div>
-        <div class="p-6 bg-gray-50 text-center">
+        <div class="bg-[var(--color-bg-surface-muted)] p-6 text-center">
           <div class="flex items-center justify-center gap-4">
             <button
               @click="handleEditReview"
-              class="btn-secondary px-6 py-2.5 rounded-xl font-bold text-gray-800 transition-all"
+              class="btn-secondary rounded-xl px-6 py-2.5 font-bold transition-all"
             >
               修改
             </button>
             <button
               @click="handleDeleteReview"
-              class="px-6 py-2.5 text-red-600 bg-red-50 rounded-xl font-bold hover:bg-red-100 transition-all"
+              class="rounded-xl bg-[var(--color-danger-soft)] px-6 py-2.5 font-bold text-[var(--color-danger)] transition-all hover:brightness-95"
             >
               删除
             </button>
             <button
               @click="exportToMarkdown"
-              class="btn-secondary flex items-center gap-2 rounded-xl px-6 py-2.5 font-bold text-gray-700 transition-all"
+              class="btn-secondary flex items-center gap-2 rounded-xl px-6 py-2.5 font-bold transition-all"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -241,7 +244,7 @@
             </button>
             <button
               @click="showDetailModal = false"
-              class="btn-secondary px-8 py-2.5 rounded-xl font-bold text-gray-800 transition-all"
+              class="btn-secondary rounded-xl px-8 py-2.5 font-bold transition-all"
             >
               阅读完毕
             </button>

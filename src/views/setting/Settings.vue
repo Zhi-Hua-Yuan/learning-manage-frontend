@@ -1,17 +1,17 @@
-<template>
-  <main class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8">
-    <div class="max-w-3xl mx-auto w-full space-y-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">⚙️ 个人设置</h2>
+﻿<template>
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div class="mx-auto w-full max-w-3xl space-y-6">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="flex items-center gap-2 text-xl font-bold text-gray-800 sm:text-2xl">⚙️ 个人设置</h2>
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="card-base overflow-hidden rounded-2xl bg-[#fcfcfa]">
         <div class="flex border-b border-gray-100">
           <button
             @click="settingsTab = 'basic'"
             :class="
               settingsTab === 'basic'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-gray-400 text-gray-800'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             "
             class="flex-1 py-4 text-sm font-bold border-b-2 transition-colors"
@@ -22,7 +22,7 @@
             @click="settingsTab = 'security'"
             :class="
               settingsTab === 'security'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-gray-400 text-gray-800'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             "
             class="flex-1 py-4 text-sm font-bold border-b-2 transition-colors"
@@ -31,7 +31,7 @@
           </button>
         </div>
 
-        <div v-if="settingsTab === 'basic'" class="p-8 space-y-6">
+        <div v-if="settingsTab === 'basic'" class="space-y-6 p-5 sm:p-8">
           <div>
             <label class="block text-sm font-bold text-gray-700 mb-2">登录账号 (不可修改)</label>
             <input
@@ -46,27 +46,27 @@
             <input
               v-model="updateInfoForm.username"
               type="text"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div class="pt-4">
             <button
               @click="handleUpdateInfo"
-              class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+              class="btn-primary px-6"
             >
               保存修改
             </button>
           </div>
         </div>
 
-        <div v-if="settingsTab === 'security'" class="p-8 space-y-6">
+        <div v-if="settingsTab === 'security'" class="space-y-6 p-5 sm:p-8">
           <div>
             <label class="block text-sm font-bold text-gray-700 mb-2">当前密码</label>
             <input
               v-model="updatePwdForm.oldPassword"
               type="password"
               placeholder="请输入旧密码"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div>
@@ -75,7 +75,7 @@
               v-model="updatePwdForm.newPassword"
               type="password"
               placeholder="至少 8 位"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div>
@@ -84,13 +84,13 @@
               v-model="updatePwdForm.confirmNewPassword"
               type="password"
               placeholder="再次输入新密码"
-              class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:bg-white focus:border-blue-400 transition-all"
+              class="w-full rounded-xl border border-gray-200 bg-[#f7f7f5] px-4 py-3 text-sm outline-none transition-all focus:border-blue-400 focus:bg-white"
             />
           </div>
           <div class="pt-4">
             <button
               @click="handleUpdatePassword"
-              class="bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+              class="btn-danger px-6"
             >
               更新密码
             </button>
@@ -98,32 +98,6 @@
         </div>
       </div>
     </div>
-
-    <transition
-      enter-active-class="transform ease-out duration-300 transition"
-      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="toast.show"
-        class="fixed top-6 right-6 z-50 flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4"
-        :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
-      >
-        <div
-          class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg"
-          :class="
-            toast.type === 'success' ? 'text-emerald-500 bg-emerald-100' : 'text-red-500 bg-red-100'
-          "
-        >
-          <span v-if="toast.type === 'success'">✅</span>
-          <span v-else>⚠️</span>
-        </div>
-        <div class="ml-3 text-sm font-bold">{{ toast.message }}</div>
-      </div>
-    </transition>
 
     <transition
       enter-active-class="ease-out duration-300"
@@ -141,11 +115,11 @@
 
         <div class="relative w-auto max-w-sm mx-auto my-6 z-50 transform transition-all">
           <div
-            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-xl outline-none focus:outline-none overflow-hidden"
           >
-            <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-green-500"></div>
+            <div class="h-1 w-full bg-blue-500"></div>
             <div class="p-8 pb-4 flex flex-col items-center text-center">
-              <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+              <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
                 <span class="text-3xl">🔒</span>
               </div>
               <h3 class="text-xl font-black text-gray-800 mb-2">密码修改成功</h3>
@@ -155,7 +129,7 @@
             </div>
             <div class="flex items-center justify-center p-6 pt-2">
               <button
-                class="w-full px-6 py-3 text-sm font-bold text-white bg-green-500 rounded-xl shadow-md hover:bg-green-600 hover:shadow-lg transition-all outline-none focus:outline-none flex items-center justify-center gap-2"
+                class="btn-primary w-full gap-2 rounded-xl px-6 py-3 text-sm font-bold outline-none focus:outline-none"
                 type="button"
                 @click="confirmReLogin"
               >
@@ -179,8 +153,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+
+defineOptions({ name: 'SettingsView' })
 import { useRouter } from 'vue-router'
 import { getUserMeApi, updatePasswordApi, updateUserInfoApi } from '@/api/user'
+import { useToast } from '@/composables/useToast'
 
 interface CurrentUserInfo {
   username?: string
@@ -188,16 +165,8 @@ interface CurrentUserInfo {
 }
 
 const router = useRouter()
-
-const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
+const toast = useToast()
 const showReLoginModal = ref(false)
-
-const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-  toast.value = { show: true, message: msg, type }
-  setTimeout(() => {
-    toast.value.show = false
-  }, 3000)
-}
 
 const confirmReLogin = async () => {
   localStorage.removeItem('token')
@@ -221,31 +190,31 @@ const loadUserInfo = async () => {
 
 const handleUpdateInfo = async () => {
   if (!updateInfoForm.value.username) {
-    showToast('昵称不能为空', 'error')
+    toast.error('昵称不能为空，请输入后重试。')
     return
   }
 
   try {
     await updateUserInfoApi({ username: updateInfoForm.value.username })
-    showToast('信息修改成功！', 'success')
+    toast.success('信息已更新。')
     await loadUserInfo()
   } catch {
-    showToast('修改失败，请重试', 'error')
+    toast.error('修改失败，请稍后重试。')
   }
 }
 
 const handleUpdatePassword = async () => {
   const { oldPassword, newPassword, confirmNewPassword } = updatePwdForm.value
   if (!oldPassword || !newPassword || !confirmNewPassword) {
-    showToast('请完整填写密码信息', 'error')
+    toast.error('请完整填写密码信息后重试。')
     return
   }
   if (newPassword !== confirmNewPassword) {
-    showToast('两次输入的新密码不一致', 'error')
+    toast.error('两次输入的新密码不一致，请确认后重试。')
     return
   }
   if (newPassword.length < 8) {
-    showToast('新密码长度不能少于 8 位', 'error')
+    toast.error('新密码长度不能少于 8 位，请修改后重试。')
     return
   }
 
@@ -260,8 +229,8 @@ const handleUpdatePassword = async () => {
       (error as { response?: { data?: { message?: string } } }).response?.data?.message
         ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
         : undefined
-    const errorMsg = backendMessage || '修改密码失败，请检查旧密码'
-    showToast(errorMsg, 'error')
+    const errorMsg = backendMessage || '修改密码失败，请检查旧密码后重试。'
+    toast.error(errorMsg)
   }
 }
 

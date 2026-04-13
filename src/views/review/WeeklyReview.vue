@@ -1,52 +1,59 @@
-<template>
-  <main class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8">
-    <div class="max-w-6xl mx-auto w-full space-y-6">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">📅 周报回顾与规划</h2>
+﻿<template>
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div class="mx-auto w-full max-w-6xl space-y-6">
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="flex items-center gap-2 text-xl font-bold text-gray-800 sm:text-2xl">📅 周报回顾与规划</h2>
         <span class="text-sm text-gray-500">温故而知新</span>
       </div>
 
-      <div class="grid grid-cols-3 gap-6">
-        <div class="col-span-2 space-y-6">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
+        <div class="space-y-6 xl:col-span-2">
           <div
-            class="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl p-6 text-white shadow-md flex justify-between items-center"
+            class="card-base flex flex-col gap-4 rounded-2xl border-blue-200 bg-[#fcfcfa] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
           >
-            <div>
-              <div class="text-blue-100 text-sm font-medium mb-1">
+            <div class="min-w-0">
+              <div class="mb-1 text-sm font-medium text-gray-500">
                 第 {{ currentReview.weekNo || '?' }} 周 ({{ currentReview.startDate }} ~
                 {{ currentReview.endDate }})
               </div>
-              <div class="text-2xl font-bold">本周高光时刻</div>
+              <div class="text-2xl font-bold text-gray-800">本周任务来源摘要</div>
+              <p class="mt-1 text-sm text-gray-500">聚合本周完成任务与核心推进项目，并支持快速回到任务页。</p>
             </div>
-            <div class="flex gap-6 text-center">
-              <div class="bg-white/20 rounded-lg px-4 py-2 backdrop-blur-sm">
-                <div class="text-3xl font-black">{{ currentReview.completedTaskCount || 0 }}</div>
-                <div class="text-xs text-blue-100 mt-1">完成任务数</div>
+            <div class="flex flex-wrap items-center gap-3 text-center sm:gap-6">
+              <div class="rounded-lg bg-[#f0f0ed] px-4 py-2">
+                <div class="text-3xl font-black text-gray-800">{{ currentReview.completedTaskCount || 0 }}</div>
+                <div class="mt-1 text-xs text-gray-500">完成任务数</div>
               </div>
-              <div class="bg-white/20 rounded-lg px-4 py-2 backdrop-blur-sm min-w-[100px]">
-                <div class="text-xl font-bold truncate mt-1">
+              <div class="min-w-[100px] rounded-lg bg-[#f0f0ed] px-4 py-2">
+                <div class="mt-1 truncate text-xl font-bold text-gray-800">
                   {{ currentReview.focusProjectName || '暂无重点' }}
                 </div>
-                <div class="text-xs text-blue-100 mt-1">核心推进项目</div>
+                <div class="mt-1 text-xs text-gray-500">核心推进项目</div>
               </div>
+              <button
+                @click="jumpToRelatedTasks"
+                class="btn-secondary rounded-lg px-4 py-2 text-sm font-bold"
+              >
+                查看对应任务
+              </button>
             </div>
           </div>
 
-          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+          <div class="card-base space-y-6 rounded-2xl bg-white p-5 sm:p-6">
             <div>
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-bold text-gray-700 flex items-center gap-2">
-                  <span>🧠</span> 本周复盘 (Reflection)
+                  <span>🧠</span> 本周复盘
                 </label>
 
                 <button
                   @click="handleAiPolish"
                   :disabled="isPolishing"
-                  class="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all"
+                  class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all"
                   :class="
                     isPolishing
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-md hover:scale-105'
+                      : 'btn-ai'
                   "
                 >
                   <svg
@@ -71,7 +78,7 @@
                     ></path>
                   </svg>
                   <span v-else>✨</span>
-                  {{ isPolishing ? 'AI 思考中...' : 'AI 一键润色' }}
+                  {{ isPolishing ? 'AI 处理中...' : 'AI 润色复盘' }}
                 </button>
               </div>
               <textarea
@@ -83,7 +90,7 @@
 
             <div>
               <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                <span>🎯</span> 下周计划 (Next Plan)
+                <span>🎯</span> 下周计划
               </label>
               <textarea
                 v-model="currentReview.nextPlan"
@@ -95,7 +102,7 @@
             <div class="flex justify-end pt-2">
               <button
                 @click="openSaveModal"
-                class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-7 rounded-2xl transition-all shadow-lg shadow-blue-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2"
+                class="btn-primary flex items-center gap-2 rounded-2xl px-7 py-3 font-bold"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -112,7 +119,7 @@
         </div>
 
         <div
-          class="col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-[calc(100vh-12rem)]"
+          class="card-base flex max-h-[420px] flex-col rounded-2xl bg-white p-5 sm:p-6 xl:max-h-[calc(100vh-12rem)]"
         >
           <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <span>🕰️</span> 历史轨迹
@@ -126,15 +133,15 @@
               v-for="item in historyReviews"
               :key="item.id"
               @click="item.id && viewDetail(item.id)"
-              class="border-l-2 border-blue-200 pl-4 py-2 relative group cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all"
+              class="relative group cursor-pointer border-l-2 border-gray-300 py-2 pl-4 transition-all hover:-translate-y-0.5 hover:shadow-sm"
             >
               <div
-                class="absolute w-3 h-3 bg-blue-500 rounded-full -left-[7px] top-3 border-2 border-white"
+                class="absolute -left-[7px] top-3 h-3 w-3 rounded-full border-2 border-white bg-gray-500"
               ></div>
               <div class="text-xs text-gray-400 font-medium mb-1">
                 {{ item.year }} 年 • 第 {{ item.weekNo }} 周
               </div>
-              <div class="bg-gray-50 rounded-lg p-3 group-hover:bg-blue-50 transition-colors">
+              <div class="rounded-lg bg-[#f7f7f5] p-3 transition-colors group-hover:bg-[#ecece8]">
                 <div class="text-sm font-bold text-gray-700 mb-1 line-clamp-1">
                   {{ item.focusProjectName || '日常推进' }}
                 </div>
@@ -148,71 +155,22 @@
       </div>
     </div>
 
-    <transition
-      enter-active-class="transform ease-out duration-300 transition"
-      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="toast.show"
-        class="fixed top-6 right-6 z-[100] flex items-center w-full max-w-xs p-4 space-x-3 text-gray-700 bg-white rounded-xl shadow-2xl border-l-4"
-        :class="toast.type === 'success' ? 'border-emerald-500' : 'border-red-500'"
-      >
-        <div
-          class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg"
-          :class="
-            toast.type === 'success' ? 'text-emerald-500 bg-emerald-100' : 'text-red-500 bg-red-100'
-          "
-        >
-          <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
-        </div>
-        <div class="ml-3 text-sm font-bold">{{ toast.message }}</div>
-      </div>
-    </transition>
-
-    <div
-      v-if="showSaveConfirmModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
-    >
-      <div
-        class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform transition-all"
-      >
-        <div class="h-1.5 w-full bg-blue-500"></div>
-        <div class="p-6 text-center">
-          <div
-            class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
-          >
-            💾
-          </div>
-          <h3 class="text-xl font-bold text-gray-800 mb-2">确认保存本周总结？</h3>
-          <p class="text-sm text-gray-500">保存后，您可以在历史记录中随时查看本次复盘内容。</p>
-        </div>
-        <div class="flex p-4 gap-3">
-          <button
-            @click="showSaveConfirmModal = false"
-            class="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
-          >
-            取消
-          </button>
-          <button
-            @click="executeSave"
-            class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all"
-          >
-            确认保存
-          </button>
-        </div>
-      </div>
-    </div>
+    <AppConfirmDialog
+      v-model="showSaveConfirmModal"
+      icon="💾"
+      title="确认保存本周总结？"
+      message="保存后，您可以在历史记录中随时查看本次复盘内容。"
+      confirm-text="确认保存"
+      cancel-text="取消"
+      @confirm="executeSave"
+    />
 
     <div
       v-if="showDetailModal && selectedReview"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
+      class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
     >
       <div
-        class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        class="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
       >
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
@@ -230,24 +188,24 @@
         <div class="flex-1 overflow-y-auto p-8 space-y-8">
           <section>
             <h4
-              class="flex items-center gap-2 text-sm font-black text-blue-600 mb-3 tracking-widest uppercase"
+              class="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-widest text-gray-700"
             >
               / 本周复盘 /
             </h4>
             <div
-              class="text-gray-700 leading-relaxed bg-blue-50/30 p-5 rounded-2xl border border-blue-50 whitespace-pre-wrap"
+              class="whitespace-pre-wrap rounded-2xl border border-gray-200 bg-[#f7f7f5] p-5 leading-relaxed text-gray-700"
             >
               {{ selectedReview.reflection || '无内容' }}
             </div>
           </section>
           <section>
             <h4
-              class="flex items-center gap-2 text-sm font-black text-emerald-600 mb-3 tracking-widest uppercase"
+              class="flex items-center gap-2 text-sm font-black text-gray-700 mb-3 tracking-widest uppercase"
             >
               / 下周计划 /
             </h4>
             <div
-              class="text-gray-700 leading-relaxed bg-emerald-50/30 p-5 rounded-2xl border border-emerald-50 whitespace-pre-wrap"
+              class="text-gray-700 leading-relaxed bg-[#f7f7f5] p-5 rounded-2xl border border-gray-200 whitespace-pre-wrap"
             >
               {{ selectedReview.nextPlan || '无内容' }}
             </div>
@@ -257,7 +215,7 @@
           <div class="flex items-center justify-center gap-4">
             <button
               @click="handleEditReview"
-              class="px-6 py-2.5 text-blue-600 bg-blue-50 rounded-xl font-bold hover:bg-blue-100 transition-all"
+              class="btn-secondary px-6 py-2.5 rounded-xl font-bold text-gray-800 transition-all"
             >
               修改
             </button>
@@ -269,7 +227,7 @@
             </button>
             <button
               @click="exportToMarkdown"
-              class="px-6 py-2.5 text-gray-700 bg-white border border-gray-200 rounded-xl font-bold hover:bg-gray-50 hover:shadow-sm transition-all flex items-center gap-2"
+              class="btn-secondary flex items-center gap-2 rounded-xl px-6 py-2.5 font-bold text-gray-700 transition-all"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -283,7 +241,7 @@
             </button>
             <button
               @click="showDetailModal = false"
-              class="px-8 py-2.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-md"
+              class="btn-secondary px-8 py-2.5 rounded-xl font-bold text-gray-800 transition-all"
             >
               阅读完毕
             </button>
@@ -292,45 +250,25 @@
       </div>
     </div>
 
-    <div
-      v-if="showDeleteConfirmModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
-    >
-      <div
-        class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform transition-all"
-      >
-        <div class="h-1.5 w-full bg-red-500"></div>
-        <div class="p-6 text-center">
-          <div
-            class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
-          >
-            🗑️
-          </div>
-          <h3 class="text-xl font-bold text-gray-800 mb-2">确认删除这条周总结？</h3>
-          <p class="text-sm text-gray-500">删除后将无法恢复，建议确认内容已经不再需要。</p>
-        </div>
-        <div class="flex p-4 gap-3">
-          <button
-            @click="showDeleteConfirmModal = false"
-            class="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
-          >
-            取消
-          </button>
-          <button
-            @click="executeDelete"
-            class="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-all"
-          >
-            确认删除
-          </button>
-        </div>
-      </div>
-    </div>
+    <AppConfirmDialog
+      v-model="showDeleteConfirmModal"
+      variant="danger"
+      icon="🗑️"
+      title="确认删除这条周总结？"
+      message="删除后将无法恢复，建议确认内容已经不再需要。"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      @confirm="executeDelete"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import { aiPolishApi } from '@/api/ai'
+import { fetchProjectList } from '@/api/project'
 import {
   deleteReviewApi,
   fetchCurrentReview,
@@ -339,6 +277,8 @@ import {
   updateReviewApi,
   saveReviewApi,
 } from '@/api/review'
+import { useToast } from '@/composables/useToast'
+import { useUndoDelete } from '@/composables/useUndoDelete'
 
 interface ReviewItem {
   id?: string | number
@@ -352,18 +292,43 @@ interface ReviewItem {
   nextPlan?: string
 }
 
+interface ProjectItem {
+  id: string | number
+  name: string
+}
+
+const router = useRouter()
+const toast = useToast()
+const undoDelete = useUndoDelete()
+
 const currentReview = ref<ReviewItem>({})
 const historyReviews = ref<ReviewItem[]>([])
 const isPolishing = ref(false)
 const showDetailModal = ref(false)
-const selectedReview = ref<any>(null)
+const selectedReview = ref<ReviewItem | null>(null)
 const showSaveConfirmModal = ref(false)
 const showDeleteConfirmModal = ref(false)
-const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'error' })
 
-const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-  toast.value = { show: true, message: msg, type }
-  setTimeout(() => (toast.value.show = false), 3000)
+const jumpToRelatedTasks = async () => {
+  try {
+    const targetName = (currentReview.value.focusProjectName || '').trim()
+    const res = await fetchProjectList()
+    const records = (res as { records?: ProjectItem[] })?.records || []
+    const matched = targetName ? records.find((item) => item.name === targetName) : undefined
+
+    if (matched?.id) {
+      const projectId = String(matched.id)
+      localStorage.setItem('tick_selectedProjectId', projectId)
+      await router.push({ path: '/tasks', query: { projectId } })
+      return
+    }
+
+    await router.push('/tasks')
+    toast.warning('未匹配到同名清单，已跳转任务总览。')
+  } catch (error) {
+    console.error('周报跳转失败', error)
+    toast.error('跳转失败，请检查网络后重试。')
+  }
 }
 
 const loadReviewData = async () => {
@@ -407,20 +372,28 @@ const executeSave = async () => {
     }
 
     showSaveConfirmModal.value = false
-    showToast('保存成功')
+    toast.success('保存成功。')
     await loadHistory()
   } catch {
-    showToast('保存失败，请检查网络', 'error')
+    toast.error('保存失败，请检查网络后重试。')
   }
 }
 
 const viewDetail = async (id: number | string) => {
   try {
     const res = await getReviewDetailApi(id)
-    selectedReview.value = res
+    const responseData =
+      res &&
+      typeof res === 'object' &&
+      'data' in (res as { data?: unknown }) &&
+      (res as { data?: unknown }).data &&
+      typeof (res as { data?: unknown }).data === 'object'
+        ? ((res as { data?: ReviewItem }).data ?? null)
+        : (res as ReviewItem)
+    selectedReview.value = responseData
     showDetailModal.value = true
-  } catch (error) {
-    showToast('获取详情失败', 'error')
+  } catch {
+    toast.error('获取详情失败，请稍后重试。')
   }
 }
 
@@ -430,17 +403,38 @@ const handleDeleteReview = async () => {
 }
 
 const executeDelete = async () => {
-  try {
-    if (!selectedReview.value?.id) return
-    await deleteReviewApi(selectedReview.value.id)
-    showDeleteConfirmModal.value = false
-    showDetailModal.value = false
-    selectedReview.value = null
-    showToast('删除成功', 'success')
-    await loadHistory()
-  } catch (error) {
-    showToast('删除失败', 'error')
-  }
+  if (!selectedReview.value?.id) return
+
+  const reviewToDelete = { ...selectedReview.value }
+  const reviewId = reviewToDelete.id
+  if (reviewId === undefined) return
+  const reviewTitle = `${reviewToDelete.year}年第${reviewToDelete.weekNo}周总结`
+  const snapshot = [...historyReviews.value]
+  const removedIndex = snapshot.findIndex((item) => item.id === reviewId)
+
+  historyReviews.value = snapshot.filter((item) => item.id !== reviewId)
+  showDeleteConfirmModal.value = false
+  showDetailModal.value = false
+  selectedReview.value = null
+
+  undoDelete.scheduleUndoDelete({
+    label: `周报「${reviewTitle}」`,
+    pendingMessage: `周报「${reviewTitle}」已移除，5 秒内可撤销。`,
+    onCommit: async () => {
+      await deleteReviewApi(reviewId)
+    },
+    onCommitSuccess: async () => {
+      await loadHistory()
+    },
+    onRollback: async () => {
+      if (!historyReviews.value.some((item) => item.id === reviewId)) {
+        const next = [...historyReviews.value]
+        const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
+        next.splice(insertIndex, 0, reviewToDelete)
+        historyReviews.value = next
+      }
+    },
+  })
 }
 
 const handleEditReview = () => {
@@ -454,7 +448,7 @@ const handleEditReview = () => {
   currentReview.value.nextPlan = selectedReview.value.nextPlan
   showDetailModal.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
-  showToast('已加载至编辑器，修改后点击保存即可', 'success')
+  toast.success('已加载至编辑器，修改后点击保存即可。')
 }
 
 const exportToMarkdown = () => {
@@ -492,12 +486,12 @@ ${review.nextPlan || '无计划内容'}
 
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
-  showToast('Markdown 文件导出成功！', 'success')
+  toast.success('Markdown 导出成功。')
 }
 
 const handleAiPolish = async () => {
   if (!currentReview.value.reflection || currentReview.value.reflection.trim() === '') {
-    showToast('请先写几句简单的复盘内容，AI 才能帮你润色哦！', 'error')
+    toast.error('请先填写复盘内容，再进行 AI 润色。')
     return
   }
 
@@ -522,17 +516,17 @@ const handleAiPolish = async () => {
           currentReview.value.nextPlan = parsedData.plan
         }
 
-        showToast('✨ AI 润色与计划推导完成！', 'success')
-      } catch (parseError) {
+        toast.success('AI 润色完成。')
+      } catch {
         console.error('JSON 解析失败, AI 返回的原始数据为:', res)
         // 兜底策略：如果解析失败（说明 AI 还是输出了废话），就全部塞进复盘框里，防止数据丢失
         currentReview.value.reflection = res
-        showToast('AI 数据格式异常，已将全部内容填入复盘区', 'error')
+        toast.error('AI 返回格式异常，内容已填入复盘区，请手动调整。')
       }
     }
   } catch (error) {
     console.error('AI 润色失败:', error)
-    showToast('AI 润色失败，请检查网络或后端日志', 'error')
+    toast.error('AI 润色失败，请检查网络后重试。')
   } finally {
     isPolishing.value = false
   }

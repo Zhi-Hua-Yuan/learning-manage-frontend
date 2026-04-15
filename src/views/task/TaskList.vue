@@ -5,12 +5,21 @@
         class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-3 sm:px-5"
       >
         <span class="text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
-          {{ projectList.find((p) => p.id === selectedProjectId)?.icon }}
-          {{ projectList.find((p) => p.id === selectedProjectId)?.name || '请选择清单' }}
+          <AppIcon
+            v-if="isTodayView"
+            name="calendar"
+            class="mr-1 inline h-5 w-5 align-[-2px]"
+          />
+          <AppIcon
+            v-else-if="selectedProject"
+            :name="getProjectIconName(selectedProject.icon)"
+            class="mr-1 inline h-5 w-5 align-[-2px]"
+          />
+          {{ pageTitle }}
         </span>
 
         <div
-          v-if="selectedProjectId && taskList.length > 0"
+          v-if="!isTodayView && selectedProjectId && taskList.length > 0"
           class="flex w-full items-center gap-3 sm:w-56"
         >
           <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
@@ -23,7 +32,10 @@
         </div>
       </div>
 
-      <div class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5">
+      <div
+        v-if="!isTodayView"
+        class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5"
+      >
         <div class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center">
           <div class="flex min-w-0 flex-1 items-center">
             <span class="mr-2 text-lg font-bold text-[var(--color-text-tertiary)]">+</span>
@@ -79,7 +91,9 @@
       <div class="flex-1 overflow-y-auto p-3 sm:p-4">
         <div class="space-y-4">
           <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
-            <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">默认列表</h3>
+            <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
+              {{ mainTaskSectionTitle }}
+            </h3>
             <div class="space-y-2">
               <div
                 v-for="task in groupedTasks.unassigned"
@@ -97,14 +111,14 @@
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
-                      ? 'border-[var(--color-success)] bg-[var(--color-success)]'
+                      ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
                       : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
                   <svg
                     v-if="task.status === 2"
-                    class="h-3 w-3 text-[var(--color-text-on-accent)]"
+                    class="h-3 w-3 text-[var(--color-text-secondary)]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -130,6 +144,13 @@
                 </span>
 
                 <div class="flex shrink-0 items-center gap-2">
+                  <span
+                    v-if="isTodayView"
+                    class="inline-flex max-w-36 items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)]"
+                  >
+                    <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
+                    <span class="truncate">{{ getTaskProjectName(task) }}</span>
+                  </span>
                   <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
                     {{ formatTaskDueDate(task.dueDate) }}
                   </span>
@@ -145,6 +166,13 @@
             </div>
           </section>
 
+          <div
+            v-if="isTodayView && groupedTasks.unassigned.length === 0"
+            class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)]"
+          >
+            今天还没有截止日期为今天的任务
+          </div>
+
           <section
             v-for="group in groupedTasks.milestones"
             :key="group.milestone.id"
@@ -155,7 +183,7 @@
                 v-if="editingMilestoneId === group.milestone.id"
                 class="flex min-w-0 flex-1 items-center gap-2"
               >
-                <span class="text-[var(--color-text-secondary)]">🚩</span>
+                <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
                 <input
                   v-model="editMilestoneName"
                   @keyup.enter="saveMilestone(group.milestone)"
@@ -167,7 +195,7 @@
               </div>
 
               <h3 v-else class="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-[var(--color-text-primary)]">
-                <span class="text-[var(--color-text-secondary)]">🚩</span>
+                <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
                 <span class="truncate">{{ group.milestone.name }}</span>
 
                 <div
@@ -239,14 +267,14 @@
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
-                      ? 'border-[var(--color-success)] bg-[var(--color-success)]'
+                      ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
                       : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
                   <svg
                     v-if="task.status === 2"
-                    class="h-3 w-3 text-[var(--color-text-on-accent)]"
+                    class="h-3 w-3 text-[var(--color-text-secondary)]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -272,6 +300,13 @@
                 </span>
 
                 <div class="flex shrink-0 items-center gap-2">
+                  <span
+                    v-if="isTodayView"
+                    class="inline-flex max-w-36 items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)]"
+                  >
+                    <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
+                    <span class="truncate">{{ getTaskProjectName(task) }}</span>
+                  </span>
                   <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
                     {{ formatTaskDueDate(task.dueDate) }}
                   </span>
@@ -287,7 +322,7 @@
             </div>
           </section>
 
-          <div class="pt-1">
+          <div v-if="!isTodayView" class="pt-1">
             <div v-if="isAddingMilestone" class="card-base border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] p-1">
               <input
                 v-model="newMilestoneName"
@@ -563,6 +598,7 @@
           </div>
 
           <div
+            v-if="!isTodayView"
             ref="milestoneRowRef"
             class="relative flex items-center gap-3 border-b border-[var(--color-divider-muted)] py-3"
           >
@@ -645,7 +681,7 @@
     <AppConfirmDialog
       v-model="showDeleteTaskConfirm"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       :title="deleteTaskConfirmTitle"
       message="删除后可在 5 秒内撤销。"
       confirm-text="确认删除"
@@ -656,7 +692,7 @@
     <AppConfirmDialog
       v-model="showDeleteMilestoneConfirm"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       :title="deleteMilestoneConfirmTitle"
       message="该阶段下的任务不会被删除，但会变回未分配状态。"
       confirm-text="确认删除"
@@ -670,6 +706,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import { fetchProjectList } from '@/api/project'
 import { addTaskApi, deleteTaskApi, fetchTaskList, updateTaskApi } from '@/api/task'
 import {
@@ -732,6 +769,12 @@ const taskList = ref<Task[]>([])
 const selectedTask = ref<Task | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
+const isTodayView = computed(() => route.query.view === 'today')
+const selectedProject = computed(() =>
+  projectList.value.find((project) => project.id === selectedProjectId.value),
+)
+const pageTitle = computed(() => (isTodayView.value ? '今天' : selectedProject.value?.name || '请选择清单'))
+const mainTaskSectionTitle = computed(() => (isTodayView.value ? '今天任务' : '默认列表'))
 
 const newTaskTitle = ref('')
 const newTaskMilestoneId = ref('')
@@ -759,6 +802,23 @@ const isResizingRight = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
 
 const isMobile = computed(() => viewportWidth.value < 768)
+
+const getProjectIconName = (icon: string | undefined): IconName => {
+  if (icon === 'sparkles' || icon === '✨') return 'sparkles'
+  return 'folder'
+}
+
+const projectById = computed(() => {
+  const map = new Map<string, Project>()
+  projectList.value.forEach((project) => {
+    map.set(String(project.id), project)
+  })
+  return map
+})
+
+const getTaskProjectName = (task: Task) => projectById.value.get(String(task.projectId))?.name || '未命名清单'
+const getTaskProjectIcon = (task: Task): IconName =>
+  getProjectIconName(projectById.value.get(String(task.projectId))?.icon)
 
 const priorityOptions: PriorityOption[] = [
   { value: 3, text: '高', dotClass: 'priority-dot--urgent', textClass: 'priority-text--urgent' },
@@ -790,6 +850,12 @@ const getTaskDueDateTimestamp = (dueDate?: string | null) => {
 }
 
 const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
+  const isACompleted = a.status === 2
+  const isBCompleted = b.status === 2
+  if (isACompleted !== isBCompleted) {
+    return isACompleted ? 1 : -1
+  }
+
   const dueDateDiff = getTaskDueDateTimestamp(a.dueDate) - getTaskDueDateTimestamp(b.dueDate)
   if (dueDateDiff !== 0) return dueDateDiff
 
@@ -956,6 +1022,11 @@ const vFocus = {
 }
 
 const syncSelectedProject = () => {
+  if (isTodayView.value) {
+    selectedProjectId.value = ''
+    return
+  }
+
   const queryId = route.query.projectId
   if (typeof queryId === 'string' && queryId) {
     selectedProjectId.value = queryId
@@ -972,7 +1043,7 @@ const loadProjects = async () => {
     const records = (res as unknown as { records?: Project[] })?.records
     projectList.value = records || []
 
-    if (!selectedProjectId.value && projectList.value.length > 0) {
+    if (!isTodayView.value && !selectedProjectId.value && projectList.value.length > 0) {
       const firstProject = projectList.value[0]
       if (!firstProject) return
       const firstId = firstProject.id
@@ -985,7 +1056,42 @@ const loadProjects = async () => {
   }
 }
 
+const syncSelectedTaskFromList = () => {
+  if (selectedTask.value) {
+    selectedTask.value = taskList.value.find((task) => task.id === selectedTask.value?.id) || null
+  }
+}
+
 const loadTasks = async () => {
+  if (isTodayView.value) {
+    if (projectList.value.length === 0) {
+      taskList.value = []
+      selectedTask.value = null
+      return
+    }
+
+    try {
+      const responses = await Promise.all(
+        projectList.value.map((project) =>
+          fetchTaskList({
+            projectId: project.id,
+            current: 1,
+            size: 100,
+          }),
+        ),
+      )
+      const todayKey = toDateKey(new Date())
+      const records = responses.flatMap((res) => (res as unknown as { records?: Task[] })?.records || [])
+      taskList.value = records
+        .filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
+        .sort(compareTaskByDueDateThenPriority)
+      syncSelectedTaskFromList()
+    } catch (error) {
+      console.error('加载今日任务失败', error)
+    }
+    return
+  }
+
   if (!selectedProjectId.value) {
     taskList.value = []
     selectedTask.value = null
@@ -1000,17 +1106,14 @@ const loadTasks = async () => {
     })
     const records = (res as unknown as { records?: Task[] })?.records
     taskList.value = records || []
-
-    if (selectedTask.value) {
-      selectedTask.value = taskList.value.find((task) => task.id === selectedTask.value?.id) || null
-    }
+    syncSelectedTaskFromList()
   } catch (error) {
     console.error('加载任务失败', error)
   }
 }
 
 const loadMilestones = async () => {
-  if (!selectedProjectId.value) {
+  if (isTodayView.value || !selectedProjectId.value) {
     milestoneList.value = []
     return
   }
@@ -1085,14 +1188,14 @@ const currentMilestoneLabel = computed(() => {
   const milestone = milestoneList.value.find((item) => item.id === String(milestoneId))
   if (!milestone) return '默认列表（未分配）'
 
-  return `🚩 ${milestone.name}`
+  return milestone.name
 })
 
 const milestoneOptions = computed(() => [
   { value: null, label: '默认列表（未分配）' },
   ...milestoneList.value.map((milestone) => ({
     value: String(milestone.id),
-    label: `🚩 ${milestone.name}`,
+    label: milestone.name,
   })),
 ])
 
@@ -1416,6 +1519,13 @@ const projectProgress = computed(() => {
 })
 
 const groupedTasks = computed(() => {
+  if (isTodayView.value) {
+    return {
+      unassigned: [...taskList.value].sort(compareTaskByDueDateThenPriority),
+      milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
+    }
+  }
+
   const result = {
     unassigned: [] as Task[],
     milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
@@ -1455,7 +1565,7 @@ const groupedTasks = computed(() => {
 })
 
 watch(
-  () => route.query.projectId,
+  [() => route.query.projectId, () => route.query.view],
   async () => {
     syncSelectedProject()
     closeDueDatePicker()
@@ -1463,7 +1573,8 @@ watch(
     isPriorityMenuOpen.value = false
     isMilestoneMenuOpen.value = false
     isNewTaskMilestoneMenuOpen.value = false
-    await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
+    await loadProjects()
+    await Promise.all([loadMilestones(), loadTasks()])
   },
 )
 
@@ -1492,7 +1603,8 @@ onMounted(async () => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
   syncSelectedProject()
-  await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
+  await loadProjects()
+  await Promise.all([loadMilestones(), loadTasks()])
 })
 
 onBeforeUnmount(() => {

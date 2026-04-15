@@ -50,40 +50,53 @@
         <div class="space-y-1">
           <div
             @click="navigateTo('/dashboard')"
-            class="interactive-row flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
               route.path === '/dashboard'
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">📊</span>
+            <AppIcon name="dashboard" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">数据仪表盘</span>
           </div>
 
           <div
+            @click="navigateToToday"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              isTodayRoute
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="calendar" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">今天</span>
+          </div>
+
+          <div
             @click="navigateTo('/review')"
-            class="interactive-row flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
               route.path === '/review'
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">📅</span>
+            <AppIcon name="calendar" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">周报回顾</span>
           </div>
 
           <div
             @click="navigateTo('/ai-planner')"
-            class="interactive-row flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
               route.path === '/ai-planner'
                 ? 'bg-[var(--color-success-soft)] text-[var(--color-ai)] font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">✨</span>
+            <AppIcon name="sparkles" class="h-4 w-4" />
             <span
               class="flex-1 text-[13px] font-semibold leading-5"
               :class="
@@ -144,14 +157,14 @@
             v-for="project in projectList"
             :key="project.id"
             @click="handleProjectRowClick(project.id)"
-            class="interactive-row group flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
-              (route.path === '/tasks' || route.path === '/') && selectedProjectId === project.id
+              (route.path === '/tasks' || route.path === '/') && !isTodayRoute && selectedProjectId === project.id
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">{{ project.icon || '📁' }}</span>
+            <AppIcon :name="getProjectIconName(project.icon)" class="h-4 w-4" />
 
             <input
               v-if="editingProjectId === project.id"
@@ -282,14 +295,14 @@
             @click="goToSettings"
             class="interactive-row flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-text-body)]"
           >
-            <span>⚙️</span> 个人设置
+            <AppIcon name="settings" class="h-4 w-4" /> 个人设置
           </div>
           <div class="my-1 h-px bg-[var(--color-popover-border)]"></div>
           <div
             @click="openLogoutModal"
             class="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
           >
-            <span>🚪</span> 退出登录
+            <AppIcon name="logout" class="h-4 w-4" /> 退出登录
           </div>
         </div>
       </div>
@@ -310,7 +323,7 @@
     <AppConfirmDialog
       v-model="showDeleteProjectConfirm"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       :title="deleteProjectConfirmTitle"
       message="相关的任务可能会一并丢失，请确认后再继续。"
       confirm-text="确认删除"
@@ -342,7 +355,7 @@
             <div class="h-1 w-full bg-[var(--color-danger-strong)]"></div>
             <div class="p-6 pb-0 flex flex-col items-center text-center">
               <div class="danger-soft mb-4 flex h-14 w-14 items-center justify-center rounded-full">
-                <span class="text-2xl">🚪</span>
+                <AppIcon name="logout" class="h-7 w-7" />
               </div>
               <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">准备离开？</h3>
               <p class="px-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
@@ -376,6 +389,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import {
   addProjectApi,
   deleteProjectApi,
@@ -422,6 +436,7 @@ const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWid
 const isSidebarOpen = ref(false)
 
 const isCompactViewport = computed(() => viewportWidth.value < 1024)
+const isTodayRoute = computed(() => route.path === '/tasks' && route.query.view === 'today')
 const sidebarStyle = computed(() =>
   isCompactViewport.value ? undefined : { width: `${sidebarWidth.value}px` },
 )
@@ -437,6 +452,11 @@ const closeSidebar = () => {
   if (isCompactViewport.value) {
     isSidebarOpen.value = false
   }
+}
+
+const getProjectIconName = (icon: string | undefined): IconName => {
+  if (icon === 'sparkles' || icon === '✨') return 'sparkles'
+  return 'folder'
 }
 
 const projectActionButtonClass = (projectId: string) => {
@@ -469,6 +489,11 @@ const cloneProjectList = () => projectList.value.map((item) => ({ ...item }))
 
 const navigateTo = async (path: string) => {
   await router.push(path)
+  closeSidebar()
+}
+
+const navigateToToday = async () => {
+  await router.push({ path: '/tasks', query: { view: 'today' } })
   closeSidebar()
 }
 
@@ -661,7 +686,7 @@ const submitNewProject = async () => {
   }
 
   try {
-    await addProjectApi({ name, icon: '📁' })
+    await addProjectApi({ name, icon: 'folder' })
     newProjectName.value = ''
     isAddingProject.value = false
     await loadProjects()

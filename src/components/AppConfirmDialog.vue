@@ -25,7 +25,7 @@
             class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full text-2xl"
             :class="iconContainerClass"
           >
-            {{ icon }}
+            <AppIcon :name="iconName" class="h-7 w-7" />
           </div>
           <h3 class="mb-2 text-xl font-bold text-[var(--color-text-primary)]">{{ title }}</h3>
           <p v-if="message" class="whitespace-pre-line text-sm leading-relaxed text-[var(--color-text-secondary)]">
@@ -60,6 +60,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 
 type ConfirmVariant = 'primary' | 'danger'
 
@@ -70,7 +71,7 @@ const props = withDefaults(
     message?: string
     confirmText?: string
     cancelText?: string
-    icon?: string
+    iconName?: IconName
     variant?: ConfirmVariant
     loading?: boolean
   }>(),
@@ -78,7 +79,7 @@ const props = withDefaults(
     message: '',
     confirmText: '确认',
     cancelText: '取消',
-    icon: '',
+    iconName: undefined,
     variant: 'primary',
     loading: false,
   },
@@ -99,9 +100,9 @@ const confirmButtonClass = computed(() => {
   if (props.loading) return `${baseClass} cursor-not-allowed opacity-70`
   return baseClass
 })
-const icon = computed(() => {
-  if (props.icon) return props.icon
-  return isDanger.value ? '🗑️' : '⚠️'
+const iconName = computed<IconName>(() => {
+  if (props.iconName) return props.iconName
+  return isDanger.value ? 'trash' : 'warning'
 })
 
 const handleCancel = () => {

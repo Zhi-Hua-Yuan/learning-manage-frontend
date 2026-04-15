@@ -2,7 +2,10 @@
   <main class="relative flex flex-1 flex-col overflow-y-auto bg-[var(--color-bg-page)] p-4 sm:p-6 lg:p-8">
     <div class="mx-auto w-full max-w-6xl space-y-6">
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">📅 周报回顾与规划</h2>
+        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">
+          <AppIcon name="calendar" class="h-5 w-5" />
+          周报回顾与规划
+        </h2>
         <span class="text-sm text-[var(--color-text-secondary)]">温故而知新</span>
       </div>
 
@@ -43,7 +46,8 @@
             <div>
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-bold text-[var(--color-text-body)] flex items-center gap-2">
-                  <span>🧠</span> 本周复盘
+                  <AppIcon name="brain" class="h-4 w-4" />
+                  本周复盘
                 </label>
 
                 <button
@@ -77,7 +81,7 @@
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  <span v-else>✨</span>
+                  <AppIcon v-else name="sparkles" class="h-3 w-3" />
                   {{ isPolishing ? 'AI 处理中...' : 'AI 润色复盘' }}
                 </button>
               </div>
@@ -90,7 +94,8 @@
 
             <div>
               <label class="block text-sm font-bold text-[var(--color-text-body)] mb-2 flex items-center gap-2">
-                <span>🎯</span> 下周计划
+                <AppIcon name="target" class="h-4 w-4" />
+                下周计划
               </label>
               <textarea
                 v-model="currentReview.nextPlan"
@@ -122,7 +127,8 @@
           class="card-base flex max-h-[420px] flex-col rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6 xl:max-h-[calc(100vh-12rem)]"
         >
           <h3 class="text-lg font-bold text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
-            <span>🕰️</span> 历史轨迹
+            <AppIcon name="history" class="h-5 w-5" />
+            历史轨迹
           </h3>
           <div class="flex-1 overflow-y-auto space-y-4 pr-2">
             <div v-if="historyReviews.length === 0" class="mt-10 text-center text-sm text-[var(--color-text-tertiary)]">
@@ -157,7 +163,7 @@
 
     <AppConfirmDialog
       v-model="showSaveConfirmModal"
-      icon="💾"
+      icon-name="save"
       title="确认保存本周总结？"
       message="保存后，您可以在历史记录中随时查看本次复盘内容。"
       confirm-text="确认保存"
@@ -185,7 +191,9 @@
             @click="showDetailModal = false"
             class="rounded p-2 text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
           >
-            ✕
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
         <div class="flex-1 overflow-y-auto p-8 space-y-8">
@@ -256,7 +264,7 @@
     <AppConfirmDialog
       v-model="showDeleteConfirmModal"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       title="确认删除这条周总结？"
       message="删除后将无法恢复，建议确认内容已经不再需要。"
       confirm-text="确认删除"
@@ -270,6 +278,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import { aiPolishApi } from '@/api/ai'
 import { fetchProjectList } from '@/api/project'
 import {
@@ -459,7 +468,7 @@ const exportToMarkdown = () => {
 
   const review = selectedReview.value
 
-  const markdownContent = `# 📅 ${review.year} 年第 ${review.weekNo} 周总结
+  const markdownContent = `# ${review.year} 年第 ${review.weekNo} 周总结
 
 > **周期**：${review.startDate} ~ ${review.endDate}
 > **核心推进项目**：${review.focusProjectName || '无'}
@@ -467,10 +476,10 @@ const exportToMarkdown = () => {
 
 ---
 
-## 🧠 本周复盘
+## 本周复盘
 ${review.reflection || '无复盘内容'}
 
-## 🎯 下周计划
+## 下周计划
 ${review.nextPlan || '无计划内容'}
 
 ---

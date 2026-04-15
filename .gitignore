@@ -41,3 +41,4 @@ __screenshots__/
 /.codex
 /.npm-cache
 /.playwright-browsers
+.omx/

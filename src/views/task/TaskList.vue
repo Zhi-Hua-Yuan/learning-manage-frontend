@@ -146,7 +146,8 @@
                 <div class="flex shrink-0 items-center gap-2">
                   <span
                     v-if="isTodayView"
-                    class="inline-flex max-w-36 items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)]"
+                    class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                    @click="navigateToProject(task.projectId)"
                   >
                     <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
                     <span class="truncate">{{ getTaskProjectName(task) }}</span>
@@ -302,7 +303,8 @@
                 <div class="flex shrink-0 items-center gap-2">
                   <span
                     v-if="isTodayView"
-                    class="inline-flex max-w-36 items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)]"
+                    class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                    @click="navigateToProject(task.projectId)"
                   >
                     <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
                     <span class="truncate">{{ getTaskProjectName(task) }}</span>
@@ -1019,6 +1021,11 @@ const vFocus = {
   mounted(el: HTMLElement) {
     el.focus()
   },
+}
+
+const navigateToProject = (projectId: string) => {
+  localStorage.setItem('tick_selectedProjectId', projectId)
+  router.push({ path: '/tasks', query: { projectId } })
 }
 
 const syncSelectedProject = () => {

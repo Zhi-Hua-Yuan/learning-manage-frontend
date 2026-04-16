@@ -958,7 +958,14 @@ const ensureDefaultProject = async () => {
   localStorage.setItem('tick_selectedProjectId', firstProjectId)
 
   if (route.path === '/tasks') {
-    await router.replace({ path: '/tasks', query: { projectId: firstProjectId } })
+    const view = typeof route.query.view === 'string' ? route.query.view : ''
+    if (view === 'today' || view === 'week') {
+      return
+    }
+    await router.replace({
+      path: '/tasks',
+      query: { ...route.query, projectId: firstProjectId },
+    })
   }
 }
 

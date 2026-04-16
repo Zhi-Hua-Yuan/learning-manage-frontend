@@ -786,6 +786,8 @@ interface LoadOptions {
 }
 
 const PROJECT_LIST_EVENT_SOURCE = 'task-list'
+const AGGREGATE_PAGE_SIZE = 100
+const AGGREGATE_MAX_PAGES = 200
 
 const route = useRoute()
 const router = useRouter()
@@ -1259,6 +1261,49 @@ const syncSelectedTaskFromList = () => {
   }
 }
 
+interface TaskPageResponse {
+  records?: Task[]
+  current?: number
+  size?: number
+  total?: number
+}
+
+const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean) => {
+  const aggregated: Task[] = []
+  let page = 1
+
+  for (let index = 0; index < AGGREGATE_MAX_PAGES; index += 1) {
+    if (isStale()) return []
+
+    const res = (await fetchTaskList({
+      projectId,
+      current: page,
+      size: AGGREGATE_PAGE_SIZE,
+    })) as unknown as TaskPageResponse
+
+    if (isStale()) return []
+
+    const records = Array.isArray(res.records) ? res.records : []
+    if (records.length === 0) break
+
+    aggregated.push(...records)
+
+    const current = Number(res.current)
+    const size = Number(res.size)
+    const total = Number(res.total)
+    const safeCurrent = Number.isFinite(current) && current > 0 ? current : page
+    const safeSize = Number.isFinite(size) && size > 0 ? size : AGGREGATE_PAGE_SIZE
+    const safeTotal = Number.isFinite(total) && total >= 0 ? total : null
+
+    if (safeTotal !== null && aggregated.length >= safeTotal) break
+    if (records.length < safeSize) break
+
+    page = safeCurrent + 1
+  }
+
+  return aggregated
+}
+
 const loadTasks = async (options: LoadOptions = {}) => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
@@ -1285,15 +1330,11 @@ const loadTasks = async (options: LoadOptions = {}) => {
     try {
       const responses = await Promise.all(
         projectList.value.map((project) =>
-          fetchTaskList({
-            projectId: project.id,
-            current: 1,
-            size: 100,
-          }),
+          fetchAllTasksByProject(project.id, () => requestVersion !== taskLoadVersion.value),
         ),
       )
       if (requestVersion !== taskLoadVersion.value) return
-      const records = responses.flatMap((res) => (res as unknown as { records?: Task[] })?.records || [])
+      const records = responses.flat()
       taskList.value = filterAggregateTasks(records).sort(compareTaskByDueDateThenPriority)
       writeTodayTaskCaches(records)
       syncSelectedTaskFromList()

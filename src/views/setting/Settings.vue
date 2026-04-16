@@ -2,7 +2,10 @@
   <main class="relative flex flex-1 flex-col overflow-y-auto bg-[var(--color-bg-page)] p-4 sm:p-6 lg:p-8">
     <div class="mx-auto w-full max-w-3xl space-y-6">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">⚙️ 个人设置</h2>
+        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">
+          <AppIcon name="settings" class="h-5 w-5" />
+          个人设置
+        </h2>
       </div>
 
       <div class="card-base overflow-hidden rounded-2xl bg-[var(--color-bg-surface)]">
@@ -149,7 +152,7 @@
             <div class="h-1 w-full bg-[var(--color-primary)]"></div>
             <div class="p-8 pb-4 flex flex-col items-center text-center">
               <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-primary-soft-2)]">
-                <span class="text-3xl">🔒</span>
+                <AppIcon name="lock" class="h-8 w-8 text-[var(--color-primary)]" />
               </div>
               <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">密码修改成功</h3>
               <p class="text-sm leading-relaxed text-[var(--color-text-secondary)]">
@@ -184,6 +187,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 defineOptions({ name: 'SettingsView' })
+import AppIcon from '@/components/AppIcon.vue'
 import { useRouter } from 'vue-router'
 import { getUserMeApi, updatePasswordApi, updateUserInfoApi } from '@/api/user'
 import { type ThemeMode, useTheme } from '@/composables/useTheme'

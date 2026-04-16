@@ -6,13 +6,22 @@ export type ProjectListParams = Record<string, string | number | boolean | undef
 
 export interface AddProjectPayload {
   name: string
+  goal?: string
   icon?: string
+  color?: string
+  startDate?: string
+  endDate?: string
 }
 
 export interface UpdateProjectPayload {
   id: EntityId
-  name: string
+  name?: string
+  goal?: string
   icon?: string
+  color?: string
+  status?: number
+  startDate?: string
+  endDate?: string
 }
 
 export interface ReorderProjectItem {
@@ -38,4 +47,16 @@ export const reorderProjectApi = (data: ReorderProjectItem[]) => {
 
 export const deleteProjectApi = (id: EntityId) => {
   return request.post(`/project/delete/${id}`)
+}
+
+export const archiveProjectApi = (ids: EntityId[]) => {
+  return request.post('/project/archive', ids)
+}
+
+export const fetchArchivedProjectsApi = () => {
+  return request.get('/project/list', { params: { status: 1 } })
+}
+
+export const recoverProjectApi = (id: EntityId) => {
+  return request.post(`/project/recover/${id}`)
 }

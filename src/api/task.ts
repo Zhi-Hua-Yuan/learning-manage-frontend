@@ -5,6 +5,7 @@ type EntityId = string | number
 export interface TaskListParams {
   projectId?: EntityId
   status?: number
+  isOverdue?: boolean
   current?: number
   size?: number
 }

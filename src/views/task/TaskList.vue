@@ -4,13 +4,27 @@
       <div
         class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-3 sm:px-5"
       >
-        <span class="text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
-          {{ projectList.find((p) => p.id === selectedProjectId)?.icon }}
-          {{ projectList.find((p) => p.id === selectedProjectId)?.name || '请选择清单' }}
-        </span>
+        <div class="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
+          <AppIcon
+            v-if="isAggregateView"
+            name="calendar"
+            class="mr-1 inline h-5 w-5 align-[-2px]"
+          />
+          <AppIcon
+            v-else-if="selectedProject"
+            :name="getProjectIconName(selectedProject.icon)"
+            class="mr-1 inline h-5 w-5 align-[-2px]"
+          />
+          <span>{{ pageTitle }}</span>
+          <span
+            v-if="!isAggregateView && selectedProjectColor"
+            class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70"
+            :style="{ backgroundColor: selectedProjectColor }"
+          ></span>
+        </div>
 
         <div
-          v-if="selectedProjectId && taskList.length > 0"
+          v-if="!isAggregateView && selectedProjectId && taskList.length > 0"
           class="flex w-full items-center gap-3 sm:w-56"
         >
           <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
@@ -23,7 +37,10 @@
         </div>
       </div>
 
-      <div class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5">
+      <div
+        v-if="!isAggregateView"
+        class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5"
+      >
         <div class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center">
           <div class="flex min-w-0 flex-1 items-center">
             <span class="mr-2 text-lg font-bold text-[var(--color-text-tertiary)]">+</span>
@@ -76,10 +93,13 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-3 sm:p-4">
-        <div class="space-y-4">
+      <Transition name="content-fade" mode="out-in">
+        <div :key="boardTransitionKey" class="flex-1 overflow-y-auto p-3 sm:p-4">
+          <div class="space-y-4">
           <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
-            <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">默认列表</h3>
+            <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
+              {{ mainTaskSectionTitle }}
+            </h3>
             <div class="space-y-2">
               <div
                 v-for="task in groupedTasks.unassigned"
@@ -97,14 +117,14 @@
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
-                      ? 'border-[var(--color-success)] bg-[var(--color-success)]'
+                      ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
                       : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
                   <svg
                     v-if="task.status === 2"
-                    class="h-3 w-3 text-[var(--color-text-on-accent)]"
+                    class="h-3 w-3 text-[var(--color-text-secondary)]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -130,6 +150,14 @@
                 </span>
 
                 <div class="flex shrink-0 items-center gap-2">
+                  <span
+                    v-if="isAggregateView"
+                    class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                    @click="navigateToProject(task.projectId)"
+                  >
+                    <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
+                    <span class="truncate">{{ getTaskProjectName(task) }}</span>
+                  </span>
                   <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
                     {{ formatTaskDueDate(task.dueDate) }}
                   </span>
@@ -145,6 +173,13 @@
             </div>
           </section>
 
+          <div
+            v-if="isAggregateView && groupedTasks.unassigned.length === 0"
+            class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)]"
+          >
+            {{ isWeekView ? '本周还没有截止日期在本周的任务' : '今天还没有截止日期为今天的任务' }}
+          </div>
+
           <section
             v-for="group in groupedTasks.milestones"
             :key="group.milestone.id"
@@ -155,7 +190,7 @@
                 v-if="editingMilestoneId === group.milestone.id"
                 class="flex min-w-0 flex-1 items-center gap-2"
               >
-                <span class="text-[var(--color-text-secondary)]">🚩</span>
+                <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
                 <input
                   v-model="editMilestoneName"
                   @keyup.enter="saveMilestone(group.milestone)"
@@ -167,7 +202,7 @@
               </div>
 
               <h3 v-else class="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-[var(--color-text-primary)]">
-                <span class="text-[var(--color-text-secondary)]">🚩</span>
+                <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
                 <span class="truncate">{{ group.milestone.name }}</span>
 
                 <div
@@ -239,14 +274,14 @@
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
                     task.status === 2
-                      ? 'border-[var(--color-success)] bg-[var(--color-success)]'
+                      ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
                       : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
                   @click.stop="toggleTaskStatus(task)"
                 >
                   <svg
                     v-if="task.status === 2"
-                    class="h-3 w-3 text-[var(--color-text-on-accent)]"
+                    class="h-3 w-3 text-[var(--color-text-secondary)]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -272,6 +307,14 @@
                 </span>
 
                 <div class="flex shrink-0 items-center gap-2">
+                  <span
+                    v-if="isAggregateView"
+                    class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                    @click="navigateToProject(task.projectId)"
+                  >
+                    <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
+                    <span class="truncate">{{ getTaskProjectName(task) }}</span>
+                  </span>
                   <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
                     {{ formatTaskDueDate(task.dueDate) }}
                   </span>
@@ -287,7 +330,7 @@
             </div>
           </section>
 
-          <div class="pt-1">
+          <div v-if="!isAggregateView" class="pt-1">
             <div v-if="isAddingMilestone" class="card-base border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] p-1">
               <input
                 v-model="newMilestoneName"
@@ -309,7 +352,8 @@
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      </Transition>
     </main>
 
     <div
@@ -563,6 +607,7 @@
           </div>
 
           <div
+            v-if="!isAggregateView"
             ref="milestoneRowRef"
             class="relative flex items-center gap-3 border-b border-[var(--color-divider-muted)] py-3"
           >
@@ -645,7 +690,7 @@
     <AppConfirmDialog
       v-model="showDeleteTaskConfirm"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       :title="deleteTaskConfirmTitle"
       message="删除后可在 5 秒内撤销。"
       confirm-text="确认删除"
@@ -656,7 +701,7 @@
     <AppConfirmDialog
       v-model="showDeleteMilestoneConfirm"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       :title="deleteMilestoneConfirmTitle"
       message="该阶段下的任务不会被删除，但会变回未分配状态。"
       confirm-text="确认删除"
@@ -670,6 +715,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import { fetchProjectList } from '@/api/project'
 import { addTaskApi, deleteTaskApi, fetchTaskList, updateTaskApi } from '@/api/task'
 import {
@@ -680,6 +726,18 @@ import {
 } from '@/api/milestone'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
+import {
+  offProjectListUpdated,
+  onProjectListUpdated,
+  type ProjectListUpdatedDetail,
+} from '@/utils/projectEvents'
+import {
+  readAllProjectsTaskCache,
+  readTaskCache,
+  writeAllProjectsTaskCache,
+  writeTaskCache,
+} from '@/utils/taskCache'
 
 interface Task {
   id: string
@@ -704,6 +762,7 @@ interface Project {
   id: string
   name: string
   icon: string
+  color?: string
 }
 
 interface PriorityOption {
@@ -722,6 +781,14 @@ interface CalendarCell {
   isSelected: boolean
 }
 
+interface LoadOptions {
+  forceRefresh?: boolean
+}
+
+const PROJECT_LIST_EVENT_SOURCE = 'task-list'
+const AGGREGATE_PAGE_SIZE = 100
+const AGGREGATE_MAX_PAGES = 200
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -732,6 +799,31 @@ const taskList = ref<Task[]>([])
 const selectedTask = ref<Task | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
+const isTodayView = computed(() => route.query.view === 'today')
+const isWeekView = computed(() => route.query.view === 'week')
+const isAggregateView = computed(() => isTodayView.value || isWeekView.value)
+const boardView = computed(() =>
+  route.query.view === 'today' || route.query.view === 'week' ? route.query.view : 'project',
+)
+const boardTransitionKey = computed(() =>
+  boardView.value === 'project' ? `project:${selectedProjectId.value || 'none'}` : String(boardView.value),
+)
+const selectedProject = computed(() =>
+  projectList.value.find((project) => project.id === selectedProjectId.value),
+)
+const selectedProjectColor = computed(() =>
+  isAggregateView.value ? '' : normalizeProjectColorValue(selectedProject.value?.color),
+)
+const pageTitle = computed(() => {
+  if (isTodayView.value) return '今天'
+  if (isWeekView.value) return '本周'
+  return selectedProject.value?.name || '请选择清单'
+})
+const mainTaskSectionTitle = computed(() => {
+  if (isTodayView.value) return '今天任务'
+  if (isWeekView.value) return '本周任务'
+  return '默认列表'
+})
 
 const newTaskTitle = ref('')
 const newTaskMilestoneId = ref('')
@@ -757,8 +849,58 @@ const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 340)
 const isResizingRight = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const projectLoadVersion = ref(0)
+const taskLoadVersion = ref(0)
+const milestoneLoadVersion = ref(0)
+const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 
 const isMobile = computed(() => viewportWidth.value < 768)
+
+const PROJECT_ICON_FALLBACK: IconName = 'folder'
+const PROJECT_ICON_COMPAT_MAP: Record<string, IconName> = {
+  folder: 'folder',
+  '📁': 'folder',
+  sparkles: 'sparkles',
+  '✨': 'sparkles',
+  flag: 'flag',
+  '🏁': 'flag',
+  star: 'star',
+  '⭐': 'star',
+  '🌟': 'star',
+  book: 'book',
+  '📚': 'book',
+  target: 'target',
+  '🎯': 'target',
+  heart: 'heart',
+  '❤️': 'heart',
+  '❤': 'heart',
+  work: 'work',
+  '💼': 'work',
+  rocket: 'rocket',
+  '🚀': 'rocket',
+}
+
+const normalizeProjectColorValue = (color?: string | null) => {
+  if (!color) return ''
+  const normalized = color.trim()
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalized) ? normalized : ''
+}
+
+const getProjectIconName = (icon: string | undefined): IconName => {
+  return PROJECT_ICON_COMPAT_MAP[icon || ''] || PROJECT_ICON_FALLBACK
+}
+
+const projectById = computed(() => {
+  const map = new Map<string, Project>()
+  projectList.value.forEach((project) => {
+    map.set(String(project.id), project)
+  })
+  return map
+})
+
+const getTaskProjectName = (task: Task) => projectById.value.get(String(task.projectId))?.name || '未命名清单'
+const getTaskProjectIcon = (task: Task): IconName =>
+  getProjectIconName(projectById.value.get(String(task.projectId))?.icon)
 
 const priorityOptions: PriorityOption[] = [
   { value: 3, text: '高', dotClass: 'priority-dot--urgent', textClass: 'priority-text--urgent' },
@@ -790,6 +932,12 @@ const getTaskDueDateTimestamp = (dueDate?: string | null) => {
 }
 
 const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
+  const isACompleted = a.status === 2
+  const isBCompleted = b.status === 2
+  if (isACompleted !== isBCompleted) {
+    return isACompleted ? 1 : -1
+  }
+
   const dueDateDiff = getTaskDueDateTimestamp(a.dueDate) - getTaskDueDateTimestamp(b.dueDate)
   if (dueDateDiff !== 0) return dueDateDiff
 
@@ -824,6 +972,38 @@ const parseDateKey = (dateKey?: string | null) => {
 }
 
 const getMonthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1)
+
+const getCurrentWeekRange = () => {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const dayOfWeek = today.getDay()
+  const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offsetToMonday)
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6)
+
+  return {
+    startDateKey: toDateKey(weekStart),
+    endDateKey: toDateKey(weekEnd),
+  }
+}
+
+const filterAggregateTasks = (records: Task[]) => {
+  if (isTodayView.value) {
+    const todayKey = toDateKey(new Date())
+    return records.filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
+  }
+
+  if (isWeekView.value) {
+    const { startDateKey, endDateKey } = getCurrentWeekRange()
+    return records.filter((task) => {
+      const dueDateKey = normalizeTaskDueDate(task.dueDate)
+      if (!dueDateKey) return false
+      return dueDateKey >= startDateKey && dueDateKey <= endDateKey
+    })
+  }
+
+  return records
+}
 
 const calendarMonthCursor = ref(getMonthStart(new Date()))
 
@@ -955,7 +1135,75 @@ const vFocus = {
   },
 }
 
+const navigateToProject = (projectId: string) => {
+  localStorage.setItem('tick_selectedProjectId', projectId)
+  router.push({ path: '/tasks', query: { projectId } })
+}
+
+const upsertTaskCache = (task: Task) => {
+  const projectId = String(task.projectId || '')
+  if (!projectId) return
+
+  const cachedProjectTasks = readTaskCache(projectId, Number.POSITIVE_INFINITY)
+  if (cachedProjectTasks) {
+    const nextProjectTasks = cachedProjectTasks.some((item) => item.id === task.id)
+      ? cachedProjectTasks.map((item) => (item.id === task.id ? { ...item, ...task } : item))
+      : [...cachedProjectTasks, task]
+    writeTaskCache(projectId, nextProjectTasks)
+  }
+
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY)
+  if (cachedAllProjectsTasks && Array.isArray(cachedAllProjectsTasks[projectId])) {
+    const nextAllProjectsTasks = cachedAllProjectsTasks[projectId]!.some((item) => item.id === task.id)
+      ? cachedAllProjectsTasks[projectId]!.map((item) => (item.id === task.id ? { ...item, ...task } : item))
+      : [...cachedAllProjectsTasks[projectId]!, task]
+    writeAllProjectsTaskCache({
+      ...cachedAllProjectsTasks,
+      [projectId]: nextAllProjectsTasks,
+    })
+  }
+}
+
+const removeTaskFromCache = (task: Task) => {
+  const projectId = String(task.projectId || '')
+  if (!projectId) return
+
+  const cachedProjectTasks = readTaskCache(projectId, Number.POSITIVE_INFINITY)
+  if (cachedProjectTasks) {
+    writeTaskCache(
+      projectId,
+      cachedProjectTasks.filter((item) => item.id !== task.id),
+    )
+  }
+
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY)
+  if (cachedAllProjectsTasks && Array.isArray(cachedAllProjectsTasks[projectId])) {
+    writeAllProjectsTaskCache({
+      ...cachedAllProjectsTasks,
+      [projectId]: cachedAllProjectsTasks[projectId]!.filter((item) => item.id !== task.id),
+    })
+  }
+}
+
+const writeTodayTaskCaches = (records: Task[]) => {
+  const nextCache: Record<string, Task[]> = {}
+  records.forEach((task) => {
+    const projectId = String(task.projectId || '')
+    if (!projectId) return
+    if (!nextCache[projectId]) {
+      nextCache[projectId] = []
+    }
+    nextCache[projectId]!.push(task)
+  })
+  writeAllProjectsTaskCache(nextCache)
+}
+
 const syncSelectedProject = () => {
+  if (isAggregateView.value) {
+    selectedProjectId.value = ''
+    return
+  }
+
   const queryId = route.query.projectId
   if (typeof queryId === 'string' && queryId) {
     selectedProjectId.value = queryId
@@ -966,13 +1214,35 @@ const syncSelectedProject = () => {
   selectedProjectId.value = localStorage.getItem('tick_selectedProjectId') || ''
 }
 
-const loadProjects = async () => {
+const loadProjects = async (options: LoadOptions = {}) => {
+  const forceRefresh = options.forceRefresh === true
+  const requestVersion = ++projectLoadVersion.value
+  const cachedRecords = !forceRefresh ? readProjectListCache<Project>(0) : null
+
+  if (cachedRecords) {
+    projectList.value = cachedRecords
+  }
+
+  if (cachedRecords && !forceRefresh) {
+    if (!isAggregateView.value && !selectedProjectId.value && projectList.value.length > 0) {
+      const firstProject = projectList.value[0]
+      if (!firstProject) return
+      const firstId = firstProject.id
+      selectedProjectId.value = firstId
+      localStorage.setItem('tick_selectedProjectId', firstId)
+      await router.replace({ path: '/tasks', query: { projectId: firstId } })
+    }
+    return
+  }
+
   try {
-    const res = await fetchProjectList()
+    const res = await fetchProjectList({ status: 0 })
+    if (requestVersion !== projectLoadVersion.value) return
     const records = (res as unknown as { records?: Project[] })?.records
     projectList.value = records || []
+    writeProjectListCache(0, projectList.value)
 
-    if (!selectedProjectId.value && projectList.value.length > 0) {
+    if (!isAggregateView.value && !selectedProjectId.value && projectList.value.length > 0) {
       const firstProject = projectList.value[0]
       if (!firstProject) return
       const firstId = firstProject.id
@@ -985,43 +1255,165 @@ const loadProjects = async () => {
   }
 }
 
-const loadTasks = async () => {
+const syncSelectedTaskFromList = () => {
+  if (selectedTask.value) {
+    selectedTask.value = taskList.value.find((task) => task.id === selectedTask.value?.id) || null
+  }
+}
+
+interface TaskPageResponse {
+  records?: Task[]
+  current?: number
+  size?: number
+  total?: number
+}
+
+const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean) => {
+  const aggregated: Task[] = []
+  let page = 1
+
+  for (let index = 0; index < AGGREGATE_MAX_PAGES; index += 1) {
+    if (isStale()) return []
+
+    const res = (await fetchTaskList({
+      projectId,
+      current: page,
+      size: AGGREGATE_PAGE_SIZE,
+    })) as unknown as TaskPageResponse
+
+    if (isStale()) return []
+
+    const records = Array.isArray(res.records) ? res.records : []
+    if (records.length === 0) break
+
+    aggregated.push(...records)
+
+    const current = Number(res.current)
+    const size = Number(res.size)
+    const total = Number(res.total)
+    const safeCurrent = Number.isFinite(current) && current > 0 ? current : page
+    const safeSize = Number.isFinite(size) && size > 0 ? size : AGGREGATE_PAGE_SIZE
+    const safeTotal = Number.isFinite(total) && total >= 0 ? total : null
+
+    if (safeTotal !== null && aggregated.length >= safeTotal) break
+    if (records.length < safeSize) break
+
+    page = safeCurrent + 1
+  }
+
+  return aggregated
+}
+
+const loadTasks = async (options: LoadOptions = {}) => {
+  const forceRefresh = options.forceRefresh === true
+  const requestVersion = ++taskLoadVersion.value
+
+  if (isAggregateView.value) {
+    if (projectList.value.length === 0) {
+      taskList.value = []
+      selectedTask.value = null
+      return
+    }
+
+    if (!forceRefresh) {
+      const cachedAllProjectsTasks = readAllProjectsTaskCache()
+      if (cachedAllProjectsTasks) {
+        const allRecords = Object.values(cachedAllProjectsTasks).flatMap((items) =>
+          Array.isArray(items) ? items : [],
+        )
+        taskList.value = filterAggregateTasks(allRecords).sort(compareTaskByDueDateThenPriority)
+        syncSelectedTaskFromList()
+        return
+      }
+    }
+
+    try {
+      const responses = await Promise.all(
+        projectList.value.map((project) =>
+          fetchAllTasksByProject(project.id, () => requestVersion !== taskLoadVersion.value),
+        ),
+      )
+      if (requestVersion !== taskLoadVersion.value) return
+      const records = responses.flat()
+      taskList.value = filterAggregateTasks(records).sort(compareTaskByDueDateThenPriority)
+      writeTodayTaskCaches(records)
+      syncSelectedTaskFromList()
+    } catch (error) {
+      if (requestVersion !== taskLoadVersion.value) return
+      console.error('加载今日任务失败', error)
+    }
+    return
+  }
+
   if (!selectedProjectId.value) {
     taskList.value = []
     selectedTask.value = null
     return
   }
 
+  if (!forceRefresh) {
+    const cachedProjectTasks = readTaskCache(selectedProjectId.value)
+    if (cachedProjectTasks) {
+      taskList.value = cachedProjectTasks
+      syncSelectedTaskFromList()
+      return
+    }
+  }
+
+  const requestProjectId = selectedProjectId.value
   try {
     const res = await fetchTaskList({
-      projectId: selectedProjectId.value,
+      projectId: requestProjectId,
       current: 1,
       size: 100,
     })
+    if (requestVersion !== taskLoadVersion.value) return
+    if (requestProjectId !== selectedProjectId.value) return
     const records = (res as unknown as { records?: Task[] })?.records
     taskList.value = records || []
-
-    if (selectedTask.value) {
-      selectedTask.value = taskList.value.find((task) => task.id === selectedTask.value?.id) || null
-    }
+    writeTaskCache(requestProjectId, taskList.value)
+    syncSelectedTaskFromList()
   } catch (error) {
+    if (requestVersion !== taskLoadVersion.value) return
     console.error('加载任务失败', error)
   }
 }
 
-const loadMilestones = async () => {
-  if (!selectedProjectId.value) {
+const loadMilestones = async (options: LoadOptions = {}) => {
+  const forceRefresh = options.forceRefresh === true
+  const requestVersion = ++milestoneLoadVersion.value
+  if (isAggregateView.value || !selectedProjectId.value) {
     milestoneList.value = []
     return
   }
 
+  const requestProjectId = selectedProjectId.value
+  if (!forceRefresh && Array.isArray(milestoneCacheByProject.value[requestProjectId])) {
+    milestoneList.value = [...milestoneCacheByProject.value[requestProjectId]!]
+    return
+  }
+
   try {
-    const res = await fetchMilestoneList({ projectId: selectedProjectId.value })
+    const res = await fetchMilestoneList({ projectId: requestProjectId })
+    if (requestVersion !== milestoneLoadVersion.value) return
+    if (requestProjectId !== selectedProjectId.value || isAggregateView.value) return
     const milestones = Array.isArray(res) ? (res as Milestone[]) : []
-    milestoneList.value = milestones.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
+    const sortedMilestones = milestones.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
+    milestoneList.value = sortedMilestones
+    milestoneCacheByProject.value = {
+      ...milestoneCacheByProject.value,
+      [requestProjectId]: sortedMilestones,
+    }
   } catch (error) {
+    if (requestVersion !== milestoneLoadVersion.value) return
     console.error('加载里程碑失败', error)
   }
+}
+
+const handleProjectListUpdated: EventListener = (event) => {
+  const customEvent = event as CustomEvent<ProjectListUpdatedDetail>
+  if (customEvent.detail?.source === PROJECT_LIST_EVENT_SOURCE) return
+  void loadProjects({ forceRefresh: true })
 }
 
 const addTask = async () => {
@@ -1038,7 +1430,7 @@ const addTask = async () => {
     newTaskTitle.value = ''
     newTaskMilestoneId.value = ''
     isNewTaskMilestoneMenuOpen.value = false
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch {
     toast.error('添加任务失败，请检查网络后重试。')
   }
@@ -1051,6 +1443,7 @@ const toggleTaskStatus = async (task: Task) => {
   try {
     task.status = newStatus
     await updateTaskApi({ ...task, status: newStatus })
+    upsertTaskCache(task)
   } catch {
     task.status = oldStatus
     toast.error('更新状态失败，请检查网络后重试。')
@@ -1085,14 +1478,14 @@ const currentMilestoneLabel = computed(() => {
   const milestone = milestoneList.value.find((item) => item.id === String(milestoneId))
   if (!milestone) return '默认列表（未分配）'
 
-  return `🚩 ${milestone.name}`
+  return milestone.name
 })
 
 const milestoneOptions = computed(() => [
   { value: null, label: '默认列表（未分配）' },
   ...milestoneList.value.map((milestone) => ({
     value: String(milestone.id),
-    label: `🚩 ${milestone.name}`,
+    label: milestone.name,
   })),
 ])
 
@@ -1209,6 +1602,7 @@ const selectPriority = async (val: number) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, priority: val })
+    upsertTaskCache(selectedTask.value)
   } catch {
     selectedTask.value.priority = oldPriority
     toast.error('更新优先级失败，请检查网络后重试。')
@@ -1231,7 +1625,7 @@ const updateDueDate = async (nextDate: string | null) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, dueDate: finalDate })
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch {
     selectedTask.value.dueDate = oldDate
     toast.error('更新日期失败，请检查网络后重试。')
@@ -1264,7 +1658,7 @@ const selectMilestone = async (milestoneId: string | null) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, milestoneId: finalMilestoneId })
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch {
     selectedTask.value.milestoneId = oldMilestoneId
     toast.error('更新所属阶段失败，请检查网络后重试。')
@@ -1276,7 +1670,7 @@ const onTextBlur = async () => {
 
   try {
     await updateTaskApi({ ...selectedTask.value })
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch (error) {
     console.error('保存任务失败', error)
     toast.error('保存失败，请检查网络后重试。')
@@ -1297,6 +1691,7 @@ const confirmDeleteTask = async () => {
 
   const originalIndex = taskList.value.findIndex((task) => task.id === taskToDelete.id)
   taskList.value = taskList.value.filter((task) => task.id !== taskToDelete.id)
+  removeTaskFromCache(taskToDelete)
   selectedTask.value = null
 
   undoDelete.scheduleUndoDelete({
@@ -1306,7 +1701,7 @@ const confirmDeleteTask = async () => {
       await deleteTaskApi(taskToDelete.id)
     },
     onCommitSuccess: async () => {
-      await loadTasks()
+      await loadTasks({ forceRefresh: true })
     },
     onRollback: async () => {
       if (!taskList.value.some((task) => task.id === taskToDelete.id)) {
@@ -1316,6 +1711,7 @@ const confirmDeleteTask = async () => {
         nextTasks.splice(insertIndex, 0, taskToDelete)
         taskList.value = nextTasks
       }
+      upsertTaskCache(taskToDelete)
     },
   })
 }
@@ -1335,7 +1731,7 @@ const submitNewMilestone = async () => {
     })
     newMilestoneName.value = ''
     isAddingMilestone.value = false
-    await loadMilestones()
+    await loadMilestones({ forceRefresh: true })
   } catch {
     toast.error('创建阶段失败，请检查网络后重试。')
   }
@@ -1362,7 +1758,7 @@ const saveMilestone = async (milestone: Milestone) => {
   try {
     await updateMilestoneApi({ ...milestone, name: newName })
     editingMilestoneId.value = ''
-    await loadMilestones()
+    await loadMilestones({ forceRefresh: true })
   } catch {
     toast.error('重命名失败，请检查网络后重试。')
   }
@@ -1396,7 +1792,7 @@ const deleteMilestone = async (id: string, name: string) => {
       await deleteMilestoneApi(id)
     },
     onCommitSuccess: async () => {
-      await Promise.all([loadMilestones(), loadTasks()])
+      await Promise.all([loadMilestones({ forceRefresh: true }), loadTasks({ forceRefresh: true })])
     },
     onRollback: () => {
       if (!milestoneList.value.some((milestone) => milestone.id === id)) {
@@ -1416,6 +1812,13 @@ const projectProgress = computed(() => {
 })
 
 const groupedTasks = computed(() => {
+  if (isAggregateView.value) {
+    return {
+      unassigned: [...taskList.value].sort(compareTaskByDueDateThenPriority),
+      milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
+    }
+  }
+
   const result = {
     unassigned: [] as Task[],
     milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
@@ -1455,7 +1858,7 @@ const groupedTasks = computed(() => {
 })
 
 watch(
-  () => route.query.projectId,
+  [() => route.query.projectId, () => route.query.view],
   async () => {
     syncSelectedProject()
     closeDueDatePicker()
@@ -1463,7 +1866,8 @@ watch(
     isPriorityMenuOpen.value = false
     isMilestoneMenuOpen.value = false
     isNewTaskMilestoneMenuOpen.value = false
-    await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
+    await loadProjects()
+    await Promise.all([loadMilestones(), loadTasks()])
   },
 )
 
@@ -1491,13 +1895,16 @@ onMounted(async () => {
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
+  onProjectListUpdated(handleProjectListUpdated)
   syncSelectedProject()
-  await Promise.all([loadProjects(), loadMilestones(), loadTasks()])
+  await loadProjects()
+  await Promise.all([loadMilestones(), loadTasks()])
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   stopResizeRight()
   window.removeEventListener('resize', updateViewport)
+  offProjectListUpdated(handleProjectListUpdated)
 })
 </script>

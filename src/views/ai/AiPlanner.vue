@@ -17,7 +17,10 @@
 
         <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           <div class="md:col-span-2">
-            <label class="mb-2 block text-sm font-bold text-[var(--color-text-body)]">🎯 你的目标是什么？</label>
+            <label class="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-text-body)]">
+              <AppIcon name="target" class="h-4 w-4" />
+              你的目标是什么？
+            </label>
             <input
               v-model="aiForm.target"
               type="text"
@@ -26,7 +29,10 @@
             />
           </div>
           <div>
-            <label class="mb-2 block text-sm font-bold text-[var(--color-text-body)]">⏳ 期望周期</label>
+            <label class="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-text-body)]">
+              <AppIcon name="history" class="h-4 w-4" />
+              期望周期
+            </label>
             <input
               v-model="aiForm.duration"
               type="text"
@@ -35,7 +41,10 @@
             />
           </div>
           <div class="md:col-span-2">
-            <label class="mb-2 block text-sm font-bold text-[var(--color-text-body)]">📝 补充描述 (可选)</label>
+            <label class="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-text-body)]">
+              <AppIcon name="document" class="h-4 w-4" />
+              补充描述 (可选)
+            </label>
             <textarea
               v-model="aiForm.description"
               placeholder="例如：我目前的基础比较薄弱，希望前两周以背单词和基础语法为主..."
@@ -72,7 +81,7 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <span v-else>✨</span>
+            <AppIcon v-else name="sparkles" class="h-5 w-5" />
             {{ isGeneratingPlan ? 'AI 正在生成计划...' : '开始智能拆解' }}
           </button>
 
@@ -95,7 +104,10 @@
         class="card-base animate-fade-in-up space-y-6 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-8"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h3 class="text-xl font-bold text-[var(--color-text-primary)]">📋 生成的专属计划草稿</h3>
+          <h3 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)]">
+            <AppIcon name="clipboard" class="h-5 w-5" />
+            生成的专属计划草稿
+          </h3>
           <div class="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -118,7 +130,10 @@
               :class="isApplying || selectedTaskCount === 0 ? 'cursor-not-allowed opacity-70' : ''"
             >
               <span v-if="isApplying">导入中...</span>
-              <span v-else>✅ 勾选项导入系统</span>
+              <span v-else class="flex items-center gap-1.5">
+                <AppIcon name="success" class="h-4 w-4" />
+                勾选项导入系统
+              </span>
             </button>
           </div>
         </div>
@@ -184,7 +199,10 @@
         class="card-base space-y-4 rounded-2xl border-[var(--color-warning)]/45 bg-[var(--color-warning-soft)]/45 p-5 sm:p-6"
       >
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="text-lg font-bold text-[var(--color-warning)]">⚠️ 导入存在失败项（{{ failedImportItems.length }}）</h3>
+          <h3 class="flex items-center gap-2 text-lg font-bold text-[var(--color-warning)]">
+            <AppIcon name="warning" class="h-5 w-5" />
+            导入存在失败项（{{ failedImportItems.length }}）
+          </h3>
           <div class="flex items-center gap-2">
             <button
               type="button"
@@ -242,7 +260,7 @@
             <div class="h-1 w-full bg-[var(--color-ai)]"></div>
             <div class="flex flex-col items-center p-6 pb-0 text-center">
               <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-success-soft)]">
-                <span class="text-2xl">✨</span>
+                <AppIcon name="sparkles" class="h-7 w-7 text-[var(--color-ai)]" />
               </div>
               <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">确认导入计划？</h3>
               <div class="space-y-2 px-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
@@ -290,6 +308,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import AppIcon from '@/components/AppIcon.vue'
 import { aiBreakdownApi } from '@/api/ai'
 import { addMilestoneApi } from '@/api/milestone'
 import { addProjectApi, fetchProjectList } from '@/api/project'
@@ -632,7 +651,7 @@ const createTask = async (projectId: string, milestoneId: string, task: DraftTas
 }
 
 const ensureProjectId = async () => {
-  const created = await addProjectApi({ name: projectDisplayName.value, icon: '✨' })
+  const created = await addProjectApi({ name: projectDisplayName.value, icon: 'sparkles' })
   const directId = resolveEntityId(created)
   if (directId) return directId
 

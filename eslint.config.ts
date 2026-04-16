@@ -21,6 +21,7 @@ export default defineConfigWithVueTs(
     '**/coverage/**',
     '**/*_bak.vue',
     '**/*.bak.vue',
+    '.omx/team/**',
   ]),
 
   ...pluginVue.configs['flat/essential'],

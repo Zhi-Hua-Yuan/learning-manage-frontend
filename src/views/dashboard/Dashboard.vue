@@ -2,7 +2,10 @@
   <main class="relative flex flex-1 flex-col overflow-y-auto bg-[var(--color-bg-page)] p-4 sm:p-6 lg:p-8">
     <div class="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">📊 数据仪表盘</h2>
+        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">
+          <AppIcon name="dashboard" class="h-5 w-5" />
+          数据仪表盘
+        </h2>
         <span class="text-sm text-[var(--color-text-secondary)]">数据实时更新</span>
       </div>
 
@@ -36,7 +39,10 @@
         <div
           class="card-base flex max-h-[420px] flex-col rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6 xl:max-h-none"
         >
-          <h3 class="mb-4 text-lg font-bold text-[var(--color-text-body)]">🏆 完成率 Top 排行</h3>
+          <h3 class="mb-4 flex items-center gap-2 text-lg font-bold text-[var(--color-text-body)]">
+            <AppIcon name="trophy" class="h-5 w-5" />
+            完成率 Top 排行
+          </h3>
           <div class="flex-1 space-y-4 overflow-y-auto pr-2">
             <div
               v-if="!statsData.topProjects || statsData.topProjects.length === 0"
@@ -75,6 +81,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 defineOptions({ name: 'DashboardView' })
+import AppIcon from '@/components/AppIcon.vue'
 import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { use, init, graphic, type ECharts, type EChartsCoreOption } from 'echarts/core'

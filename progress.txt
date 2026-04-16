@@ -1,0 +1,47 @@
+# Ralph Progress - Task Cache Implementation
+
+## Iteration 1
+
+### Stories Completed
+- US-001: taskCache.ts created with all required exports
+- US-002: TaskList overview board view uses task cache
+- US-003: TaskList single project view uses task cache
+- US-004: Task mutations clear cache on add/delete/update
+- US-005: Build verification passed
+
+### Files Changed
+- `src/utils/taskCache.ts` (NEW)
+- `src/views/task/TaskList.vue` (MODIFIED)
+
+### Implementation Details
+
+**taskCache.ts:**
+- `TASK_LIST_CACHE_TTL_MS = 5 * 60 * 1000` (5 minutes)
+- Key: `tick:cache:task-list:v1:{projectId}` for per-project cache
+- Key: `tick:cache:task-list:all:v1` for combined all-projects cache
+- Exports: `readTaskCache`, `writeTaskCache`, `clearTaskCache`, `readAllProjectsTaskCache`, `writeAllProjectsTaskCache`
+
+**TaskList.vue loadTasks():**
+- Overview board (today/week): Uses `readAllProjectsTaskCache()` first, falls back to API fetch, then caches via `writeAllProjectsTaskCache()`
+- Single project view: Uses `readTaskCache(projectId)` first, falls back to API fetch, then caches via `writeTaskCache(projectId, records)`
+- Switching between today/week views no longer triggers API calls when cache is warm
+
+**Cache invalidation on mutations:**
+- `addTask()`: `clearTaskCache(selectedProjectId)` before reload
+- `toggleTaskStatus()`: `clearTaskCache(task.projectId)` after API success
+- `selectPriority()`: `clearTaskCache(selectedTask.value.projectId)` after API success
+- `updateDueDate()`: `clearTaskCache(selectedTask.value.projectId)` before reload
+- `selectMilestone()`: `clearTaskCache(selectedTask.value.projectId)` before reload
+- `onTextBlur()`: `clearTaskCache(selectedTask.value.projectId)` before reload
+- `confirmDeleteTask()`: `clearTaskCache(taskToDelete.projectId)` in onCommitSuccess
+- `confirmDeleteMilestone()`: `clearTaskCache(selectedProjectId.value)` in onCommitSuccess
+
+### Verification Results
+- `npm run type-check`: PASSED
+- `npm run lint`: PASSED (0 warnings, 0 errors)
+- `npm run build`: PASSED
+
+### Patterns Discovered
+- Task interface has `status: number` (not string), `priority: number` (not string), `dueDate?: string | null`, `milestoneId?: string | null`
+- projectCache.ts uses CacheEnvelope<T> pattern with `updatedAt: number` and `data: T`
+- BasicLayout uses event-based cache invalidation via `emitProjectListUpdated` / `onProjectListUpdated`

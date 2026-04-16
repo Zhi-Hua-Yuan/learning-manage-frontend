@@ -21,7 +21,7 @@
         class="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-base"
         :class="getIconClass(toast.type)"
       >
-        {{ getIcon(toast.type) }}
+        <AppIcon :name="getIconName(toast.type)" class="h-4 w-4" />
       </div>
       <div class="min-w-0 flex-1">
         <p class="text-sm font-bold leading-5">{{ toast.message }}</p>
@@ -41,7 +41,9 @@
         class="toast-close rounded-md p-1 transition-colors"
         @click="toastStore.dismiss(toast.id)"
       >
-        ✕
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
+        </svg>
       </button>
     </div>
   </TransitionGroup>
@@ -49,19 +51,20 @@
 
 <script setup lang="ts">
 import { useToastStore, type ToastType } from '@/stores/toast'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 
 const toastStore = useToastStore()
 
-const getIcon = (type: ToastType) => {
+const getIconName = (type: ToastType): IconName => {
   switch (type) {
     case 'success':
-      return '✅'
+      return 'success'
     case 'error':
-      return '⚠️'
+      return 'warning'
     case 'warning':
-      return '⚠️'
+      return 'warning'
     default:
-      return 'ℹ️'
+      return 'info'
   }
 }
 

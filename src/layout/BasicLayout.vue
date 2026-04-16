@@ -50,40 +50,66 @@
         <div class="space-y-1">
           <div
             @click="navigateTo('/dashboard')"
-            class="interactive-row flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
               route.path === '/dashboard'
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">📊</span>
+            <AppIcon name="dashboard" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">数据仪表盘</span>
           </div>
 
           <div
+            @click="navigateToToday"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              isTodayRoute
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="calendar" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">今天</span>
+          </div>
+
+          <div
+            @click="navigateToWeek"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              isWeekRoute
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="calendar" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">本周</span>
+          </div>
+
+          <div
             @click="navigateTo('/review')"
-            class="interactive-row flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
               route.path === '/review'
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">📅</span>
+            <AppIcon name="calendar" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">周报回顾</span>
           </div>
 
           <div
             @click="navigateTo('/ai-planner')"
-            class="interactive-row flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
               route.path === '/ai-planner'
                 ? 'bg-[var(--color-success-soft)] text-[var(--color-ai)] font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">✨</span>
+            <AppIcon name="sparkles" class="h-4 w-4" />
             <span
               class="flex-1 text-[13px] font-semibold leading-5"
               :class="
@@ -104,13 +130,7 @@
             <button
               @click="openAddProjectInput"
               type="button"
-              :disabled="isAddingProject"
-              class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors"
-              :class="
-                isAddingProject
-                  ? 'invisible'
-                  : 'hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]'
-              "
+              class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
               aria-label="添加清单"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,47 +145,25 @@
           </div>
         </div>
 
-        <div v-if="isAddingProject" class="mb-1 px-3">
-          <div class="flex items-center overflow-hidden rounded border border-[var(--color-input-border)] bg-[var(--color-input-bg)] shadow-[var(--shadow-card)]">
-            <input
-              v-model="newProjectName"
-              @keyup.enter="submitNewProject"
-              @blur="isAddingProject = false"
-              autofocus
-              type="text"
-              placeholder="清单名称 (按回车)"
-              class="w-full px-3 py-2 text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
-            />
-          </div>
-        </div>
-
         <div class="space-y-1">
           <div
             v-for="project in projectList"
             :key="project.id"
             @click="handleProjectRowClick(project.id)"
-            class="interactive-row group flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5"
+            class="interactive-row group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
-              (route.path === '/tasks' || route.path === '/') && selectedProjectId === project.id
+              (route.path === '/tasks' || route.path === '/') && !isTodayRoute && !isWeekRoute && selectedProjectId === project.id
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <span class="text-lg leading-none">{{ project.icon || '📁' }}</span>
-
-            <input
-              v-if="editingProjectId === project.id"
-              :id="`project-rename-${project.id}`"
-              v-model="editingProjectName"
-              type="text"
-              class="input-base !min-h-0 min-w-0 flex-1 px-2 py-1 text-[13px]"
-              @click.stop
-              @pointerdown.stop
-              @keyup.enter="submitProjectRename(project)"
-              @keyup.esc="cancelProjectRename"
-              @blur="submitProjectRename(project)"
-            />
-            <span v-else class="flex-1 truncate text-[13px] leading-5">{{ project.name }}</span>
+            <AppIcon :name="getProjectIconName(project.icon)" class="h-4 w-4" />
+            <span class="flex-1 truncate text-[13px] leading-5">{{ project.name }}</span>
+            <span
+              v-if="getProjectColor(project.color)"
+              class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70"
+              :style="{ backgroundColor: getProjectColor(project.color) }"
+            ></span>
 
             <div
               class="relative flex items-center"
@@ -191,16 +189,24 @@
                 </svg>
               </button>
 
-              <div
+              <Teleport
                 v-if="activeProjectActionId === project.id"
-                class="surface-panel absolute right-0 top-9 z-[var(--z-popover)] w-36 overflow-hidden rounded-lg py-1"
+                to="body"
               >
+                <div
+                  class="surface-panel absolute right-0 top-9 z-[var(--z-overlay)] w-36 overflow-hidden rounded-lg py-1"
+                  :style="getActionMenuStyle(project.id)"
+                  data-project-action-menu
+                  :data-project-id="project.id"
+                  @pointerdown.stop
+                  @click.stop
+                >
                 <button
                   type="button"
                   class="interactive-row flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-text-body)]"
-                  @click="startRenameProject(project)"
+                  @click="openProjectSettings(project)"
                 >
-                  重命名
+                  自定义
                 </button>
                 <button
                   type="button"
@@ -231,16 +237,33 @@
                 <div class="my-1 h-px bg-[var(--color-popover-border)]"></div>
                 <button
                   type="button"
+                  class="flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-text-body)] hover:bg-[var(--color-menu-hover)]"
+                  @click="archiveProject(project.id)"
+                >
+                  归档
+                </button>
+                <button
+                  type="button"
                   class="flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
                   @click="openDeleteProjectConfirm(project.id, project.name)"
                 >
                   删除
                 </button>
-              </div>
+                </div>
+              </Teleport>
             </div>
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+        @click="router.push('/projects/archived')"
+      >
+        <AppIcon name="archive" class="h-4 w-4" />
+        归档清单
+      </button>
 
       <div class="group relative mt-auto border-t border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] p-4">
         <div
@@ -282,14 +305,14 @@
             @click="goToSettings"
             class="interactive-row flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-text-body)]"
           >
-            <span>⚙️</span> 个人设置
+            <AppIcon name="settings" class="h-4 w-4" /> 个人设置
           </div>
           <div class="my-1 h-px bg-[var(--color-popover-border)]"></div>
           <div
             @click="openLogoutModal"
             class="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
           >
-            <span>🚪</span> 退出登录
+            <AppIcon name="logout" class="h-4 w-4" /> 退出登录
           </div>
         </div>
       </div>
@@ -301,22 +324,156 @@
       ></div>
     </aside>
 
-    <router-view
-      class="flex-1 overflow-y-auto bg-[var(--color-bg-page)]"
-      :class="isCompactViewport ? 'pt-14' : ''"
-      @refresh-projects="loadProjects"
-    />
+    <router-view v-slot="{ Component }">
+      <Transition name="content-fade" mode="out-in">
+        <component
+          :is="Component"
+          :key="pageTransitionKey"
+          class="flex-1 overflow-y-auto bg-[var(--color-bg-page)]"
+          :class="isCompactViewport ? 'pt-14' : ''"
+          @refresh-projects="loadProjects"
+        />
+      </Transition>
+    </router-view>
 
     <AppConfirmDialog
       v-model="showDeleteProjectConfirm"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       :title="deleteProjectConfirmTitle"
       message="相关的任务可能会一并丢失，请确认后再继续。"
       confirm-text="确认删除"
       cancel-text="取消"
       @confirm="confirmDeleteProject"
     />
+
+    <transition name="project-settings-overlay">
+      <div
+        v-if="showProjectSettingsModal"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto px-4 outline-none focus:outline-none"
+      >
+        <div
+          class="project-settings-backdrop fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm"
+          @click="closeProjectSettingsModal"
+        ></div>
+
+        <div class="project-settings-panel relative z-[var(--z-modal-panel)] mx-auto my-6 w-full max-w-lg transform">
+          <div class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl border-0 outline-none focus:outline-none">
+            <div class="h-1 w-full bg-[var(--color-primary)]"></div>
+            <div class="space-y-5 p-5 sm:p-6">
+              <div>
+                <h3 class="text-lg font-black text-[var(--color-text-primary)]">{{ projectSettingsTitle }}</h3>
+                <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  配置清单名称、图标和颜色展示。
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-semibold text-[var(--color-text-body)]">清单名称</label>
+                <input
+                  ref="projectNameInputRef"
+                  v-model="projectSettingsForm.name"
+                  type="text"
+                  maxlength="100"
+                  placeholder="请输入清单名称"
+                  class="input-base w-full px-3 py-2 text-sm"
+                  @keyup.enter="submitProjectSettings"
+                />
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-semibold text-[var(--color-text-body)]">图标</label>
+                <div class="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                  <button
+                    type="button"
+                    class="flex h-10 items-center justify-center rounded-lg border transition-colors"
+                    :class="
+                      projectSettingsForm.icon === ''
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                        : 'border-[var(--color-input-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-body)]'
+                    "
+                    @click="selectProjectIcon('')"
+                    title="默认文件夹"
+                  >
+                    <AppIcon name="folder" class="h-4 w-4" />
+                  </button>
+                  <button
+                    v-for="option in projectIconOptions"
+                    :key="option.value"
+                    type="button"
+                    class="flex h-10 items-center justify-center rounded-lg border transition-colors"
+                    :class="
+                      projectSettingsForm.icon === option.value
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                        : 'border-[var(--color-input-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-body)]'
+                    "
+                    :title="option.label"
+                    @click="selectProjectIcon(option.value)"
+                  >
+                    <AppIcon :name="option.icon" class="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-semibold text-[var(--color-text-body)]">颜色</label>
+                <div class="grid grid-cols-5 gap-2">
+                  <button
+                    type="button"
+                    class="flex h-9 items-center justify-center rounded-lg border text-xs font-medium transition-colors"
+                    :class="
+                      projectSettingsForm.color === ''
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                        : 'border-[var(--color-input-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-body)]'
+                    "
+                    @click="selectProjectColor('')"
+                  >
+                    无
+                  </button>
+                  <button
+                    v-for="option in projectColorOptions"
+                    :key="option.value"
+                    type="button"
+                    class="flex h-9 items-center justify-center rounded-lg border transition-colors"
+                    :class="
+                      projectSettingsForm.color === option.value
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
+                        : 'border-[var(--color-input-border)] hover:border-[var(--color-border-strong)]'
+                    "
+                    :title="option.label"
+                    @click="selectProjectColor(option.value)"
+                  >
+                    <span
+                      class="h-4 w-4 rounded-full border border-white/70"
+                      :style="{ backgroundColor: option.value }"
+                    ></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-3 pt-1">
+                <button
+                  class="btn-secondary rounded-xl px-4 py-2"
+                  type="button"
+                  :disabled="isProjectSettingsSubmitting"
+                  @click="closeProjectSettingsModal"
+                >
+                  取消
+                </button>
+                <button
+                  class="btn-primary rounded-xl px-5 py-2"
+                  type="button"
+                  :disabled="isProjectSettingsSubmitting"
+                  @click="submitProjectSettings"
+                >
+                  {{ projectSettingsSubmitText }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <transition
       enter-active-class="ease-out duration-300"
@@ -342,7 +499,7 @@
             <div class="h-1 w-full bg-[var(--color-danger-strong)]"></div>
             <div class="p-6 pb-0 flex flex-col items-center text-center">
               <div class="danger-soft mb-4 flex h-14 w-14 items-center justify-center rounded-full">
-                <span class="text-2xl">🚪</span>
+                <AppIcon name="logout" class="h-7 w-7" />
               </div>
               <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">准备离开？</h3>
               <p class="px-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
@@ -376,8 +533,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import {
   addProjectApi,
+  archiveProjectApi,
   deleteProjectApi,
   fetchProjectList,
   reorderProjectApi,
@@ -386,11 +545,19 @@ import {
 import { getUserMeApi, logoutApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
+import {
+  emitProjectListUpdated,
+  offProjectListUpdated,
+  onProjectListUpdated,
+  type ProjectListUpdatedDetail,
+} from '@/utils/projectEvents'
 
 interface Project {
   id: string
   name: string
   icon: string
+  color?: string
 }
 
 interface CurrentUserInfo {
@@ -399,6 +566,53 @@ interface CurrentUserInfo {
 }
 
 const USER_INFO_UPDATED_EVENT = 'tick:user-updated'
+const PROJECT_LIST_EVENT_SOURCE = 'basic-layout'
+const PROJECT_ICON_FALLBACK: IconName = 'folder'
+
+const PROJECT_ICON_COMPAT_MAP: Record<string, IconName> = {
+  folder: 'folder',
+  '📁': 'folder',
+  sparkles: 'sparkles',
+  '✨': 'sparkles',
+  flag: 'flag',
+  '🏁': 'flag',
+  star: 'star',
+  '⭐': 'star',
+  '🌟': 'star',
+  book: 'book',
+  '📚': 'book',
+  target: 'target',
+  '🎯': 'target',
+  heart: 'heart',
+  '❤️': 'heart',
+  '❤': 'heart',
+  work: 'work',
+  '💼': 'work',
+  rocket: 'rocket',
+  '🚀': 'rocket',
+}
+
+const projectIconOptions: Array<{ value: string; label: string; icon: IconName }> = [
+  { value: 'sparkles', label: '灵感', icon: 'sparkles' },
+  { value: 'flag', label: '阶段', icon: 'flag' },
+  { value: 'book', label: '学习', icon: 'book' },
+  { value: 'target', label: '目标', icon: 'target' },
+  { value: 'star', label: '重点', icon: 'star' },
+  { value: 'heart', label: '兴趣', icon: 'heart' },
+  { value: 'work', label: '工作', icon: 'work' },
+  { value: 'rocket', label: '冲刺', icon: 'rocket' },
+]
+
+const projectColorOptions: Array<{ value: string; label: string }> = [
+  { value: '#2563EB', label: '蓝色' },
+  { value: '#10B981', label: '绿色' },
+  { value: '#F59E0B', label: '橙色' },
+  { value: '#EF4444', label: '红色' },
+  { value: '#8B5CF6', label: '紫色' },
+  { value: '#EC4899', label: '粉色' },
+  { value: '#14B8A6', label: '青绿' },
+  { value: '#6B7280', label: '灰色' },
+]
 
 const router = useRouter()
 const route = useRoute()
@@ -406,15 +620,21 @@ const toast = useToast()
 const undoDelete = useUndoDelete()
 
 const projectList = ref<Project[]>([])
-const isAddingProject = ref(false)
-const newProjectName = ref('')
 const isUserMenuOpen = ref(false)
 const showLogoutModal = ref(false)
 const showDeleteProjectConfirm = ref(false)
 const pendingDeleteProject = ref<{ id: string; name: string } | null>(null)
 const activeProjectActionId = ref('')
-const editingProjectId = ref('')
-const editingProjectName = ref('')
+const showProjectSettingsModal = ref(false)
+const projectSettingsMode = ref<'create' | 'update'>('create')
+const projectSettingsProjectId = ref('')
+const projectSettingsForm = ref({
+  name: '',
+  icon: '',
+  color: '',
+})
+const isProjectSettingsSubmitting = ref(false)
+const projectNameInputRef = ref<HTMLInputElement | null>(null)
 const currentUserInfo = ref<CurrentUserInfo>({})
 const sidebarWidth = ref(Number(localStorage.getItem('tick_sidebarWidth')) || 256)
 const isResizingLeft = ref(false)
@@ -422,8 +642,17 @@ const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWid
 const isSidebarOpen = ref(false)
 
 const isCompactViewport = computed(() => viewportWidth.value < 1024)
+const isTodayRoute = computed(() => route.path === '/tasks' && route.query.view === 'today')
+const isWeekRoute = computed(() => route.path === '/tasks' && route.query.view === 'week')
+const pageTransitionKey = computed(() => route.path)
 const sidebarStyle = computed(() =>
   isCompactViewport.value ? undefined : { width: `${sidebarWidth.value}px` },
+)
+const projectSettingsTitle = computed(() =>
+  projectSettingsMode.value === 'create' ? '创建清单' : '自定义清单',
+)
+const projectSettingsSubmitText = computed(() =>
+  projectSettingsMode.value === 'create' ? '创建' : '保存',
 )
 
 const updateViewport = () => {
@@ -437,6 +666,27 @@ const closeSidebar = () => {
   if (isCompactViewport.value) {
     isSidebarOpen.value = false
   }
+}
+
+const normalizeProjectColorValue = (color?: string | null) => {
+  if (!color) return ''
+  const normalized = color.trim()
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalized) ? normalized : ''
+}
+
+const normalizeProjectIconValue = (icon?: string | null) => {
+  if (!icon) return ''
+  const mapped = PROJECT_ICON_COMPAT_MAP[icon] || null
+  if (!mapped || mapped === PROJECT_ICON_FALLBACK) return ''
+  return mapped
+}
+
+const getProjectIconName = (icon: string | undefined): IconName => {
+  return PROJECT_ICON_COMPAT_MAP[icon || ''] || PROJECT_ICON_FALLBACK
+}
+
+const getProjectColor = (color?: string | null) => {
+  return normalizeProjectColorValue(color)
 }
 
 const projectActionButtonClass = (projectId: string) => {
@@ -453,6 +703,17 @@ const closeProjectActionMenu = () => {
 
 const toggleProjectActionMenu = (projectId: string) => {
   activeProjectActionId.value = activeProjectActionId.value === projectId ? '' : projectId
+}
+
+const getActionMenuStyle = (projectId: string): Record<string, string> => {
+  const el = document.querySelector(`[data-project-action-root][data-project-id="${projectId}"]`)
+  if (!el) return { display: 'none' }
+  const rect = el.getBoundingClientRect()
+  return {
+    position: 'fixed',
+    right: `${window.innerWidth - rect.right}px`,
+    top: `${rect.bottom + 4}px`,
+  }
 }
 
 const isFirstProject = (projectId: string) => {
@@ -472,56 +733,122 @@ const navigateTo = async (path: string) => {
   closeSidebar()
 }
 
+const navigateToToday = async () => {
+  await router.push({ path: '/tasks', query: { view: 'today' } })
+  closeSidebar()
+}
+
+const navigateToWeek = async () => {
+  await router.push({ path: '/tasks', query: { view: 'week' } })
+  closeSidebar()
+}
+
 const handleProjectRowClick = async (id: string) => {
-  if (editingProjectId.value) return
   await selectProject(id)
 }
 
-const cancelProjectRename = () => {
-  editingProjectId.value = ''
-  editingProjectName.value = ''
+const resetProjectSettingsForm = () => {
+  projectSettingsForm.value = {
+    name: '',
+    icon: '',
+    color: '',
+  }
 }
 
-const startRenameProject = async (project: Project) => {
-  editingProjectId.value = project.id
-  editingProjectName.value = project.name
+const closeProjectSettingsModal = () => {
+  if (isProjectSettingsSubmitting.value) return
+  showProjectSettingsModal.value = false
+  projectSettingsProjectId.value = ''
+  resetProjectSettingsForm()
+}
+
+const openProjectSettings = async (project: Project) => {
+  projectSettingsMode.value = 'update'
+  projectSettingsProjectId.value = project.id
+  projectSettingsForm.value = {
+    name: project.name || '',
+    icon: normalizeProjectIconValue(project.icon),
+    color: normalizeProjectColorValue(project.color),
+  }
   closeProjectActionMenu()
   await nextTick()
-  const input = document.getElementById(`project-rename-${project.id}`) as HTMLInputElement | null
-  input?.focus()
-  input?.select()
+  showProjectSettingsModal.value = true
+  await nextTick()
+  projectNameInputRef.value?.focus()
+  projectNameInputRef.value?.select()
 }
 
-const submitProjectRename = async (project: Project) => {
-  if (editingProjectId.value !== project.id) return
+const openCreateProjectSettings = async () => {
+  projectSettingsMode.value = 'create'
+  projectSettingsProjectId.value = ''
+  resetProjectSettingsForm()
+  closeProjectActionMenu()
+  showProjectSettingsModal.value = true
+  if (isCompactViewport.value) {
+    isSidebarOpen.value = true
+  }
+  await nextTick()
+  projectNameInputRef.value?.focus()
+}
 
-  const nextName = editingProjectName.value.trim()
-  if (!nextName) {
+const selectProjectIcon = (icon: string) => {
+  projectSettingsForm.value.icon = icon
+}
+
+const selectProjectColor = (color: string) => {
+  projectSettingsForm.value.color = color
+}
+
+const submitProjectSettings = async () => {
+  const name = projectSettingsForm.value.name.trim()
+  if (!name) {
     toast.warning('清单名称不能为空。')
-    cancelProjectRename()
     return
   }
 
-  if (nextName === project.name) {
-    cancelProjectRename()
-    return
-  }
+  const normalizedIcon = projectSettingsForm.value.icon || ''
+  const normalizedColor = normalizeProjectColorValue(projectSettingsForm.value.color)
 
-  const snapshot = cloneProjectList()
-  const target = projectList.value.find((item) => item.id === project.id)
-  if (!target) {
-    cancelProjectRename()
-    return
-  }
-
-  target.name = nextName
-  cancelProjectRename()
-
+  isProjectSettingsSubmitting.value = true
   try {
-    await updateProjectApi({ id: project.id, name: nextName, icon: project.icon })
+    if (projectSettingsMode.value === 'create') {
+      await addProjectApi({
+        name,
+        icon: normalizedIcon,
+        color: normalizedColor,
+      })
+    } else {
+      const id = projectSettingsProjectId.value
+      if (!id) return
+      await updateProjectApi({
+        id,
+        name,
+        icon: normalizedIcon,
+        color: normalizedColor,
+      })
+    }
+
+    showProjectSettingsModal.value = false
+    projectSettingsProjectId.value = ''
+    resetProjectSettingsForm()
+    await loadProjects()
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
   } catch {
-    projectList.value = snapshot
-    toast.error('重命名清单失败，请检查网络后重试。')
+    toast.error(projectSettingsMode.value === 'create' ? '创建清单失败，请检查网络后重试。' : '保存清单设置失败，请检查网络后重试。')
+  } finally {
+    isProjectSettingsSubmitting.value = false
+  }
+}
+
+const archiveProject = async (id: string) => {
+  closeProjectActionMenu()
+  try {
+    await archiveProjectApi([id])
+    toast.success('清单已归档。')
+    await loadProjects()
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
+  } catch {
+    toast.error('归档失败，请重试。')
   }
 }
 
@@ -547,6 +874,7 @@ const moveProject = async (projectId: string, direction: -1 | 1) => {
         orderNo: index,
       })),
     )
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
   } catch {
     projectList.value = snapshot
     toast.error('调整清单顺序失败，请检查网络后重试。')
@@ -557,10 +885,17 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
   const target = event.target as HTMLElement | null
   if (!target || !activeProjectActionId.value) return
 
-  const selector = `[data-project-action-root][data-project-id="${activeProjectActionId.value}"]`
-  if (!target.closest(selector)) {
+  const rootSelector = `[data-project-action-root][data-project-id="${activeProjectActionId.value}"]`
+  const menuSelector = `[data-project-action-menu][data-project-id="${activeProjectActionId.value}"]`
+  if (!target.closest(rootSelector) && !target.closest(menuSelector)) {
     closeProjectActionMenu()
   }
+}
+
+const handleProjectListUpdated: EventListener = (event) => {
+  const customEvent = event as CustomEvent<ProjectListUpdatedDetail>
+  if (customEvent.detail?.source === PROJECT_LIST_EVENT_SOURCE) return
+  void loadProjects()
 }
 
 const startResizeLeft = () => {
@@ -623,26 +958,39 @@ const ensureDefaultProject = async () => {
   localStorage.setItem('tick_selectedProjectId', firstProjectId)
 
   if (route.path === '/tasks') {
-    await router.replace({ path: '/tasks', query: { projectId: firstProjectId } })
+    const view = typeof route.query.view === 'string' ? route.query.view : ''
+    if (view === 'today' || view === 'week') {
+      return
+    }
+    await router.replace({
+      path: '/tasks',
+      query: { ...route.query, projectId: firstProjectId },
+    })
   }
 }
 
 const loadProjects = async () => {
+  const cachedRecords = readProjectListCache<Project>(0)
+  if (cachedRecords && cachedRecords.length > 0) {
+    projectList.value = cachedRecords
+    await ensureDefaultProject()
+  }
+
   try {
-    const res = await fetchProjectList()
+    const res = await fetchProjectList({ status: 0 })
     const records = (res as unknown as { records?: Project[] })?.records
     projectList.value = records || []
+    writeProjectListCache(0, projectList.value)
 
     if (activeProjectActionId.value && !projectList.value.some((item) => item.id === activeProjectActionId.value)) {
       closeProjectActionMenu()
     }
-    if (editingProjectId.value && !projectList.value.some((item) => item.id === editingProjectId.value)) {
-      cancelProjectRename()
-    }
 
     await ensureDefaultProject()
   } catch (error) {
-    console.error('加载项目失败', error)
+    if (!cachedRecords) {
+      console.error('加载项目失败', error)
+    }
   }
 }
 
@@ -653,31 +1001,8 @@ const selectProject = async (id: string) => {
   closeSidebar()
 }
 
-const submitNewProject = async () => {
-  const name = newProjectName.value.trim()
-  if (!name) {
-    isAddingProject.value = false
-    return
-  }
-
-  try {
-    await addProjectApi({ name, icon: '📁' })
-    newProjectName.value = ''
-    isAddingProject.value = false
-    await loadProjects()
-  } catch {
-    toast.error('创建清单失败，请检查网络后重试。')
-  }
-}
-
 const openAddProjectInput = () => {
-  closeProjectActionMenu()
-  cancelProjectRename()
-  isAddingProject.value = true
-  newProjectName.value = ''
-  if (isCompactViewport.value) {
-    isSidebarOpen.value = true
-  }
+  void openCreateProjectSettings()
 }
 
 const openDeleteProjectConfirm = (id: string, name: string) => {
@@ -716,6 +1041,7 @@ const deleteProject = async (id: string, name: string) => {
     },
     onCommitSuccess: async () => {
       await loadProjects()
+      emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
     },
     onRollback: async () => {
       if (!projectList.value.some((item) => item.id === id)) {
@@ -731,6 +1057,7 @@ const deleteProject = async (id: string, name: string) => {
           await router.push({ path: '/tasks', query: { projectId: id } })
         }
       }
+      emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
     },
   })
 }
@@ -761,7 +1088,9 @@ watch(
   () => {
     isUserMenuOpen.value = false
     closeProjectActionMenu()
-    cancelProjectRename()
+    showProjectSettingsModal.value = false
+    projectSettingsProjectId.value = ''
+    resetProjectSettingsForm()
     closeSidebar()
   },
 )
@@ -777,6 +1106,7 @@ onMounted(() => {
   loadProjects()
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
+  onProjectListUpdated(handleProjectListUpdated)
   window.addEventListener('resize', updateViewport)
   window.addEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })
@@ -784,7 +1114,32 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopResizeLeft()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  offProjectListUpdated(handleProjectListUpdated)
   window.removeEventListener('resize', updateViewport)
   window.removeEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })
 </script>
+
+<style scoped>
+.project-settings-backdrop {
+  transition: opacity 220ms var(--ease-standard);
+}
+
+.project-settings-panel {
+  transition:
+    opacity 260ms var(--ease-emphasized),
+    transform 260ms var(--ease-emphasized);
+  transform-origin: center;
+}
+
+.project-settings-overlay-enter-from .project-settings-backdrop,
+.project-settings-overlay-leave-to .project-settings-backdrop {
+  opacity: 0;
+}
+
+.project-settings-overlay-enter-from .project-settings-panel,
+.project-settings-overlay-leave-to .project-settings-panel {
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+}
+</style>

@@ -2,40 +2,63 @@
   <main class="relative flex flex-1 flex-col overflow-y-auto bg-[var(--color-bg-page)] p-4 sm:p-6 lg:p-8">
     <div class="mx-auto w-full max-w-6xl space-y-6">
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">📅 周报回顾与规划</h2>
-        <span class="text-sm text-[var(--color-text-secondary)]">温故而知新</span>
+        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">
+          <AppIcon name="calendar" class="h-5 w-5" />
+          周报回顾与规划
+        </h2>
+        <span class="text-sm text-[var(--color-text-secondary)]">看看这周做得怎么样</span>
       </div>
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
         <div class="space-y-6 xl:col-span-2">
           <div
-            class="card-base flex flex-col gap-4 rounded-2xl border-[var(--color-primary-soft-2)] bg-[var(--color-bg-surface)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+            class="card-base rounded-2xl border-[var(--color-primary-soft-2)] bg-[var(--color-bg-surface)] p-5 sm:p-6"
           >
-            <div class="min-w-0">
-              <div class="mb-1 text-sm font-medium text-[var(--color-text-secondary)]">
-                第 {{ currentReview.weekNo || '?' }} 周 ({{ currentReview.startDate }} ~
-                {{ currentReview.endDate }})
-              </div>
-              <div class="text-2xl font-bold text-[var(--color-text-primary)]">本周任务来源摘要</div>
-              <p class="mt-1 text-sm text-[var(--color-text-secondary)]">聚合本周完成任务与核心推进项目，并支持快速回到任务页。</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3 text-center sm:gap-6">
-              <div class="rounded-lg bg-[var(--color-bg-surface-secondary)] px-4 py-2">
-                <div class="text-3xl font-black text-[var(--color-text-primary)]">{{ currentReview.completedTaskCount || 0 }}</div>
-                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">完成任务数</div>
-              </div>
-              <div class="min-w-[100px] rounded-lg bg-[var(--color-bg-surface-secondary)] px-4 py-2">
-                <div class="mt-1 truncate text-xl font-bold text-[var(--color-text-primary)]">
-                  {{ currentReview.focusProjectName || '暂无重点' }}
+            <div class="flex flex-col gap-5">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div class="min-w-0">
+                  <div class="mb-1 text-sm font-medium text-[var(--color-text-secondary)]">
+                    第 {{ currentReview.weekNo || '?' }} 周 ({{ currentReview.startDate || '--' }} ~
+                    {{ currentReview.endDate || '--' }})
+                  </div>
+                  <div class="text-2xl font-bold text-[var(--color-text-primary)]">本周任务摘要看板</div>
+                  <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    这里会自动汇总本周完成情况，并和上周做对比。
+                  </p>
                 </div>
-                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">核心推进项目</div>
+
+                <button
+                  @click="jumpToRelatedTasks"
+                  class="btn-secondary rounded-lg px-4 py-2 text-sm font-bold"
+                >
+                  查看任务页
+                </button>
               </div>
-              <button
-                @click="jumpToRelatedTasks"
-                class="btn-secondary rounded-lg px-4 py-2 text-sm font-bold"
+
+              <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <div
+                  v-for="card in summaryCards"
+                  :key="card.label"
+                  class="rounded-2xl px-4 py-4"
+                  :class="card.containerClass"
+                >
+                  <div class="text-xs font-medium text-[var(--color-text-secondary)]">{{ card.label }}</div>
+                  <div class="mono mt-2 text-3xl font-black" :class="card.valueClass">{{ card.value }}</div>
+                  <div class="mt-2 text-xs" :class="card.hintClass">{{ card.hint }}</div>
+                </div>
+              </div>
+
+              <div
+                class="flex flex-wrap items-center gap-2 text-sm"
+                :class="summaryNoticeToneClass"
               >
-                查看对应任务
-              </button>
+                <AppIcon
+                  v-if="summaryNoticeIcon"
+                  :name="summaryNoticeIcon"
+                  class="h-4 w-4"
+                />
+                <span>{{ summaryNoticeText }}</span>
+              </div>
             </div>
           </div>
 
@@ -43,7 +66,8 @@
             <div>
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-bold text-[var(--color-text-body)] flex items-center gap-2">
-                  <span>🧠</span> 本周复盘
+                  <AppIcon name="brain" class="h-4 w-4" />
+                  本周复盘
                 </label>
 
                 <button
@@ -77,7 +101,7 @@
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  <span v-else>✨</span>
+                  <AppIcon v-else name="sparkles" class="h-3 w-3" />
                   {{ isPolishing ? 'AI 处理中...' : 'AI 润色复盘' }}
                 </button>
               </div>
@@ -90,7 +114,8 @@
 
             <div>
               <label class="block text-sm font-bold text-[var(--color-text-body)] mb-2 flex items-center gap-2">
-                <span>🎯</span> 下周计划
+                <AppIcon name="target" class="h-4 w-4" />
+                下周计划
               </label>
               <textarea
                 v-model="currentReview.nextPlan"
@@ -122,7 +147,8 @@
           class="card-base flex max-h-[420px] flex-col rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6 xl:max-h-[calc(100vh-12rem)]"
         >
           <h3 class="text-lg font-bold text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
-            <span>🕰️</span> 历史轨迹
+            <AppIcon name="history" class="h-5 w-5" />
+            历史轨迹
           </h3>
           <div class="flex-1 overflow-y-auto space-y-4 pr-2">
             <div v-if="historyReviews.length === 0" class="mt-10 text-center text-sm text-[var(--color-text-tertiary)]">
@@ -157,7 +183,7 @@
 
     <AppConfirmDialog
       v-model="showSaveConfirmModal"
-      icon="💾"
+      icon-name="save"
       title="确认保存本周总结？"
       message="保存后，您可以在历史记录中随时查看本次复盘内容。"
       confirm-text="确认保存"
@@ -185,7 +211,9 @@
             @click="showDetailModal = false"
             class="rounded p-2 text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
           >
-            ✕
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
         <div class="flex-1 overflow-y-auto p-8 space-y-8">
@@ -256,7 +284,7 @@
     <AppConfirmDialog
       v-model="showDeleteConfirmModal"
       variant="danger"
-      icon="🗑️"
+      icon-name="trash"
       title="确认删除这条周总结？"
       message="删除后将无法恢复，建议确认内容已经不再需要。"
       confirm-text="确认删除"
@@ -267,11 +295,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import { aiPolishApi } from '@/api/ai'
 import { fetchProjectList } from '@/api/project'
+import { fetchTaskList } from '@/api/task'
 import {
   deleteReviewApi,
   fetchCurrentReview,
@@ -300,6 +330,55 @@ interface ProjectItem {
   name: string
 }
 
+interface TaskItem {
+  id: string | number
+  status: number
+  projectId: string | number
+  dueDate?: string | null
+}
+
+interface TaskListResponse {
+  records?: TaskItem[]
+}
+
+interface SummaryMetrics {
+  completedCount: number | null
+  assignedCount: number | null
+  completionRate: string
+  wowRate: string
+  completedDiff: number | null
+  completionRateDiff: number | null
+  currentCompletedRaw: number | null
+  currentAssignedRaw: number | null
+  previousCompletedRaw: number | null
+  previousAssignedRaw: number | null
+  currentCompletionRateRaw: number | null
+  previousCompletionRateRaw: number | null
+}
+
+interface SummaryCardView {
+  label: string
+  value: string
+  hint: string
+  containerClass: string
+  valueClass: string
+  hintClass: string
+}
+
+const SUMMARY_PAGE_SIZE = 100
+const MAX_PAGES_PER_PROJECT = 10
+const MAX_TOTAL_REQUESTS = 60
+const MAX_CONCURRENT_PROJECT_FETCHES = 3
+const COMPLETED_TASK_STATUS = 2
+const TIMEZONE_BASELINE = 'Asia/Shanghai'
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const DATE_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIMEZONE_BASELINE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
 const router = useRouter()
 const toast = useToast()
 const undoDelete = useUndoDelete()
@@ -311,28 +390,400 @@ const showDetailModal = ref(false)
 const selectedReview = ref<ReviewItem | null>(null)
 const showSaveConfirmModal = ref(false)
 const showDeleteConfirmModal = ref(false)
+const summaryLoading = ref(false)
+const summaryReady = ref(false)
+const summaryError = ref('')
+const summaryGuardHit = ref(false)
+const weeklyCompletedTaskIds = ref<number[]>([])
+const summaryMetrics = ref<SummaryMetrics>({
+  completedCount: null,
+  assignedCount: null,
+  completionRate: '--',
+  wowRate: '--',
+  completedDiff: null,
+  completionRateDiff: null,
+  currentCompletedRaw: null,
+  currentAssignedRaw: null,
+  previousCompletedRaw: null,
+  previousAssignedRaw: null,
+  currentCompletionRateRaw: null,
+  previousCompletionRateRaw: null,
+})
 
 const jumpToRelatedTasks = async () => {
   try {
-    const targetName = (currentReview.value.focusProjectName || '').trim()
-    const res = await fetchProjectList()
-    const records = (res as { records?: ProjectItem[] })?.records || []
-    const matched = targetName ? records.find((item) => item.name === targetName) : undefined
-
-    if (matched?.id) {
-      const projectId = String(matched.id)
-      localStorage.setItem('tick_selectedProjectId', projectId)
-      await router.push({ path: '/tasks', query: { projectId } })
-      return
-    }
-
     await router.push('/tasks')
-    toast.warning('未匹配到同名清单，已跳转任务总览。')
   } catch (error) {
     console.error('周报跳转失败', error)
     toast.error('跳转失败，请检查网络后重试。')
   }
 }
+
+const formatDateKeyInTimeZone = (date: Date) => {
+  return DATE_KEY_FORMATTER.formatToParts(date).reduce((acc, part) => {
+    if (part.type === 'year') return `${part.value}-`
+    if (part.type === 'month') return `${acc}${part.value}-`
+    if (part.type === 'day') return `${acc}${part.value}`
+    return acc
+  }, '')
+}
+
+const normalizeDueDateKey = (value?: string | null) => {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (DATE_KEY_PATTERN.test(trimmed)) return trimmed
+
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return ''
+
+  return formatDateKeyInTimeZone(parsed)
+}
+
+const parseDateKeyToUtc = (dateKey: string) => {
+  if (!DATE_KEY_PATTERN.test(dateKey)) return null
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const timestamp = Date.UTC(year || 0, (month || 1) - 1, day || 1)
+  return Number.isNaN(timestamp) ? null : timestamp
+}
+
+const shiftDateKey = (dateKey: string, offsetDays: number) => {
+  const timestamp = parseDateKeyToUtc(dateKey)
+  if (timestamp === null) return ''
+
+  const shifted = new Date(timestamp + offsetDays * 24 * 60 * 60 * 1000)
+  const year = shifted.getUTCFullYear()
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(shifted.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const isDateKeyWithinRange = (dateKey: string, startDate: string, endDate: string) => {
+  return dateKey >= startDate && dateKey <= endDate
+}
+
+const calcRate = (completed: number, assigned: number) => {
+  if (assigned === 0) return null
+  return (completed / assigned) * 100
+}
+
+const formatRate = (rate: number | null) => {
+  return rate === null ? '--' : `${rate.toFixed(1)}%`
+}
+
+const formatWow = (currentRate: number | null, previousRate: number | null) => {
+  if (currentRate === null || previousRate === null) return '--'
+
+  const diff = currentRate - previousRate
+  const prefix = diff > 0 ? '+' : ''
+  return `${prefix}${diff.toFixed(1)}pp`
+}
+
+const calcWeekMetrics = (tasks: TaskItem[], startDate: string, endDate: string): SummaryMetrics => {
+  const previousStartDate = shiftDateKey(startDate, -7)
+  const previousEndDate = shiftDateKey(endDate, -7)
+
+  let currentAssignedCount = 0
+  let currentCompletedCount = 0
+  let previousAssignedCount = 0
+  let previousCompletedCount = 0
+
+  tasks.forEach((task) => {
+    const dueDateKey = normalizeDueDateKey(task.dueDate)
+    if (!dueDateKey) return
+
+    if (isDateKeyWithinRange(dueDateKey, startDate, endDate)) {
+      currentAssignedCount += 1
+      if (task.status === COMPLETED_TASK_STATUS) {
+        currentCompletedCount += 1
+      }
+      return
+    }
+
+    if (previousStartDate && previousEndDate && isDateKeyWithinRange(dueDateKey, previousStartDate, previousEndDate)) {
+      previousAssignedCount += 1
+      if (task.status === COMPLETED_TASK_STATUS) {
+        previousCompletedCount += 1
+      }
+    }
+  })
+
+  const currentRate = calcRate(currentCompletedCount, currentAssignedCount)
+  const previousRate = calcRate(previousCompletedCount, previousAssignedCount)
+  const completedDiff = currentCompletedCount - previousCompletedCount
+  const completionRateDiff =
+    currentRate === null || previousRate === null ? null : currentRate - previousRate
+
+  return {
+    completedCount: currentCompletedCount,
+    assignedCount: currentAssignedCount,
+    completionRate: formatRate(currentRate),
+    wowRate: formatWow(currentRate, previousRate),
+    completedDiff,
+    completionRateDiff,
+    currentCompletedRaw: currentCompletedCount,
+    currentAssignedRaw: currentAssignedCount,
+    previousCompletedRaw: previousCompletedCount,
+    previousAssignedRaw: previousAssignedCount,
+    currentCompletionRateRaw: currentRate,
+    previousCompletionRateRaw: previousRate,
+  }
+}
+
+const collectCompletedTaskIdsInRange = (tasks: TaskItem[], startDate: string, endDate: string) => {
+  const idSet = new Set<number>()
+
+  tasks.forEach((task) => {
+    const dueDateKey = normalizeDueDateKey(task.dueDate)
+    if (!dueDateKey || !isDateKeyWithinRange(dueDateKey, startDate, endDate)) return
+    if (task.status !== COMPLETED_TASK_STATUS) return
+
+    const parsedId = typeof task.id === 'number' ? task.id : Number(task.id)
+    if (Number.isFinite(parsedId)) {
+      idSet.add(parsedId)
+    }
+  })
+
+  return Array.from(idSet)
+}
+
+const createSummaryPlaceholder = (): SummaryMetrics => ({
+  completedCount: null,
+  assignedCount: null,
+  completionRate: '--',
+  wowRate: '--',
+  completedDiff: null,
+  completionRateDiff: null,
+  currentCompletedRaw: null,
+  currentAssignedRaw: null,
+  previousCompletedRaw: null,
+  previousAssignedRaw: null,
+  currentCompletionRateRaw: null,
+  previousCompletionRateRaw: null,
+})
+
+const hydrateSummaryMetrics = async () => {
+  summaryLoading.value = true
+  summaryReady.value = false
+  summaryError.value = ''
+  summaryGuardHit.value = false
+
+  const startDate = normalizeDueDateKey(currentReview.value.startDate)
+  const endDate = normalizeDueDateKey(currentReview.value.endDate)
+
+  if (!startDate || !endDate) {
+    summaryMetrics.value = createSummaryPlaceholder()
+    weeklyCompletedTaskIds.value = []
+    summaryReady.value = true
+    summaryLoading.value = false
+    summaryError.value = '本周时间范围暂未设置，先填写后可自动生成看板。'
+    return
+  }
+
+  try {
+    const projectResponse = await fetchProjectList()
+    const projects = (projectResponse as { records?: ProjectItem[] })?.records || []
+    const guardState = {
+      totalRequests: 0,
+      hit: false,
+      reason: '',
+    }
+
+    const fetchProjectTasks = async (projectId: string | number) => {
+      const projectTasks: TaskItem[] = []
+      let currentPage = 1
+
+      while (currentPage <= MAX_PAGES_PER_PROJECT && !guardState.hit) {
+        if (guardState.totalRequests >= MAX_TOTAL_REQUESTS) {
+          guardState.hit = true
+          guardState.reason = '数据较多，当前先展示主要结果。'
+          break
+        }
+
+        guardState.totalRequests += 1
+        const response = await fetchTaskList({
+          projectId,
+          current: currentPage,
+          size: SUMMARY_PAGE_SIZE,
+        })
+        const records = ((response as TaskListResponse)?.records || []) as TaskItem[]
+
+        projectTasks.push(...records)
+
+        if (records.length === 0 || records.length < SUMMARY_PAGE_SIZE) {
+          break
+        }
+
+        currentPage += 1
+      }
+
+      if (currentPage > MAX_PAGES_PER_PROJECT && !guardState.hit) {
+        guardState.hit = true
+        guardState.reason = '数据较多，当前先展示主要结果。'
+      }
+
+      return projectTasks
+    }
+
+    const allTasks: TaskItem[] = []
+
+    for (let index = 0; index < projects.length; index += MAX_CONCURRENT_PROJECT_FETCHES) {
+      if (guardState.hit) break
+
+      const chunk = projects.slice(index, index + MAX_CONCURRENT_PROJECT_FETCHES)
+      const chunkResults = await Promise.all(chunk.map((project) => fetchProjectTasks(project.id)))
+      chunkResults.forEach((records) => {
+        allTasks.push(...records)
+      })
+    }
+
+    const finalMetrics = calcWeekMetrics(allTasks, startDate, endDate)
+    summaryMetrics.value = finalMetrics
+    weeklyCompletedTaskIds.value = collectCompletedTaskIdsInRange(allTasks, startDate, endDate)
+    currentReview.value.completedTaskCount = finalMetrics.completedCount ?? currentReview.value.completedTaskCount
+    summaryGuardHit.value = guardState.hit
+    if (guardState.reason) {
+      summaryError.value = guardState.reason
+    }
+    summaryReady.value = true
+  } catch (error) {
+    console.error('加载摘要看板失败', error)
+    summaryMetrics.value = createSummaryPlaceholder()
+    weeklyCompletedTaskIds.value = []
+    summaryError.value = '网络不太稳定，暂时没拿到最新数据，请稍后重试。'
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
+const summaryDisplayValue = (value: number | string | null) => {
+  if (!summaryReady.value || summaryLoading.value) return '--'
+  if (value === null || value === '') return '--'
+  return String(value)
+}
+
+const hasPreviousWeekBaseline = computed(() => {
+  const previousAssigned = summaryMetrics.value.previousAssignedRaw
+  const previousCompleted = summaryMetrics.value.previousCompletedRaw
+  return (previousAssigned ?? 0) > 0 || (previousCompleted ?? 0) > 0
+})
+
+const formatSignedCount = (value: number | null) => {
+  if (value === null) return '--'
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${value}`
+}
+
+const getTrendTone = (diff: number | null): 'positive' | 'negative' | 'neutral' => {
+  if (diff === null || diff === 0) return 'neutral'
+  return diff > 0 ? 'positive' : 'negative'
+}
+
+const getSummaryCardToneClasses = (tone: 'positive' | 'negative' | 'neutral') => {
+  if (tone === 'positive') {
+    return {
+      containerClass: 'bg-[var(--color-success-soft)]',
+      valueClass: 'text-[var(--color-success)]',
+      hintClass: 'text-[var(--color-success)]',
+    }
+  }
+
+  if (tone === 'negative') {
+    return {
+      containerClass: 'bg-[var(--color-danger-soft)]',
+      valueClass: 'text-[var(--color-danger)]',
+      hintClass: 'text-[var(--color-danger)]',
+    }
+  }
+
+  return {
+    containerClass: 'bg-[var(--color-bg-surface-secondary)]',
+    valueClass: 'text-[var(--color-text-primary)]',
+    hintClass: 'text-[var(--color-text-secondary)]',
+  }
+}
+
+const summaryCards = computed<SummaryCardView[]>(() => {
+  const metric = summaryMetrics.value
+  const completedTone =
+    !summaryReady.value || !hasPreviousWeekBaseline.value
+      ? 'neutral'
+      : getTrendTone(metric.completedDiff)
+  const completionRateTone =
+    !summaryReady.value || metric.previousCompletionRateRaw === null
+      ? 'neutral'
+      : getTrendTone(metric.completionRateDiff)
+  const completedDiffTone =
+    !summaryReady.value || !hasPreviousWeekBaseline.value
+      ? 'neutral'
+      : getTrendTone(metric.completedDiff)
+  const wowTone =
+    !summaryReady.value || metric.previousCompletionRateRaw === null
+      ? 'neutral'
+      : getTrendTone(metric.completionRateDiff)
+
+  const completedCountHint = !summaryReady.value
+    ? '正在整理本周数据'
+    : !hasPreviousWeekBaseline.value
+      ? `本周共完成 ${metric.currentCompletedRaw ?? 0} 项`
+      : `较上周 ${formatSignedCount(metric.completedDiff)} 项`
+
+  const completionRateHint = !summaryReady.value
+    ? '正在整理本周数据'
+    : metric.currentAssignedRaw === 0
+      ? '本周暂无安排任务'
+      : metric.previousCompletionRateRaw === null
+        ? `本周共安排 ${metric.currentAssignedRaw ?? 0} 项任务`
+        : `较上周 ${metric.wowRate}`
+
+  return [
+    {
+      label: '本周完成任务',
+      value: summaryDisplayValue(metric.completedCount),
+      hint: completedCountHint,
+      ...getSummaryCardToneClasses(completedTone),
+    },
+    {
+      label: '完成任务变化',
+      value: summaryDisplayValue(
+        summaryReady.value && hasPreviousWeekBaseline.value ? formatSignedCount(metric.completedDiff) : '--',
+      ),
+      hint: hasPreviousWeekBaseline.value ? `上周完成 ${metric.previousCompletedRaw ?? 0} 项` : '暂无上周数据',
+      ...getSummaryCardToneClasses(completedDiffTone),
+    },
+    {
+      label: '本周完成率',
+      value: summaryDisplayValue(metric.completionRate),
+      hint: completionRateHint,
+      ...getSummaryCardToneClasses(completionRateTone),
+    },
+    {
+      label: '完成率变化',
+      value: summaryDisplayValue(metric.wowRate),
+      hint: metric.previousCompletionRateRaw === null ? '暂无上周完成率可对比' : '绿色代表比上周更好，红色需要关注',
+      ...getSummaryCardToneClasses(wowTone),
+    },
+  ]
+})
+
+const summaryNoticeText = computed(() => {
+  if (summaryLoading.value) return '正在更新本周看板，请稍候。'
+  if (summaryGuardHit.value) return summaryError.value || '数据较多，当前先展示已整理完成的结果。'
+  if (summaryError.value) return summaryError.value
+  if (!summaryReady.value) return '看板尚未准备好。'
+  return '绿色表示比上周更好，红色表示需要重点关注。'
+})
+
+const summaryNoticeIcon = computed<IconName | null>(() => {
+  if (summaryLoading.value) return 'info'
+  if (summaryGuardHit.value || summaryError.value) return 'warning'
+  return 'success'
+})
+
+const summaryNoticeToneClass = computed(() => {
+  if (summaryLoading.value) return 'text-[var(--color-text-secondary)]'
+  if (summaryGuardHit.value || summaryError.value) return 'text-[var(--color-warning)]'
+  return 'text-[var(--color-success)]'
+})
 
 const loadReviewData = async () => {
   await loadHistory()
@@ -346,8 +797,12 @@ const loadHistory = async () => {
 
     const historyRes = await fetchReviewHistory()
     historyReviews.value = Array.isArray(historyRes) ? (historyRes as ReviewItem[]) : []
+    await hydrateSummaryMetrics()
   } catch (error) {
     console.error('加载周报数据失败', error)
+    summaryLoading.value = false
+    summaryReady.value = false
+    summaryError.value = '周报数据加载失败，请稍后重试。'
   }
 }
 
@@ -459,7 +914,7 @@ const exportToMarkdown = () => {
 
   const review = selectedReview.value
 
-  const markdownContent = `# 📅 ${review.year} 年第 ${review.weekNo} 周总结
+  const markdownContent = `# ${review.year} 年第 ${review.weekNo} 周总结
 
 > **周期**：${review.startDate} ~ ${review.endDate}
 > **核心推进项目**：${review.focusProjectName || '无'}
@@ -467,10 +922,10 @@ const exportToMarkdown = () => {
 
 ---
 
-## 🧠 本周复盘
+## 本周复盘
 ${review.reflection || '无复盘内容'}
 
-## 🎯 下周计划
+## 下周计划
 ${review.nextPlan || '无计划内容'}
 
 ---
@@ -500,9 +955,9 @@ const handleAiPolish = async () => {
 
   isPolishing.value = true
   try {
+    const taskIds = weeklyCompletedTaskIds.value.length > 0 ? weeklyCompletedTaskIds.value : undefined
     const res = await aiPolishApi({
-      taskCount: currentReview.value.completedTaskCount || 0,
-      focusProject: currentReview.value.focusProjectName || '日常事务',
+      taskIds,
       reflection: currentReview.value.reflection,
     })
 

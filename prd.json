@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "创建任务缓存工具模块 taskCache.ts",
+      "description": "在 src/utils/ 下创建 taskCache.ts，提供基于 localStorage 的任务列表缓存能力",
+      "acceptanceCriteria": [
+        "taskCache.ts 导出 readTaskCache(projectId), writeTaskCache(projectId, tasks), clearTaskCache(projectId?), readAllProjectsTaskCache(), writeAllProjectsTaskCache(record) 函数",
+        "缓存 key 格式为 tick:cache:task-list:v1，TTL 5分钟",
+        "CacheEnvelope 格式包含 updatedAt 和 data 字段",
+        "readAllProjectsTaskCache() 返回 Record<projectId, Task[]> 或 null",
+        "代码通过 TypeScript 类型检查 (npm run type-check)"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "TaskList 看板视图使用任务缓存",
+      "description": "修改 TaskList.vue 的 loadTasks()，今天看板和本周看板优先从缓存读取所有项目任务，再按 view 过滤显示",
+      "acceptanceCriteria": [
+        "loadTasks() 在 isOverviewBoardView 模式下优先调用 readAllProjectsTaskCache() 读取缓存",
+        "缓存命中时直接用 records.filter() 按 dueDate 过滤，缓存未命中才调用 fetchTaskList API",
+        "API 返回数据后调用 writeAllProjectsTaskCache() 写入缓存",
+        "切换 today/week 视图时不再重复调用 API，直接使用内存中已缓存的任务数据",
+        "代码通过 TypeScript 类型检查和 ESLint 检查"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "单个项目视图使用任务缓存",
+      "description": "修改 TaskList.vue 的 loadTasks()，当选择具体项目时使用 readTaskCache/writeTaskCache",
+      "acceptanceCriteria": [
+        "loadTasks() 在非看板视图下优先调用 readTaskCache(selectedProjectId) 读取该项目的缓存",
+        "缓存命中时直接使用，缓存未命中时调用 fetchTaskList API",
+        "API 返回数据后调用 writeTaskCache(projectId, records) 写入缓存",
+        "代码通过 TypeScript 类型检查和 ESLint 检查"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "任务变更时清除相关缓存",
+      "description": "当任务发生增删改时，清除对应的项目任务缓存，确保数据一致性",
+      "acceptanceCriteria": [
+        "addTask 成功后调用 clearTaskCache(projectId) 清除该项目缓存",
+        "deleteTask 成功后调用 clearTaskCache(projectId) 清除该项目缓存",
+        "toggleTaskStatus/updateTaskApi 成功后调用 clearTaskCache(projectId) 清除该项目缓存",
+        "任务详情编辑(onTextBlur)成功后清除该任务所属项目缓存",
+        "代码通过 TypeScript 类型检查和 ESLint 检查"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-005",
+      "title": "构建验证通过",
+      "description": "所有修改完成后，验证项目能正常构建",
+      "acceptanceCriteria": [
+        "npm run build 成功，无编译错误",
+        "npm run type-check 成功，无类型错误"
+      ],
+      "passes": true
+    }
+  ]
+}

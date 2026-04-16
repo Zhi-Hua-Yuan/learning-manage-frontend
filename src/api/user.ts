@@ -9,7 +9,7 @@ export interface RegisterPayload {
   account: string
   username: string
   password: string
-  confirmPassword?: string
+  confirmPassword: string
 }
 
 export interface UpdatePasswordPayload {

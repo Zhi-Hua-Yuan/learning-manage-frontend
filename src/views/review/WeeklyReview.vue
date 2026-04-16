@@ -6,7 +6,7 @@
           <AppIcon name="calendar" class="h-5 w-5" />
           周报回顾与规划
         </h2>
-        <span class="text-sm text-[var(--color-text-secondary)]">温故而知新</span>
+        <span class="text-sm text-[var(--color-text-secondary)]">看看这周做得怎么样</span>
       </div>
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
@@ -23,7 +23,7 @@
                   </div>
                   <div class="text-2xl font-bold text-[var(--color-text-primary)]">本周任务摘要看板</div>
                   <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
-                    聚合本周分配与完成表现，补拉完成后统一渲染最终 KPI。
+                    这里会自动汇总本周完成情况，并和上周做对比。
                   </p>
                 </div>
 
@@ -39,11 +39,12 @@
                 <div
                   v-for="card in summaryCards"
                   :key="card.label"
-                  class="rounded-2xl bg-[var(--color-bg-surface-secondary)] px-4 py-4"
+                  class="rounded-2xl px-4 py-4"
+                  :class="card.containerClass"
                 >
                   <div class="text-xs font-medium text-[var(--color-text-secondary)]">{{ card.label }}</div>
-                  <div class="mono mt-2 text-3xl font-black text-[var(--color-text-primary)]">{{ card.value }}</div>
-                  <div class="mt-2 text-xs text-[var(--color-text-secondary)]">{{ card.hint }}</div>
+                  <div class="mono mt-2 text-3xl font-black" :class="card.valueClass">{{ card.value }}</div>
+                  <div class="mt-2 text-xs" :class="card.hintClass">{{ card.hint }}</div>
                 </div>
               </div>
 
@@ -345,10 +346,23 @@ interface SummaryMetrics {
   assignedCount: number | null
   completionRate: string
   wowRate: string
+  completedDiff: number | null
+  completionRateDiff: number | null
   currentCompletedRaw: number | null
   currentAssignedRaw: number | null
   previousCompletedRaw: number | null
   previousAssignedRaw: number | null
+  currentCompletionRateRaw: number | null
+  previousCompletionRateRaw: number | null
+}
+
+interface SummaryCardView {
+  label: string
+  value: string
+  hint: string
+  containerClass: string
+  valueClass: string
+  hintClass: string
 }
 
 const SUMMARY_PAGE_SIZE = 100
@@ -385,10 +399,14 @@ const summaryMetrics = ref<SummaryMetrics>({
   assignedCount: null,
   completionRate: '--',
   wowRate: '--',
+  completedDiff: null,
+  completionRateDiff: null,
   currentCompletedRaw: null,
   currentAssignedRaw: null,
   previousCompletedRaw: null,
   previousAssignedRaw: null,
+  currentCompletionRateRaw: null,
+  previousCompletionRateRaw: null,
 })
 
 const jumpToRelatedTasks = async () => {
@@ -490,16 +508,23 @@ const calcWeekMetrics = (tasks: TaskItem[], startDate: string, endDate: string):
 
   const currentRate = calcRate(currentCompletedCount, currentAssignedCount)
   const previousRate = calcRate(previousCompletedCount, previousAssignedCount)
+  const completedDiff = currentCompletedCount - previousCompletedCount
+  const completionRateDiff =
+    currentRate === null || previousRate === null ? null : currentRate - previousRate
 
   return {
     completedCount: currentCompletedCount,
     assignedCount: currentAssignedCount,
     completionRate: formatRate(currentRate),
     wowRate: formatWow(currentRate, previousRate),
+    completedDiff,
+    completionRateDiff,
     currentCompletedRaw: currentCompletedCount,
     currentAssignedRaw: currentAssignedCount,
     previousCompletedRaw: previousCompletedCount,
     previousAssignedRaw: previousAssignedCount,
+    currentCompletionRateRaw: currentRate,
+    previousCompletionRateRaw: previousRate,
   }
 }
 
@@ -508,10 +533,14 @@ const createSummaryPlaceholder = (): SummaryMetrics => ({
   assignedCount: null,
   completionRate: '--',
   wowRate: '--',
+  completedDiff: null,
+  completionRateDiff: null,
   currentCompletedRaw: null,
   currentAssignedRaw: null,
   previousCompletedRaw: null,
   previousAssignedRaw: null,
+  currentCompletionRateRaw: null,
+  previousCompletionRateRaw: null,
 })
 
 const hydrateSummaryMetrics = async () => {
@@ -527,7 +556,7 @@ const hydrateSummaryMetrics = async () => {
     summaryMetrics.value = createSummaryPlaceholder()
     summaryReady.value = true
     summaryLoading.value = false
-    summaryError.value = '周区间缺失'
+    summaryError.value = '本周时间范围暂未设置，先填写后可自动生成看板。'
     return
   }
 
@@ -547,7 +576,7 @@ const hydrateSummaryMetrics = async () => {
       while (currentPage <= MAX_PAGES_PER_PROJECT && !guardState.hit) {
         if (guardState.totalRequests >= MAX_TOTAL_REQUESTS) {
           guardState.hit = true
-          guardState.reason = `已触发摘要补拉护栏（请求数上限 ${MAX_TOTAL_REQUESTS}）`
+          guardState.reason = '数据较多，当前先展示主要结果。'
           break
         }
 
@@ -570,7 +599,7 @@ const hydrateSummaryMetrics = async () => {
 
       if (currentPage > MAX_PAGES_PER_PROJECT && !guardState.hit) {
         guardState.hit = true
-        guardState.reason = `已触发摘要补拉护栏（单项目页数上限 ${MAX_PAGES_PER_PROJECT}）`
+        guardState.reason = '数据较多，当前先展示主要结果。'
       }
 
       return projectTasks
@@ -599,7 +628,7 @@ const hydrateSummaryMetrics = async () => {
   } catch (error) {
     console.error('加载摘要看板失败', error)
     summaryMetrics.value = createSummaryPlaceholder()
-    summaryError.value = '摘要加载失败，请稍后重试。'
+    summaryError.value = '网络不太稳定，暂时没拿到最新数据，请稍后重试。'
   } finally {
     summaryLoading.value = false
   }
@@ -611,43 +640,116 @@ const summaryDisplayValue = (value: number | string | null) => {
   return String(value)
 }
 
-const summaryCards = computed(() => {
+const hasPreviousWeekBaseline = computed(() => {
+  const previousAssigned = summaryMetrics.value.previousAssignedRaw
+  const previousCompleted = summaryMetrics.value.previousCompletedRaw
+  return (previousAssigned ?? 0) > 0 || (previousCompleted ?? 0) > 0
+})
+
+const formatSignedCount = (value: number | null) => {
+  if (value === null) return '--'
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${value}`
+}
+
+const getTrendTone = (diff: number | null): 'positive' | 'negative' | 'neutral' => {
+  if (diff === null || diff === 0) return 'neutral'
+  return diff > 0 ? 'positive' : 'negative'
+}
+
+const getSummaryCardToneClasses = (tone: 'positive' | 'negative' | 'neutral') => {
+  if (tone === 'positive') {
+    return {
+      containerClass: 'bg-[var(--color-success-soft)]',
+      valueClass: 'text-[var(--color-success)]',
+      hintClass: 'text-[var(--color-success)]',
+    }
+  }
+
+  if (tone === 'negative') {
+    return {
+      containerClass: 'bg-[var(--color-danger-soft)]',
+      valueClass: 'text-[var(--color-danger)]',
+      hintClass: 'text-[var(--color-danger)]',
+    }
+  }
+
+  return {
+    containerClass: 'bg-[var(--color-bg-surface-secondary)]',
+    valueClass: 'text-[var(--color-text-primary)]',
+    hintClass: 'text-[var(--color-text-secondary)]',
+  }
+}
+
+const summaryCards = computed<SummaryCardView[]>(() => {
+  const metric = summaryMetrics.value
+  const completedTone =
+    !summaryReady.value || !hasPreviousWeekBaseline.value
+      ? 'neutral'
+      : getTrendTone(metric.completedDiff)
+  const completionRateTone =
+    !summaryReady.value || metric.previousCompletionRateRaw === null
+      ? 'neutral'
+      : getTrendTone(metric.completionRateDiff)
+  const completedDiffTone =
+    !summaryReady.value || !hasPreviousWeekBaseline.value
+      ? 'neutral'
+      : getTrendTone(metric.completedDiff)
+  const wowTone =
+    !summaryReady.value || metric.previousCompletionRateRaw === null
+      ? 'neutral'
+      : getTrendTone(metric.completionRateDiff)
+
+  const completedCountHint = !summaryReady.value
+    ? '正在整理本周数据'
+    : !hasPreviousWeekBaseline.value
+      ? `本周共完成 ${metric.currentCompletedRaw ?? 0} 项`
+      : `较上周 ${formatSignedCount(metric.completedDiff)} 项`
+
+  const completionRateHint = !summaryReady.value
+    ? '正在整理本周数据'
+    : metric.currentAssignedRaw === 0
+      ? '本周暂无安排任务'
+      : metric.previousCompletionRateRaw === null
+        ? `本周共安排 ${metric.currentAssignedRaw ?? 0} 项任务`
+        : `较上周 ${metric.wowRate}`
+
   return [
     {
-      label: '本周完成数',
-      value: summaryDisplayValue(summaryMetrics.value.completedCount),
-      hint: summaryReady.value ? `已完成 ${summaryMetrics.value.currentCompletedRaw ?? 0} 项` : '等待摘要补拉完成',
+      label: '本周完成任务',
+      value: summaryDisplayValue(metric.completedCount),
+      hint: completedCountHint,
+      ...getSummaryCardToneClasses(completedTone),
     },
     {
-      label: '本周分配数',
-      value: summaryDisplayValue(summaryMetrics.value.assignedCount),
-      hint: '仅统计 dueDate 落在本周的任务',
+      label: '完成任务变化',
+      value: summaryDisplayValue(
+        summaryReady.value && hasPreviousWeekBaseline.value ? formatSignedCount(metric.completedDiff) : '--',
+      ),
+      hint: hasPreviousWeekBaseline.value ? `上周完成 ${metric.previousCompletedRaw ?? 0} 项` : '暂无上周数据',
+      ...getSummaryCardToneClasses(completedDiffTone),
     },
     {
       label: '本周完成率',
-      value: summaryDisplayValue(summaryMetrics.value.completionRate),
-      hint:
-        summaryReady.value && summaryMetrics.value.currentAssignedRaw === 0
-          ? '本周无分配任务'
-          : '完成数 ÷ 分配数',
+      value: summaryDisplayValue(metric.completionRate),
+      hint: completionRateHint,
+      ...getSummaryCardToneClasses(completionRateTone),
     },
     {
-      label: '较上周完成率变化',
-      value: summaryDisplayValue(summaryMetrics.value.wowRate),
-      hint:
-        summaryReady.value && summaryMetrics.value.previousAssignedRaw === 0
-          ? '上周完成率不可计算'
-          : '单位：百分点',
+      label: '完成率变化',
+      value: summaryDisplayValue(metric.wowRate),
+      hint: metric.previousCompletionRateRaw === null ? '暂无上周完成率可对比' : '绿色代表比上周更好，红色需要关注',
+      ...getSummaryCardToneClasses(wowTone),
     },
   ]
 })
 
 const summaryNoticeText = computed(() => {
-  if (summaryLoading.value) return '摘要补拉中，最终 KPI 将在同一快照完成后展示。'
-  if (summaryGuardHit.value) return summaryError.value || '摘要补拉已降级，当前结果可能低估。'
+  if (summaryLoading.value) return '正在更新本周看板，请稍候。'
+  if (summaryGuardHit.value) return summaryError.value || '数据较多，当前先展示已整理完成的结果。'
   if (summaryError.value) return summaryError.value
-  if (!summaryReady.value) return '摘要尚未就绪。'
-  return `统计口径：${TIMEZONE_BASELINE} / dueDate 周归属 / 周一为一周起始`
+  if (!summaryReady.value) return '看板尚未准备好。'
+  return '绿色表示比上周更好，红色表示需要重点关注。'
 })
 
 const summaryNoticeIcon = computed<IconName | null>(() => {

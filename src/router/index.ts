@@ -41,6 +41,11 @@ const router = createRouter({
           name: 'settings',
           component: () => import('@/views/setting/Settings.vue'),
         },
+        {
+          path: 'projects/archived',
+          name: 'archived-projects',
+          component: () => import('@/views/project/ArchivedProjects.vue'),
+        },
       ],
     },
   ],

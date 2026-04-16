@@ -11,8 +11,9 @@ export interface AddProjectPayload {
 
 export interface UpdateProjectPayload {
   id: EntityId
-  name: string
+  name?: string
   icon?: string
+  status?: number
 }
 
 export interface ReorderProjectItem {
@@ -38,4 +39,16 @@ export const reorderProjectApi = (data: ReorderProjectItem[]) => {
 
 export const deleteProjectApi = (id: EntityId) => {
   return request.post(`/project/delete/${id}`)
+}
+
+export const archiveProjectApi = (ids: EntityId[]) => {
+  return request.post('/project/archive', ids)
+}
+
+export const fetchArchivedProjectsApi = () => {
+  return request.get('/project/list', { params: { status: 1 } })
+}
+
+export const recoverProjectApi = (id: EntityId) => {
+  return request.post(`/project/recover/${id}`)
 }

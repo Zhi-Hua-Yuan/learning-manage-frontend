@@ -130,6 +130,39 @@
       <path d="M9 8h6" />
     </template>
 
+    <template v-else-if="name === 'archive'">
+      <path d="M3 5h18" />
+      <path d="M4 5v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5" />
+      <path d="M10 10v4" />
+      <path d="M14 10v4" />
+      <path d="M4 5l2 2h12l2-2" />
+    </template>
+
+    <template v-else-if="name === 'star'">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </template>
+
+    <template v-else-if="name === 'book'">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </template>
+
+    <template v-else-if="name === 'heart'">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </template>
+
+    <template v-else-if="name === 'work'">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </template>
+
+    <template v-else-if="name === 'rocket'">
+      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+      <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+      <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+      <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+    </template>
+
     <template v-else>
       <circle cx="12" cy="12" r="8" />
       <path d="M12 8h.01" />
@@ -159,6 +192,12 @@ export type IconName =
   | 'save'
   | 'lock'
   | 'clipboard'
+  | 'archive'
+  | 'star'
+  | 'book'
+  | 'heart'
+  | 'work'
+  | 'rocket'
 
 withDefaults(
   defineProps<{

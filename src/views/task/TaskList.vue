@@ -88,8 +88,9 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-3 sm:p-4">
-        <div class="space-y-4">
+      <Transition name="content-fade" mode="out-in">
+        <div :key="boardTransitionKey" class="flex-1 overflow-y-auto p-3 sm:p-4">
+          <div class="space-y-4">
           <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
             <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
               {{ mainTaskSectionTitle }}
@@ -346,7 +347,8 @@
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      </Transition>
     </main>
 
     <div
@@ -719,6 +721,13 @@ import {
 } from '@/api/milestone'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
+import {
+  readAllProjectsTaskCache,
+  readTaskCache,
+  writeAllProjectsTaskCache,
+  writeTaskCache,
+} from '@/utils/taskCache'
 
 interface Task {
   id: string
@@ -761,6 +770,10 @@ interface CalendarCell {
   isSelected: boolean
 }
 
+interface LoadOptions {
+  forceRefresh?: boolean
+}
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -772,6 +785,12 @@ const selectedTask = ref<Task | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
+const boardView = computed(() =>
+  route.query.view === 'today' || route.query.view === 'week' ? route.query.view : 'project',
+)
+const boardTransitionKey = computed(() =>
+  boardView.value === 'project' ? `project:${selectedProjectId.value || 'none'}` : String(boardView.value),
+)
 const selectedProject = computed(() =>
   projectList.value.find((project) => project.id === selectedProjectId.value),
 )
@@ -802,6 +821,10 @@ const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 340)
 const isResizingRight = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const projectLoadVersion = ref(0)
+const taskLoadVersion = ref(0)
+const milestoneLoadVersion = ref(0)
+const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 
 const isMobile = computed(() => viewportWidth.value < 768)
 
@@ -1028,6 +1051,64 @@ const navigateToProject = (projectId: string) => {
   router.push({ path: '/tasks', query: { projectId } })
 }
 
+const upsertTaskCache = (task: Task) => {
+  const projectId = String(task.projectId || '')
+  if (!projectId) return
+
+  const cachedProjectTasks = readTaskCache(projectId, Number.POSITIVE_INFINITY)
+  if (cachedProjectTasks) {
+    const nextProjectTasks = cachedProjectTasks.some((item) => item.id === task.id)
+      ? cachedProjectTasks.map((item) => (item.id === task.id ? { ...item, ...task } : item))
+      : [...cachedProjectTasks, task]
+    writeTaskCache(projectId, nextProjectTasks)
+  }
+
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY)
+  if (cachedAllProjectsTasks && Array.isArray(cachedAllProjectsTasks[projectId])) {
+    const nextAllProjectsTasks = cachedAllProjectsTasks[projectId]!.some((item) => item.id === task.id)
+      ? cachedAllProjectsTasks[projectId]!.map((item) => (item.id === task.id ? { ...item, ...task } : item))
+      : [...cachedAllProjectsTasks[projectId]!, task]
+    writeAllProjectsTaskCache({
+      ...cachedAllProjectsTasks,
+      [projectId]: nextAllProjectsTasks,
+    })
+  }
+}
+
+const removeTaskFromCache = (task: Task) => {
+  const projectId = String(task.projectId || '')
+  if (!projectId) return
+
+  const cachedProjectTasks = readTaskCache(projectId, Number.POSITIVE_INFINITY)
+  if (cachedProjectTasks) {
+    writeTaskCache(
+      projectId,
+      cachedProjectTasks.filter((item) => item.id !== task.id),
+    )
+  }
+
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY)
+  if (cachedAllProjectsTasks && Array.isArray(cachedAllProjectsTasks[projectId])) {
+    writeAllProjectsTaskCache({
+      ...cachedAllProjectsTasks,
+      [projectId]: cachedAllProjectsTasks[projectId]!.filter((item) => item.id !== task.id),
+    })
+  }
+}
+
+const writeTodayTaskCaches = (records: Task[]) => {
+  const nextCache: Record<string, Task[]> = {}
+  records.forEach((task) => {
+    const projectId = String(task.projectId || '')
+    if (!projectId) return
+    if (!nextCache[projectId]) {
+      nextCache[projectId] = []
+    }
+    nextCache[projectId]!.push(task)
+  })
+  writeAllProjectsTaskCache(nextCache)
+}
+
 const syncSelectedProject = () => {
   if (isTodayView.value) {
     selectedProjectId.value = ''
@@ -1044,11 +1125,33 @@ const syncSelectedProject = () => {
   selectedProjectId.value = localStorage.getItem('tick_selectedProjectId') || ''
 }
 
-const loadProjects = async () => {
+const loadProjects = async (options: LoadOptions = {}) => {
+  const forceRefresh = options.forceRefresh === true
+  const requestVersion = ++projectLoadVersion.value
+  const cachedRecords = !forceRefresh ? readProjectListCache<Project>(0) : null
+
+  if (cachedRecords) {
+    projectList.value = cachedRecords
+  }
+
+  if (cachedRecords && !forceRefresh) {
+    if (!isTodayView.value && !selectedProjectId.value && projectList.value.length > 0) {
+      const firstProject = projectList.value[0]
+      if (!firstProject) return
+      const firstId = firstProject.id
+      selectedProjectId.value = firstId
+      localStorage.setItem('tick_selectedProjectId', firstId)
+      await router.replace({ path: '/tasks', query: { projectId: firstId } })
+    }
+    return
+  }
+
   try {
-    const res = await fetchProjectList()
+    const res = await fetchProjectList({ status: 0 })
+    if (requestVersion !== projectLoadVersion.value) return
     const records = (res as unknown as { records?: Project[] })?.records
     projectList.value = records || []
+    writeProjectListCache(0, projectList.value)
 
     if (!isTodayView.value && !selectedProjectId.value && projectList.value.length > 0) {
       const firstProject = projectList.value[0]
@@ -1069,12 +1172,30 @@ const syncSelectedTaskFromList = () => {
   }
 }
 
-const loadTasks = async () => {
+const loadTasks = async (options: LoadOptions = {}) => {
+  const forceRefresh = options.forceRefresh === true
+  const requestVersion = ++taskLoadVersion.value
+
   if (isTodayView.value) {
     if (projectList.value.length === 0) {
       taskList.value = []
       selectedTask.value = null
       return
+    }
+
+    if (!forceRefresh) {
+      const cachedAllProjectsTasks = readAllProjectsTaskCache()
+      if (cachedAllProjectsTasks) {
+        const todayKey = toDateKey(new Date())
+        const allRecords = Object.values(cachedAllProjectsTasks).flatMap((items) =>
+          Array.isArray(items) ? items : [],
+        )
+        taskList.value = allRecords
+          .filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
+          .sort(compareTaskByDueDateThenPriority)
+        syncSelectedTaskFromList()
+        return
+      }
     }
 
     try {
@@ -1087,13 +1208,16 @@ const loadTasks = async () => {
           }),
         ),
       )
+      if (requestVersion !== taskLoadVersion.value) return
       const todayKey = toDateKey(new Date())
       const records = responses.flatMap((res) => (res as unknown as { records?: Task[] })?.records || [])
       taskList.value = records
         .filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
         .sort(compareTaskByDueDateThenPriority)
+      writeTodayTaskCaches(records)
       syncSelectedTaskFromList()
     } catch (error) {
+      if (requestVersion !== taskLoadVersion.value) return
       console.error('加载今日任务失败', error)
     }
     return
@@ -1105,31 +1229,61 @@ const loadTasks = async () => {
     return
   }
 
+  if (!forceRefresh) {
+    const cachedProjectTasks = readTaskCache(selectedProjectId.value)
+    if (cachedProjectTasks) {
+      taskList.value = cachedProjectTasks
+      syncSelectedTaskFromList()
+      return
+    }
+  }
+
+  const requestProjectId = selectedProjectId.value
   try {
     const res = await fetchTaskList({
-      projectId: selectedProjectId.value,
+      projectId: requestProjectId,
       current: 1,
       size: 100,
     })
+    if (requestVersion !== taskLoadVersion.value) return
+    if (requestProjectId !== selectedProjectId.value) return
     const records = (res as unknown as { records?: Task[] })?.records
     taskList.value = records || []
+    writeTaskCache(requestProjectId, taskList.value)
     syncSelectedTaskFromList()
   } catch (error) {
+    if (requestVersion !== taskLoadVersion.value) return
     console.error('加载任务失败', error)
   }
 }
 
-const loadMilestones = async () => {
+const loadMilestones = async (options: LoadOptions = {}) => {
+  const forceRefresh = options.forceRefresh === true
+  const requestVersion = ++milestoneLoadVersion.value
   if (isTodayView.value || !selectedProjectId.value) {
     milestoneList.value = []
     return
   }
 
+  const requestProjectId = selectedProjectId.value
+  if (!forceRefresh && Array.isArray(milestoneCacheByProject.value[requestProjectId])) {
+    milestoneList.value = [...milestoneCacheByProject.value[requestProjectId]!]
+    return
+  }
+
   try {
-    const res = await fetchMilestoneList({ projectId: selectedProjectId.value })
+    const res = await fetchMilestoneList({ projectId: requestProjectId })
+    if (requestVersion !== milestoneLoadVersion.value) return
+    if (requestProjectId !== selectedProjectId.value || isTodayView.value) return
     const milestones = Array.isArray(res) ? (res as Milestone[]) : []
-    milestoneList.value = milestones.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
+    const sortedMilestones = milestones.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
+    milestoneList.value = sortedMilestones
+    milestoneCacheByProject.value = {
+      ...milestoneCacheByProject.value,
+      [requestProjectId]: sortedMilestones,
+    }
   } catch (error) {
+    if (requestVersion !== milestoneLoadVersion.value) return
     console.error('加载里程碑失败', error)
   }
 }
@@ -1148,7 +1302,7 @@ const addTask = async () => {
     newTaskTitle.value = ''
     newTaskMilestoneId.value = ''
     isNewTaskMilestoneMenuOpen.value = false
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch {
     toast.error('添加任务失败，请检查网络后重试。')
   }
@@ -1161,6 +1315,7 @@ const toggleTaskStatus = async (task: Task) => {
   try {
     task.status = newStatus
     await updateTaskApi({ ...task, status: newStatus })
+    upsertTaskCache(task)
   } catch {
     task.status = oldStatus
     toast.error('更新状态失败，请检查网络后重试。')
@@ -1319,6 +1474,7 @@ const selectPriority = async (val: number) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, priority: val })
+    upsertTaskCache(selectedTask.value)
   } catch {
     selectedTask.value.priority = oldPriority
     toast.error('更新优先级失败，请检查网络后重试。')
@@ -1341,7 +1497,7 @@ const updateDueDate = async (nextDate: string | null) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, dueDate: finalDate })
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch {
     selectedTask.value.dueDate = oldDate
     toast.error('更新日期失败，请检查网络后重试。')
@@ -1374,7 +1530,7 @@ const selectMilestone = async (milestoneId: string | null) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, milestoneId: finalMilestoneId })
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch {
     selectedTask.value.milestoneId = oldMilestoneId
     toast.error('更新所属阶段失败，请检查网络后重试。')
@@ -1386,7 +1542,7 @@ const onTextBlur = async () => {
 
   try {
     await updateTaskApi({ ...selectedTask.value })
-    await loadTasks()
+    await loadTasks({ forceRefresh: true })
   } catch (error) {
     console.error('保存任务失败', error)
     toast.error('保存失败，请检查网络后重试。')
@@ -1407,6 +1563,7 @@ const confirmDeleteTask = async () => {
 
   const originalIndex = taskList.value.findIndex((task) => task.id === taskToDelete.id)
   taskList.value = taskList.value.filter((task) => task.id !== taskToDelete.id)
+  removeTaskFromCache(taskToDelete)
   selectedTask.value = null
 
   undoDelete.scheduleUndoDelete({
@@ -1416,7 +1573,7 @@ const confirmDeleteTask = async () => {
       await deleteTaskApi(taskToDelete.id)
     },
     onCommitSuccess: async () => {
-      await loadTasks()
+      await loadTasks({ forceRefresh: true })
     },
     onRollback: async () => {
       if (!taskList.value.some((task) => task.id === taskToDelete.id)) {
@@ -1426,6 +1583,7 @@ const confirmDeleteTask = async () => {
         nextTasks.splice(insertIndex, 0, taskToDelete)
         taskList.value = nextTasks
       }
+      upsertTaskCache(taskToDelete)
     },
   })
 }
@@ -1445,7 +1603,7 @@ const submitNewMilestone = async () => {
     })
     newMilestoneName.value = ''
     isAddingMilestone.value = false
-    await loadMilestones()
+    await loadMilestones({ forceRefresh: true })
   } catch {
     toast.error('创建阶段失败，请检查网络后重试。')
   }
@@ -1472,7 +1630,7 @@ const saveMilestone = async (milestone: Milestone) => {
   try {
     await updateMilestoneApi({ ...milestone, name: newName })
     editingMilestoneId.value = ''
-    await loadMilestones()
+    await loadMilestones({ forceRefresh: true })
   } catch {
     toast.error('重命名失败，请检查网络后重试。')
   }
@@ -1506,7 +1664,7 @@ const deleteMilestone = async (id: string, name: string) => {
       await deleteMilestoneApi(id)
     },
     onCommitSuccess: async () => {
-      await Promise.all([loadMilestones(), loadTasks()])
+      await Promise.all([loadMilestones({ forceRefresh: true }), loadTasks({ forceRefresh: true })])
     },
     onRollback: () => {
       if (!milestoneList.value.some((milestone) => milestone.id === id)) {

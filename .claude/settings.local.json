@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p .omc/context .omc/interviews .omc/logs .omc/plans .omc/reports .omc/specs)",
+      "Bash(cp -n .omx/context/* .omc/context/)",
+      "Bash(cp -n .omx/hud-config.json .omc/)",
+      "Bash(cp -n .omx/interviews/* .omc/interviews/)",
+      "Bash(cp -n .omx/metrics.json .omc/)",
+      "Bash(cp -n .omx/state/*.json .omc/state/)",
+      "Bash(mkdir -p .omc/state/team)",
+      "Bash(cp -rn .omx/state/team/* .omc/state/team/)",
+      "Bash(omx team:*)",
+      "Bash(tmux list-windows:*)",
+      "Bash(npm run:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m 'chore: exclude .omx/team worktrees from eslint tsconfig candidate paths:*)",
+      "Bash(git commit -m 'feat\\(task\\): make project tag clickable in Today view to navigate to project:*)",
+      "Bash([ -f \"$HOME/.claude/CLAUDE.md\" ])",
+      "Bash(npx tsc:*)",
+      "Bash(git checkout:*)",
+      "Bash(ls .omc/state/*.json)"
+    ]
+  }
+}

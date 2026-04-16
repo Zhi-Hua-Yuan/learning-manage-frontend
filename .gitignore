@@ -42,3 +42,4 @@ __screenshots__/
 /.npm-cache
 /.playwright-browsers
 .omx/
+.omc/

@@ -75,6 +75,19 @@
           </div>
 
           <div
+            @click="navigateToWeek"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              isWeekRoute
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="calendar" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">本周</span>
+          </div>
+
+          <div
             @click="navigateTo('/review')"
             class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
@@ -159,7 +172,7 @@
             @click="handleProjectRowClick(project.id)"
             class="interactive-row group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
-              (route.path === '/tasks' || route.path === '/') && !isTodayRoute && selectedProjectId === project.id
+              (route.path === '/tasks' || route.path === '/') && !isTodayRoute && !isWeekRoute && selectedProjectId === project.id
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
@@ -204,10 +217,18 @@
                 </svg>
               </button>
 
-              <div
+              <Teleport
                 v-if="activeProjectActionId === project.id"
-                class="surface-panel absolute right-0 top-9 z-[var(--z-popover)] w-36 overflow-hidden rounded-lg py-1"
+                to="body"
               >
+                <div
+                  class="surface-panel absolute right-0 top-9 z-[var(--z-overlay)] w-36 overflow-hidden rounded-lg py-1"
+                  :style="getActionMenuStyle(project.id)"
+                  data-project-action-menu
+                  :data-project-id="project.id"
+                  @pointerdown.stop
+                  @click.stop
+                >
                 <button
                   type="button"
                   class="interactive-row flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-text-body)]"
@@ -244,16 +265,33 @@
                 <div class="my-1 h-px bg-[var(--color-popover-border)]"></div>
                 <button
                   type="button"
+                  class="flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-text-body)] hover:bg-[var(--color-menu-hover)]"
+                  @click="archiveProject(project.id)"
+                >
+                  归档
+                </button>
+                <button
+                  type="button"
                   class="flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
                   @click="openDeleteProjectConfirm(project.id, project.name)"
                 >
                   删除
                 </button>
-              </div>
+                </div>
+              </Teleport>
             </div>
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+        @click="router.push('/projects/archived')"
+      >
+        <AppIcon name="archive" class="h-4 w-4" />
+        归档清单
+      </button>
 
       <div class="group relative mt-auto border-t border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] p-4">
         <div
@@ -314,11 +352,17 @@
       ></div>
     </aside>
 
-    <router-view
-      class="flex-1 overflow-y-auto bg-[var(--color-bg-page)]"
-      :class="isCompactViewport ? 'pt-14' : ''"
-      @refresh-projects="loadProjects"
-    />
+    <router-view v-slot="{ Component }">
+      <Transition name="content-fade" mode="out-in">
+        <component
+          :is="Component"
+          :key="pageTransitionKey"
+          class="flex-1 overflow-y-auto bg-[var(--color-bg-page)]"
+          :class="isCompactViewport ? 'pt-14' : ''"
+          @refresh-projects="loadProjects"
+        />
+      </Transition>
+    </router-view>
 
     <AppConfirmDialog
       v-model="showDeleteProjectConfirm"
@@ -392,6 +436,7 @@ import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import {
   addProjectApi,
+  archiveProjectApi,
   deleteProjectApi,
   fetchProjectList,
   reorderProjectApi,
@@ -400,6 +445,13 @@ import {
 import { getUserMeApi, logoutApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
+import {
+  emitProjectListUpdated,
+  offProjectListUpdated,
+  onProjectListUpdated,
+  type ProjectListUpdatedDetail,
+} from '@/utils/projectEvents'
 
 interface Project {
   id: string
@@ -413,6 +465,7 @@ interface CurrentUserInfo {
 }
 
 const USER_INFO_UPDATED_EVENT = 'tick:user-updated'
+const PROJECT_LIST_EVENT_SOURCE = 'basic-layout'
 
 const router = useRouter()
 const route = useRoute()
@@ -437,6 +490,8 @@ const isSidebarOpen = ref(false)
 
 const isCompactViewport = computed(() => viewportWidth.value < 1024)
 const isTodayRoute = computed(() => route.path === '/tasks' && route.query.view === 'today')
+const isWeekRoute = computed(() => route.path === '/tasks' && route.query.view === 'week')
+const pageTransitionKey = computed(() => route.path)
 const sidebarStyle = computed(() =>
   isCompactViewport.value ? undefined : { width: `${sidebarWidth.value}px` },
 )
@@ -475,6 +530,17 @@ const toggleProjectActionMenu = (projectId: string) => {
   activeProjectActionId.value = activeProjectActionId.value === projectId ? '' : projectId
 }
 
+const getActionMenuStyle = (projectId: string): Record<string, string> => {
+  const el = document.querySelector(`[data-project-action-root][data-project-id="${projectId}"]`)
+  if (!el) return { display: 'none' }
+  const rect = el.getBoundingClientRect()
+  return {
+    position: 'fixed',
+    right: `${window.innerWidth - rect.right}px`,
+    top: `${rect.bottom + 4}px`,
+  }
+}
+
 const isFirstProject = (projectId: string) => {
   const index = projectList.value.findIndex((item) => item.id === projectId)
   return index <= 0
@@ -494,6 +560,11 @@ const navigateTo = async (path: string) => {
 
 const navigateToToday = async () => {
   await router.push({ path: '/tasks', query: { view: 'today' } })
+  closeSidebar()
+}
+
+const navigateToWeek = async () => {
+  await router.push({ path: '/tasks', query: { view: 'week' } })
   closeSidebar()
 }
 
@@ -544,9 +615,22 @@ const submitProjectRename = async (project: Project) => {
 
   try {
     await updateProjectApi({ id: project.id, name: nextName, icon: project.icon })
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
   } catch {
     projectList.value = snapshot
     toast.error('重命名清单失败，请检查网络后重试。')
+  }
+}
+
+const archiveProject = async (id: string) => {
+  closeProjectActionMenu()
+  try {
+    await archiveProjectApi([id])
+    toast.success('清单已归档。')
+    await loadProjects()
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
+  } catch {
+    toast.error('归档失败，请重试。')
   }
 }
 
@@ -572,6 +656,7 @@ const moveProject = async (projectId: string, direction: -1 | 1) => {
         orderNo: index,
       })),
     )
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
   } catch {
     projectList.value = snapshot
     toast.error('调整清单顺序失败，请检查网络后重试。')
@@ -582,10 +667,17 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
   const target = event.target as HTMLElement | null
   if (!target || !activeProjectActionId.value) return
 
-  const selector = `[data-project-action-root][data-project-id="${activeProjectActionId.value}"]`
-  if (!target.closest(selector)) {
+  const rootSelector = `[data-project-action-root][data-project-id="${activeProjectActionId.value}"]`
+  const menuSelector = `[data-project-action-menu][data-project-id="${activeProjectActionId.value}"]`
+  if (!target.closest(rootSelector) && !target.closest(menuSelector)) {
     closeProjectActionMenu()
   }
+}
+
+const handleProjectListUpdated: EventListener = (event) => {
+  const customEvent = event as CustomEvent<ProjectListUpdatedDetail>
+  if (customEvent.detail?.source === PROJECT_LIST_EVENT_SOURCE) return
+  void loadProjects()
 }
 
 const startResizeLeft = () => {
@@ -653,10 +745,17 @@ const ensureDefaultProject = async () => {
 }
 
 const loadProjects = async () => {
+  const cachedRecords = readProjectListCache<Project>(0)
+  if (cachedRecords && cachedRecords.length > 0) {
+    projectList.value = cachedRecords
+    await ensureDefaultProject()
+  }
+
   try {
-    const res = await fetchProjectList()
+    const res = await fetchProjectList({ status: 0 })
     const records = (res as unknown as { records?: Project[] })?.records
     projectList.value = records || []
+    writeProjectListCache(0, projectList.value)
 
     if (activeProjectActionId.value && !projectList.value.some((item) => item.id === activeProjectActionId.value)) {
       closeProjectActionMenu()
@@ -667,7 +766,9 @@ const loadProjects = async () => {
 
     await ensureDefaultProject()
   } catch (error) {
-    console.error('加载项目失败', error)
+    if (!cachedRecords) {
+      console.error('加载项目失败', error)
+    }
   }
 }
 
@@ -690,6 +791,7 @@ const submitNewProject = async () => {
     newProjectName.value = ''
     isAddingProject.value = false
     await loadProjects()
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
   } catch {
     toast.error('创建清单失败，请检查网络后重试。')
   }
@@ -741,6 +843,7 @@ const deleteProject = async (id: string, name: string) => {
     },
     onCommitSuccess: async () => {
       await loadProjects()
+      emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
     },
     onRollback: async () => {
       if (!projectList.value.some((item) => item.id === id)) {
@@ -756,6 +859,7 @@ const deleteProject = async (id: string, name: string) => {
           await router.push({ path: '/tasks', query: { projectId: id } })
         }
       }
+      emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
     },
   })
 }
@@ -802,6 +906,7 @@ onMounted(() => {
   loadProjects()
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
+  onProjectListUpdated(handleProjectListUpdated)
   window.addEventListener('resize', updateViewport)
   window.addEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })
@@ -809,6 +914,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopResizeLeft()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  offProjectListUpdated(handleProjectListUpdated)
   window.removeEventListener('resize', updateViewport)
   window.removeEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })

@@ -1,152 +1,133 @@
-# Project / Milestone / Task API
+# 项目 / 里程碑 / 任务接口 (Project / Milestone / Task API)
 
-Base URL: `/api`
+## 概述
+
+- **Base URL**: `http://localhost:8123/api`
+- **认证**: 所有接口均需携带 `Authorization: Bearer <token>`
+
+## 实体字段说明
+
+### Project（项目）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | Long | 主键 ID |
+| userId | Long | 所属用户 ID |
+| name | String | 项目名称（最大100字符） |
+| goal | String | 项目目标（最大500字符） |
+| status | Integer | 0=进行中，1=已归档 |
+| icon | String | 项目图标（emoji 或图标名称） |
+| color | String | 项目颜色（十六进制，如 #4A90D9） |
+| progress | BigDecimal | 完成进度百分比（0.00~100.00），实体有但 ProjectVo 不返回 |
+| orderNo | Integer | 排序序号（数值越小排序越靠前） |
+| startDate | LocalDate | 开始日期 |
+| endDate | LocalDate | 结束日期 |
+| isDelete | Integer | 软删除标记：0=正常，1=已删除 |
+| deletedAt | LocalDateTime | 软删除时间 |
+| createTime | LocalDateTime | 创建时间 |
+| updateTime | LocalDateTime | 更新时间 |
+
+### Milestone（里程碑）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | Long | 主键 ID |
+| projectId | Long | 所属项目 ID |
+| userId | Long | 所属用户 ID |
+| name | String | 里程碑名称（最大100字符） |
+| orderNo | Integer | 排序序号（数值越小排序越靠前） |
+| progress | BigDecimal | 完成进度百分比（0.00~100.00） |
+| deleteSource | Integer | 删除来源：0=无，1=手动删除，2=级联删除 |
+| isDelete | Integer | 软删除标记：0=正常，1=已删除 |
+| deletedAt | LocalDateTime | 软删除时间 |
+| createTime | LocalDateTime | 创建时间 |
+| updateTime | LocalDateTime | 更新时间 |
+
+### Task（任务）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | Long | 主键 ID |
+| projectId | Long | 所属项目 ID |
+| milestoneId | Long | 所属里程碑 ID（可为空，表示未归组） |
+| userId | Long | 所属用户 ID |
+| title | String | 任务标题（最大60字符） |
+| description | String | 任务描述（最大550字符） |
+| status | Integer | 0=待办，1=进行中，2=已完成 |
+| priority | Integer | 优先级（数值越大优先级越高，默认0） |
+| dueDate | LocalDate | 截止日期 |
+| completedAt | LocalDateTime | 完成时间（status=2 时自动记录） |
+| deleteSource | Integer | 删除来源：0=无，1=手动删除，2=级联删除 |
+| isDelete | Integer | 软删除标记：0=正常，1=已删除 |
+| deletedAt | LocalDateTime | 软删除时间 |
+| createTime | LocalDateTime | 创建时间 |
+| updateTime | LocalDateTime | 更新时间 |
 
 ---
 
-## Common Response Format
+## 状态值说明
 
-All endpoints return a `BaseResponse<T>` wrapper:
+### Project.status
 
+| 值 | 含义 |
+|----|------|
+| 0 | 进行中（Active） |
+| 1 | 已归档（Archived） |
+
+### Task.status
+
+| 值 | 含义 |
+|----|------|
+| 0 | 待办（To Do） |
+| 1 | 进行中（In Progress） |
+| 2 | 已完成（Completed） |
+
+### deleteSource（删除来源）
+
+| 值 | 含义 |
+|----|------|
+| 0 | 无（正常状态或手动删除） |
+| 1 | 手动删除（用户主动删除） |
+| 2 | 级联删除（父级删除时自动触发） |
+
+---
+
+## 接口详情
+
+### ProjectController
+
+#### POST /project/add — 创建项目
+
+**请求体（ProjectCreateRequest）:**
 ```json
 {
-  "code": 0,
-  "message": "OK",
-  "data": { ... }
+  "name": "英语六级冲刺",
+  "goal": "三个月内通过英语六级考试",
+  "icon": "📚",
+  "color": "#4A90D9",
+  "startDate": "2026-04-01",
+  "endDate": "2026-06-30"
 }
 ```
 
-| code | meaning |
-|------|--------|
-| `0`  | Success |
-| `*`  | Error — see `message` for details |
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | String | 是 | 项目名称 |
+| goal | String | 否 | 项目目标 |
+| icon | String | 否 | 项目图标 |
+| color | String | 否 | 项目颜色（十六进制） |
+| startDate | LocalDate | 否 | 开始日期，格式 yyyy-MM-dd |
+| endDate | LocalDate | 否 | 结束日期，格式 yyyy-MM-dd |
+
+**成功响应:** `BaseResponse<Long>` — 返回新建项目 ID
 
 ---
 
-## Data Models
+#### GET /project/get/{id} — 获取项目详情
 
-### Project Entity
+**路径参数:** `id` (Long) — 项目 ID
 
-| Field       | Type           | Description |
-|-------------|----------------|-------------|
-| `id`        | `Long`         | Unique primary key |
-| `userId`    | `Long`         | Owner user ID |
-| `name`      | `String`       | Project name (max 100 chars) |
-| `goal`      | `String`       | Project goal / objective (max 500 chars), nullable |
-| `status`    | `Integer`      | **0 = Active (in progress), 1 = Archived** |
-| `progress`  | `BigDecimal`   | Completion percentage, 0.00–100.00 (defaults to 0.00) |
-| `orderNo`   | `Integer`      | Sort priority — smaller numbers appear first; unique per user |
-| `startDate` | `LocalDate`    | Planned start date, nullable |
-| `endDate`   | `LocalDate`    | Planned end date, nullable |
-| `isDelete`  | `Integer`      | Logical delete flag — `0` = normal, `1` = deleted |
-| `deletedAt` | `LocalDateTime`| Timestamp when the project was soft-deleted, nullable |
-| `createTime`| `LocalDateTime`| Record creation timestamp |
-| `updateTime`| `LocalDateTime`| Last update timestamp |
-
-### Milestone Entity
-
-| Field         | Type           | Description |
-|---------------|----------------|-------------|
-| `id`          | `Long`         | Unique primary key |
-| `projectId`   | `Long`         | Parent project ID |
-| `userId`      | `Long`         | Owner user ID |
-| `name`        | `String`       | Milestone name (max 100 chars) |
-| `orderNo`     | `Integer`      | Sort priority within the project — smaller = higher position; unique per project |
-| `progress`    | `BigDecimal`   | Completion percentage, 0.00–100.00 (defaults to 0.00) |
-| `deleteSource`| `Integer`      | Who initiated deletion: **0 = none (normal), 1 = manual delete, 2 = cascade (parent project deleted)** |
-| `isDelete`    | `Integer`      | Logical delete flag — `0` = normal, `1` = deleted |
-| `deletedAt`   | `LocalDateTime`| Timestamp when the milestone was soft-deleted, nullable |
-| `createTime`  | `LocalDateTime`| Record creation timestamp |
-| `updateTime`  | `LocalDateTime`| Last update timestamp |
-
-### Task Entity
-
-| Field         | Type           | Description |
-|---------------|----------------|-------------|
-| `id`          | `Long`         | Unique primary key |
-| `projectId`   | `Long`         | Parent project ID |
-| `milestoneId` | `Long`         | Parent milestone ID, nullable (task may be ungrouped) |
-| `userId`      | `Long`         | Assigned user ID |
-| `title`       | `String`       | Task title (max 60 chars) |
-| `description` | `String`       | Task description (max 550 chars), nullable |
-| `status`      | `Integer`      | **0 = To Do, 1 = In Progress, 2 = Completed** |
-| `priority`    | `Integer`      | Priority level — higher value = higher priority; defaults to `0` |
-| `dueDate`     | `LocalDate`    | Deadline, nullable |
-| `completedAt` | `LocalDateTime`| Timestamp when the task was marked completed, nullable |
-| `deleteSource`| `Integer`      | Who initiated deletion: **0 = none (normal), 1 = manual delete, 2 = cascade (parent deleted)** |
-| `isDelete`    | `Integer`      | Logical delete flag — `0` = normal, `1` = deleted |
-| `deletedAt`   | `LocalDateTime`| Timestamp when the task was soft-deleted, nullable |
-| `createTime`  | `LocalDateTime`| Record creation timestamp |
-| `updateTime`  | `LocalDateTime`| Last update timestamp |
-
-### deleteSource Field — What It Means
-
-Tracks who triggered the soft-delete, used primarily for cascade deletion scenarios:
-
-| Value | Meaning |
-|-------|---------|
-| `0`   | Not deleted, or deleted by an unknown party |
-| `1`   | Deleted manually by a user action |
-| `2`   | Cascade deletion — deleted automatically when the parent (project or milestone) was deleted |
-
-### Status Field Values
-
-**Project status:**
-
-| Value | Meaning |
-|-------|---------|
-| `0`   | Active / In Progress |
-| `1`   | Archived |
-
-**Task status:**
-
-| Value | Meaning |
-|-------|---------|
-| `0`   | To Do |
-| `1`   | In Progress |
-| `2`   | Completed |
-
----
-
-## Project Controller
-
-### `POST /project/add` — Create Project
-
-Creates a new project and returns its generated ID.
-
-**Request Body — `ProjectCreateRequest`**
-
-| Field       | Type         | Required | Description |
-|-------------|--------------|----------|-------------|
-| `name`      | `String`     | Yes      | Project name (max 100 chars) |
-| `goal`      | `String`     | No       | Project goal / objective |
-| `startDate` | `LocalDate`  | No       | Start date, format `yyyy-MM-dd` |
-| `endDate`   | `LocalDate`  | No       | End date, format `yyyy-MM-dd` |
-
-**Response** — `BaseResponse<Long>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": 1901234567890123456
-}
-```
-
----
-
-### `GET /project/get/{id}` — Get Project by ID
-
-Retrieves a single project by its ID. Returns `ProjectVo`.
-
-**Path Parameters**
-
-| Param | Type   | Description |
-|-------|--------|-------------|
-| `id`  | `Long` | Project ID |
-
-**Response** — `BaseResponse<ProjectVo>`
-
+**成功响应:** `BaseResponse<ProjectVo>`
 ```json
 {
   "code": 0,
@@ -154,96 +135,82 @@ Retrieves a single project by its ID. Returns `ProjectVo`.
   "data": {
     "id": 1901234567890123456,
     "userId": 1001,
-    "name": "Q1 Learning Plan",
-    "goal": "Master Spring Boot by Q1",
+    "name": "英语六级冲刺",
+    "goal": "三个月内通过英语六级考试",
     "status": 0,
     "orderNo": 0,
-    "startDate": "2026-01-01",
-    "endDate": "2026-03-31",
-    "createTime": "2026-01-01T09:00:00",
-    "updateTime": "2026-01-15T14:30:00"
+    "icon": "📚",
+    "color": "#4A90D9",
+    "startDate": "2026-04-01",
+    "endDate": "2026-06-30",
+    "createTime": "2026-04-01T09:00:00",
+    "updateTime": "2026-04-01T09:00:00"
   }
 }
 ```
+注意：ProjectVo 不包含 progress 字段。
 
 ---
 
-### `GET /project/list` — List Projects (Paginated)
+#### GET /project/list — 获取项目列表（分页）
 
-Returns a paginated list of projects with optional status and keyword filters.
+**查询参数:**
 
-**Query Parameters**
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| pageNum | Long | 1 | 页码 |
+| pageSize | Long | 10 | 每页数量 |
+| status | Integer | 无 | 筛选：0=进行中，1=已归档，null=全部 |
+| keyword | String | 无 | 模糊搜索项目名称 |
 
-| Param     | Type      | Default | Description |
-|-----------|-----------|---------|-------------|
-| `pageNum` | `Long`    | `1`     | Page number |
-| `pageSize`| `Long`    | `1000`  | Page size |
-| `status`  | `Integer` | No      | Filter by status: `0` = active, `1` = archived |
-| `keyword` | `String`  | No      | Fuzzy search on project name |
-
-**Response** — `BaseResponse<Page<ProjectVo>>`
-
+**成功响应:** `BaseResponse<Page<ProjectVo>>`
 ```json
 {
   "code": 0,
   "message": "OK",
   "data": {
-    "total": 42,
+    "total": 5,
     "size": 10,
     "current": 1,
-    "records": [
-      {
-        "id": 1901234567890123456,
-        "userId": 1001,
-        "name": "Q1 Learning Plan",
-        "goal": "Master Spring Boot by Q1",
-        "status": 0,
-        "orderNo": 0,
-        "startDate": "2026-01-01",
-        "endDate": "2026-03-31",
-        "createTime": "2026-01-01T09:00:00",
-        "updateTime": "2026-01-15T14:30:00"
-      }
-    ]
+    "records": [...]
   }
 }
 ```
 
 ---
 
-### `POST /project/update` — Update Project
+#### POST /project/update — 更新项目
 
-Updates mutable fields of an existing project.
-
-**Request Body — `ProjectUpdateRequest`**
-
-| Field       | Type         | Required | Description |
-|-------------|--------------|----------|-------------|
-| `id`        | `Long`       | Yes      | Project ID |
-| `name`      | `String`     | No       | New project name |
-| `goal`      | `String`     | No       | New goal text |
-| `status`    | `Integer`    | No       | New status (`0` active, `1` archived) |
-| `startDate` | `LocalDate`  | No       | New start date, format `yyyy-MM-dd` |
-| `endDate`   | `LocalDate`  | No       | New end date, format `yyyy-MM-dd` |
-
-**Response** — `BaseResponse<Boolean>`
-
+**请求体（ProjectUpdateRequest）:**
 ```json
 {
-  "code": 0,
-  "message": "OK",
-  "data": true
+  "id": 1901234567890123456,
+  "name": "英语六级冲刺（修订）",
+  "goal": "更新后的目标",
+  "icon": "📖",
+  "color": "#FF6B6B",
+  "status": 0,
+  "startDate": "2026-04-15",
+  "endDate": "2026-07-15"
 }
 ```
 
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | Long | 是 | 项目 ID |
+| name | String | 否 | 新名称 |
+| goal | String | 否 | 新目标 |
+| icon | String | 否 | 新图标 |
+| color | String | 否 | 新颜色 |
+| status | Integer | 否 | 新状态（0进行中，1归档） |
+| startDate | LocalDate | 否 | 新开始日期 |
+| endDate | LocalDate | 否 | 新结束日期 |
+
 ---
 
-### `POST /project/reorder` — Reorder Projects
+#### POST /project/reorder — 批量排序
 
-Batch-update the sort order of multiple projects. Pass the full desired ordering; items not included may be affected depending on implementation.
-
-**Request Body** — `List<ProjectReorderRequest>`
-
+**请求体:** `List<ProjectReorderRequest>`
 ```json
 [
   { "id": 1901234567890123456, "orderNo": 0 },
@@ -252,129 +219,67 @@ Batch-update the sort order of multiple projects. Pass the full desired ordering
 ]
 ```
 
-**`ProjectReorderRequest`**
-
-| Field     | Type      | Description |
-|-----------|-----------|-------------|
-| `id`      | `Long`    | Project ID |
-| `orderNo` | `Integer` | New sort position (smaller = higher priority) |
-
-**Response** — `BaseResponse<Boolean>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": true
-}
-```
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | Long | 是 | 项目 ID |
+| orderNo | Integer | 是 | 新的排序序号（越小越靠前） |
 
 ---
 
-### `POST /project/archive` — Archive Projects
+#### POST /project/archive — 归档项目
 
-Archives one or more projects (sets `status = 1`). Archived projects are not returned in normal list queries by default.
-
-**Request Body** — `List<Long>`
-
+**请求体:** `List<Long>` — 项目 ID 列表
 ```json
 [1901234567890123456, 1901234567890123457]
 ```
 
-**Response** — `BaseResponse<Boolean>`
+---
 
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": true
-}
-```
+#### POST /project/delete/{id} — 删除项目（软删除）
+
+**路径参数:** `id` (Long) — 项目 ID
+
+软删除后，项目下关联的里程碑和任务也会被级联软删除（deleteSource=2）。
 
 ---
 
-### `POST /project/delete/{id}` — Delete Project (Soft Delete)
+#### POST /project/recover/{id} — 恢复项目
 
-Soft-deletes a project (sets `isDelete = 1`, records `deletedAt`). This may cascade-delete associated milestones and tasks depending on service-layer logic.
+**路径参数:** `id` (Long) — 项目 ID
 
-**Path Parameters**
-
-| Param | Type   | Description |
-|-------|--------|-------------|
-| `id`  | `Long` | Project ID |
-
-**Response** — `BaseResponse<Boolean>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": true
-}
-```
+恢复已软删除的项目。
 
 ---
 
-### `POST /project/recover/{id}` — Recover Project
+### MilestoneController
 
-Restores a soft-deleted project (sets `isDelete = 0`). The project must not already exist as an active record.
+#### POST /milestone/add — 创建里程碑
 
-**Path Parameters**
-
-| Param | Type   | Description |
-|-------|--------|-------------|
-| `id`  | `Long` | Project ID |
-
-**Response** — `BaseResponse<Boolean>`
-
+**请求体（MilestoneCreateRequest）:**
 ```json
 {
-  "code": 0,
-  "message": "OK",
-  "data": true
+  "projectId": 1901234567890123456,
+  "name": "第1-2周：词汇基础"
 }
 ```
 
----
-
-## Milestone Controller
-
-### `POST /milestone/add` — Create Milestone
-
-Creates a new milestone within a project and returns its generated ID.
-
-**Request Body — `MilestoneCreateRequest`**
-
-| Field      | Type   | Required | Description |
-|------------|--------|----------|-------------|
-| `projectId`| `Long` | Yes      | Parent project ID |
-| `name`     | `String`| Yes     | Milestone name (max 100 chars) |
-
-**Response** — `BaseResponse<Long>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": 2901234567890123456
-}
-```
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| projectId | Long | 是 | 所属项目 ID |
+| name | String | 是 | 里程碑名称 |
 
 ---
 
-### `GET /milestone/list` — List Milestones
+#### GET /milestone/list — 获取里程碑列表
 
-Returns all milestones for a given project, optionally filtered by keyword. Results are sorted by `orderNo` ascending.
+**查询参数:**
 
-**Query Parameters**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| projectId | Long | 是 | 项目 ID |
+| keyword | String | 否 | 模糊搜索名称 |
 
-| Param      | Type    | Required | Description |
-|------------|---------|----------|-------------|
-| `projectId`| `Long`  | Yes      | Parent project ID |
-| `keyword`  | `String`| No       | Fuzzy search on milestone name |
-
-**Response** — `BaseResponse<List<MilestoneVo>>`
-
+**成功响应:** `BaseResponse<List<MilestoneVo>>`
 ```json
 {
   "code": 0,
@@ -384,11 +289,11 @@ Returns all milestones for a given project, optionally filtered by keyword. Resu
       "id": 2901234567890123456,
       "projectId": 1901234567890123456,
       "userId": 1001,
-      "name": "Phase 1: Foundation",
+      "name": "第1-2周：词汇基础",
       "orderNo": 0,
       "progress": 60.00,
-      "createTime": "2026-01-01T09:00:00",
-      "updateTime": "2026-02-01T11:20:00"
+      "createTime": "2026-04-01T09:00:00",
+      "updateTime": "2026-04-15T11:20:00"
     }
   ]
 }
@@ -396,222 +301,127 @@ Returns all milestones for a given project, optionally filtered by keyword. Resu
 
 ---
 
-### `POST /milestone/update` — Update Milestone
+#### POST /milestone/update — 更新里程碑
 
-Updates mutable fields of an existing milestone.
-
-**Request Body — `MilestoneUpdateRequest`**
-
-| Field      | Type         | Required | Description |
-|------------|--------------|----------|-------------|
-| `id`       | `Long`       | Yes      | Milestone ID |
-| `name`     | `String`     | No       | New milestone name |
-| `orderNo`  | `Integer`    | No       | New sort position within the project |
-| `progress` | `BigDecimal` | No       | Progress percentage, 0.00–100.00 |
-
-**Response** — `BaseResponse<Boolean>`
-
+**请求体（MilestoneUpdateRequest）:**
 ```json
 {
-  "code": 0,
-  "message": "OK",
-  "data": true
+  "id": 2901234567890123456,
+  "name": "第1-2周：词汇基础（修订）",
+  "orderNo": 1,
+  "progress": 75.00
 }
 ```
 
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | Long | 是 | 里程碑 ID |
+| name | String | 否 | 新名称 |
+| orderNo | Integer | 否 | 新排序序号 |
+| progress | BigDecimal | 否 | 新进度百分比 |
+
 ---
 
-### `POST /milestone/delete/{id}` — Delete Milestone (Soft Delete)
+#### POST /milestone/delete/{id} — 删除里程碑
 
-Soft-deletes a milestone. Associated tasks may be cascade-deleted depending on service-layer logic.
+**路径参数:** `id` (Long) — 里程碑 ID
 
-**Path Parameters**
+---
 
-| Param | Type   | Description |
-|-------|--------|-------------|
-| `id`  | `Long` | Milestone ID |
+### TaskController
 
-**Response** — `BaseResponse<Boolean>`
+#### POST /task/add — 创建任务
 
+**请求体（TaskCreateRequest）:**
 ```json
 {
-  "code": 0,
-  "message": "OK",
-  "data": true
+  "title": "每天背诵50个单词",
+  "description": "使用单词APP背诵",
+  "projectId": 1901234567890123456,
+  "milestoneId": 2901234567890123456,
+  "priority": 2,
+  "dueDate": "2026-04-20"
 }
 ```
 
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| title | String | 是 | 任务标题（最大60字符） |
+| description | String | 否 | 任务描述（最大550字符） |
+| projectId | Long | 是 | 所属项目 ID |
+| milestoneId | Long | 否 | 所属里程碑 ID（可为空） |
+| priority | Integer | 否 | 优先级（默认0，数值越大越高） |
+| dueDate | LocalDate | 否 | 截止日期，格式 yyyy-MM-dd |
+
 ---
 
-## Task Controller
+#### GET /task/get/{id} — 获取任务详情
 
-### `POST /task/add` — Create Task
+**路径参数:** `id` (Long) — 任务 ID
 
-Creates a new task and returns its generated ID.
+**成功响应:** `BaseResponse<TaskVo>`
 
-**Request Body — `TaskCreateRequest`**
+---
 
-| Field        | Type         | Required | Description |
-|--------------|--------------|----------|-------------|
-| `title`      | `String`     | Yes      | Task title (max 60 chars) |
-| `description`| `String`     | No       | Task description (max 550 chars) |
-| `projectId`  | `Long`       | Yes      | Parent project ID |
-| `milestoneId`| `Long`       | No       | Parent milestone ID (nullable) |
-| `priority`   | `Integer`    | No       | Priority level, defaults to `0` |
-| `dueDate`    | `LocalDate`  | No       | Deadline, format `yyyy-MM-dd` |
+#### GET /task/list — 获取任务列表（分页）
 
-**Response** — `BaseResponse<Long>`
+**查询参数:**
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| projectId | Long | 无 | 筛选项目 |
+| status | Integer | 无 | 筛选状态：0=待办，1=进行中，2=完成 |
+| isOverdue | Boolean | 无 | true=只返回已逾期且未完成的任务 |
+| current | Integer | 1 | 页码 |
+| size | Integer | 10 | 每页数量 |
+
+**成功响应:** `BaseResponse<Page<TaskVo>>`
+
+---
+
+#### POST /task/update — 更新任务
+
+**请求体（TaskUpdateRequest）:**
 ```json
 {
-  "code": 0,
-  "message": "OK",
-  "data": 3901234567890123456
+  "id": 3901234567890123456,
+  "title": "每天背诵50个单词（修订）",
+  "status": 1,
+  "priority": 3,
+  "dueDate": "2026-04-25",
+  "milestoneId": 2901234567890123456
 }
 ```
 
----
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | Long | 是 | 任务 ID |
+| title | String | 否 | 新标题 |
+| description | String | 否 | 新描述 |
+| status | Integer | 否 | 新状态：0=待办，1=进行中，2=完成 |
+| priority | Integer | 否 | 新优先级 |
+| dueDate | LocalDate | 否 | 新截止日期 |
+| milestoneId | Long | 否 | 新里程碑 ID（设为 null 可取消归组） |
 
-### `GET /task/get/{id}` — Get Task by ID
-
-Retrieves a single task by its ID. Returns `TaskVo`.
-
-**Path Parameters**
-
-| Param | Type   | Description |
-|-------|--------|-------------|
-| `id`  | `Long` | Task ID |
-
-**Response** — `BaseResponse<TaskVo>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": {
-    "id": 3901234567890123456,
-    "projectId": 1901234567890123456,
-    "milestoneId": 2901234567890123456,
-    "userId": 1001,
-    "title": "Read Spring Security docs",
-    "description": "Covers authentication and authorization basics",
-    "status": 1,
-    "priority": 2,
-    "dueDate": "2026-04-20",
-    "completedAt": null,
-    "createTime": "2026-04-01T10:00:00",
-    "updateTime": "2026-04-10T15:30:00"
-  }
-}
-```
+注意：设置 status=2 时，completedAt 会自动记录当前时间。
 
 ---
 
-### `GET /task/list` — List Tasks (Paginated)
+#### POST /task/delete/{id} — 删除任务（软删除）
 
-Returns a paginated list of tasks with optional filters.
-
-**Query Parameters**
-
-| Param       | Type      | Default | Description |
-|-------------|-----------|---------|-------------|
-| `projectId` | `Long`    | No      | Filter by parent project |
-| `status`    | `Integer` | No      | Filter by status: `0` to do, `1` in progress, `2` completed |
-| `isOverdue` | `Boolean` | No      | If `true`, return only overdue tasks (dueDate in the past and status not `2`) |
-| `current`   | `Integer` | `1`     | Page number (1-indexed) |
-| `size`      | `Integer` | `10`    | Page size |
-
-**Response** — `BaseResponse<Page<TaskVo>>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": {
-    "total": 87,
-    "size": 10,
-    "current": 1,
-    "records": [
-      {
-        "id": 3901234567890123456,
-        "projectId": 1901234567890123456,
-        "milestoneId": 2901234567890123456,
-        "userId": 1001,
-        "title": "Read Spring Security docs",
-        "description": "Covers authentication and authorization basics",
-        "status": 1,
-        "priority": 2,
-        "dueDate": "2026-04-20",
-        "completedAt": null,
-        "createTime": "2026-04-01T10:00:00",
-        "updateTime": "2026-04-10T15:30:00"
-      }
-    ]
-  }
-}
-```
+**路径参数:** `id` (Long) — 任务 ID
 
 ---
 
-### `POST /task/update` — Update Task
-
-Updates mutable fields of an existing task. Setting `status = 2` may auto-populate `completedAt`.
-
-**Request Body — `TaskUpdateRequest`**
-
-| Field        | Type         | Required | Description |
-|--------------|--------------|----------|-------------|
-| `id`         | `Long`       | Yes      | Task ID |
-| `title`      | `String`     | No       | New task title |
-| `description`| `String`     | No       | New description |
-| `status`     | `Integer`    | No       | New status: `0` to do, `1` in progress, `2` completed |
-| `priority`   | `Integer`    | No       | New priority level |
-| `dueDate`    | `LocalDate`  | No       | New deadline, format `yyyy-MM-dd` |
-| `milestoneId`| `Long`       | No       | New parent milestone ID (nullable to ungroup) |
-
-**Response** — `BaseResponse<Boolean>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": true
-}
-```
-
----
-
-### `POST /task/delete/{id}` — Delete Task (Soft Delete)
-
-Soft-deletes a task (moves it to trash/recycle bin). The task is not permanently removed.
-
-**Path Parameters**
-
-| Param | Type   | Description |
-|-------|--------|-------------|
-| `id`  | `Long` | Task ID |
-
-**Response** — `BaseResponse<Boolean>`
-
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": true
-}
-```
-
----
-
-## Relationship Summary
+## 实体关系
 
 ```
-Project  (1) ──────< (many) Milestone
-  │                          │
-  └─────< (many) Task  <─────┘
+Project (1) ──────< (多个) Milestone
+  │
+  └─────< (多个) Task  <─────┘
 ```
 
-- A **Project** contains multiple **Milestones** and **Tasks**.
-- A **Milestone** optionally contains multiple **Tasks**.
-- A **Task** belongs to one **Milestone** (nullable) and one **Project**.
-- Deleting a project or milestone may cascade-delete associated children (`deleteSource = 2`).
+- 一个 **Project** 包含多个 **Milestone** 和 **Task**
+- 一个 **Milestone** 可包含多个 **Task**（milestoneId 关联）
+- 一个 **Task** 属于一个 **Milestone**（可为空，表示未归组）
+- 删除 Project 会级联软删除其下所有 Milestone 和 Task（deleteSource=2）

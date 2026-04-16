@@ -10,12 +10,9 @@ const request = axios.create({
 // 1. 请求拦截器 (Request Interceptor)
 request.interceptors.request.use(
   (config) => {
-    // 👇👇👇 新增：从浏览器的本地存储中获取 token
     const token = localStorage.getItem('token')
     if (token) {
-      // 你的后端拦截器写的是 request.getHeader("Authorization")
-      // 所以这里直接把 token 塞进 Authorization 头里
-      config.headers.Authorization = token
+      config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`
     }
     return config
   },

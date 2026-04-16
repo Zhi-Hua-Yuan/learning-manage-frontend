@@ -394,6 +394,7 @@ const summaryLoading = ref(false)
 const summaryReady = ref(false)
 const summaryError = ref('')
 const summaryGuardHit = ref(false)
+const weeklyCompletedTaskIds = ref<number[]>([])
 const summaryMetrics = ref<SummaryMetrics>({
   completedCount: null,
   assignedCount: null,
@@ -528,6 +529,23 @@ const calcWeekMetrics = (tasks: TaskItem[], startDate: string, endDate: string):
   }
 }
 
+const collectCompletedTaskIdsInRange = (tasks: TaskItem[], startDate: string, endDate: string) => {
+  const idSet = new Set<number>()
+
+  tasks.forEach((task) => {
+    const dueDateKey = normalizeDueDateKey(task.dueDate)
+    if (!dueDateKey || !isDateKeyWithinRange(dueDateKey, startDate, endDate)) return
+    if (task.status !== COMPLETED_TASK_STATUS) return
+
+    const parsedId = typeof task.id === 'number' ? task.id : Number(task.id)
+    if (Number.isFinite(parsedId)) {
+      idSet.add(parsedId)
+    }
+  })
+
+  return Array.from(idSet)
+}
+
 const createSummaryPlaceholder = (): SummaryMetrics => ({
   completedCount: null,
   assignedCount: null,
@@ -554,6 +572,7 @@ const hydrateSummaryMetrics = async () => {
 
   if (!startDate || !endDate) {
     summaryMetrics.value = createSummaryPlaceholder()
+    weeklyCompletedTaskIds.value = []
     summaryReady.value = true
     summaryLoading.value = false
     summaryError.value = '本周时间范围暂未设置，先填写后可自动生成看板。'
@@ -619,6 +638,7 @@ const hydrateSummaryMetrics = async () => {
 
     const finalMetrics = calcWeekMetrics(allTasks, startDate, endDate)
     summaryMetrics.value = finalMetrics
+    weeklyCompletedTaskIds.value = collectCompletedTaskIdsInRange(allTasks, startDate, endDate)
     currentReview.value.completedTaskCount = finalMetrics.completedCount ?? currentReview.value.completedTaskCount
     summaryGuardHit.value = guardState.hit
     if (guardState.reason) {
@@ -628,6 +648,7 @@ const hydrateSummaryMetrics = async () => {
   } catch (error) {
     console.error('加载摘要看板失败', error)
     summaryMetrics.value = createSummaryPlaceholder()
+    weeklyCompletedTaskIds.value = []
     summaryError.value = '网络不太稳定，暂时没拿到最新数据，请稍后重试。'
   } finally {
     summaryLoading.value = false
@@ -934,9 +955,9 @@ const handleAiPolish = async () => {
 
   isPolishing.value = true
   try {
+    const taskIds = weeklyCompletedTaskIds.value.length > 0 ? weeklyCompletedTaskIds.value : undefined
     const res = await aiPolishApi({
-      taskCount: currentReview.value.completedTaskCount || 0,
-      focusProject: currentReview.value.focusProjectName || '日常事务',
+      taskIds,
       reflection: currentReview.value.reflection,
     })
 

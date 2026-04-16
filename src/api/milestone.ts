@@ -3,21 +3,22 @@ import request from '../utils/request'
 type EntityId = string | number
 
 export interface MilestoneListParams {
-  projectId: string
+  projectId: EntityId
+  keyword?: string
 }
 
 export interface AddMilestonePayload {
   name: string
-  projectId: string
+  projectId: EntityId
   orderNo?: number
 }
 
 export interface UpdateMilestonePayload {
   id: EntityId
   name?: string
-  projectId?: string
+  projectId?: EntityId
   orderNo?: number
-  status?: number
+  progress?: number
 }
 
 // 获取里程碑列表 (对应 GET /milestone/list)

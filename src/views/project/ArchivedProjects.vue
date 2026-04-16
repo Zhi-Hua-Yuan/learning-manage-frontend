@@ -66,7 +66,7 @@
 import { onMounted, ref } from 'vue'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
-import { deleteProjectApi, fetchArchivedProjectsApi, updateProjectApi } from '@/api/project'
+import { deleteProjectApi, fetchArchivedProjectsApi, recoverProjectApi } from '@/api/project'
 import { fetchTaskList } from '@/api/task'
 import { useToast } from '@/composables/useToast'
 import {
@@ -236,7 +236,7 @@ const loadArchivedProjects = async () => {
 
 const handleRecover = async (id: string) => {
   try {
-    await updateProjectApi({ id, status: 0 })
+    await recoverProjectApi(id)
     emitProjectListUpdated('archived-projects')
     toast.success('清单已恢复。')
     await loadArchivedProjects()

@@ -1,22 +1,13 @@
-# User Management API
+# 用户接口 (User API)
 
-Base URL: `http://localhost:8123/api`
+## 概述
 
-All responses are wrapped in a `BaseResponse` envelope with `code`, `message`, and `data` fields.
+- **Base URL**: `http://localhost:8123/api`
+- **认证**: 除登录/注册外均需携带 `Authorization: Bearer <token>`
 
----
+## 响应格式
 
-## Response Format
-
-Every API response follows this structure:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `code` | int | `0` means success; non-zero means error |
-| `message` | string | Human-readable status message |
-| `data` | object/null | Response payload (absent on errors) |
-
-### Success Example
+所有接口统一返回 `BaseResponse<T>`:
 
 ```json
 {
@@ -26,96 +17,70 @@ Every API response follows this structure:
 }
 ```
 
-### Error Example
-
-```json
-{
-  "code": 40101,
-  "message": "Account does not exist",
-  "data": null
-}
-```
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| code | int | 0=成功，非0=失败 |
+| message | string | 状态信息 |
+| data | object | 响应数据，失败时为 null |
 
 ---
 
-## Data Models
-
-### User Entity
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | long | Auto-generated primary key, globally unique |
-| `account` | string | Login account name; must be unique across the system |
-| `username` | string | Display name shown in the UI; can be changed |
-| `password` | string | Encrypted (hashed) password; **never returned** by any API |
-| `userRole` | string | Role identifier: `"user"` (default) or `"admin"` |
-| `createTime` | datetime | When the account was registered |
-| `updateTime` | datetime | When the profile was last modified |
-| `isDelete` | int | Soft-delete flag: `0` = active, `1` = deleted (never returned by normal queries) |
+## 数据模型
 
 ### UserRegisterRequest
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `account` | string | Yes | Desired login account name |
-| `username` | string | Yes | Display name |
-| `password` | string | Yes | Plain-text password (min. length enforced server-side) |
-| `confirmPassword` | string | Yes | Must match `password` exactly |
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| account | string | 是 | 账户名（唯一） |
+| username | string | 是 | 显示名称 |
+| password | string | 是 | 密码 |
+| confirmPassword | string | 是 | 确认密码（需与 password 一致） |
 
 ### UserLoginRequest
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `account` | string | Yes | Account name |
-| `password` | string | Yes | Plain-text password |
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| account | string | 是 | 账户名 |
+| password | string | 是 | 密码 |
 
 ### UserUpdateRequest
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `username` | string | Yes | New display name |
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| username | string | 是 | 新的显示名称 |
 
 ### UserUpdatePasswordRequest
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `oldPassword` | string | Yes | Current password for verification |
-| `newPassword` | string | Yes | New password (replaces `oldPassword`) |
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| oldPassword | string | 是 | 当前密码 |
+| newPassword | string | 是 | 新密码 |
 
-### UserVO (view object — returned by `/user/me`)
+### UserVO（/user/me 响应）
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | long | User ID |
-| `account` | string | Account name |
-| `username` | string | Display name |
-| `userRole` | string | Role (`"user"` or `"admin"`) |
-| `createTime` | datetime | Registration timestamp |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | long | 用户 ID |
+| account | string | 账户名 |
+| username | string | 显示名称 |
+| userRole | string | 角色，如 "user" |
+| createTime | datetime | 注册时间 |
 
-### UserLoginVo (login response payload)
+### UserLoginVo（/user/login 响应）
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | long | User ID |
-| `username` | string | Display name |
-| `token` | string | JWT or session token; send as `Authorization: Bearer <token>` header on subsequent requests |
-
----
-
-## Endpoints
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | long | 用户 ID |
+| username | string | 显示名称 |
+| token | string | JWT 令牌，后续请求携带 |
 
 ---
 
-### 1. Register
+## 接口详情
 
-Register a new user account.
+### POST /user/register — 注册
 
-**HTTP Method:** `POST`  
-**Path:** `/user/register`  
-**Authentication:** None
-
-#### Request Body
-
+**请求体:**
 ```json
 {
   "account": "alice_dev",
@@ -125,8 +90,7 @@ Register a new user account.
 }
 ```
 
-#### Success Response
-
+**成功响应:**
 ```json
 {
   "code": 0,
@@ -134,29 +98,20 @@ Register a new user account.
   "data": 1879200000000001
 }
 ```
+返回值为新用户 ID。
 
-`data` is the newly created user's `id`.
+**错误响应:**
 
-#### Error Responses
-
-| code | Scenario |
-|------|----------|
-| 40101 | Account already exists |
-| 40102 | Passwords do not match |
-| 40100 | Account or password is empty |
+| code | 说明 |
+|------|------|
+| 20002 | 账号已存在 |
+| 40000 | 参数错误（密码不匹配等） |
 
 ---
 
-### 2. Login
+### POST /user/login — 登录
 
-Authenticate with account credentials and receive a session token.
-
-**HTTP Method:** `POST`  
-**Path:** `/user/login`  
-**Authentication:** None
-
-#### Request Body
-
+**请求体:**
 ```json
 {
   "account": "alice_dev",
@@ -164,8 +119,7 @@ Authenticate with account credentials and receive a session token.
 }
 ```
 
-#### Success Response
-
+**成功响应:**
 ```json
 {
   "code": 0,
@@ -177,32 +131,22 @@ Authenticate with account credentials and receive a session token.
   }
 }
 ```
+保存 token，后续请求在 header 中携带 `Authorization: Bearer <token>`。
 
-Store the `token` value and include it in the `Authorization` header for all subsequent authenticated requests.
+**错误响应:**
 
-#### Error Responses
-
-| code | Scenario |
-|------|----------|
-| 40101 | Account does not exist |
-| 40102 | Wrong password |
+| code | 说明 |
+|------|------|
+| 20001 | 用户不存在 |
+| 20003 | 密码错误 |
 
 ---
 
-### 3. Logout
+### POST /user/logout — 登出
 
-End the current session. Currently the client is expected to discard its local token; no server-side token invalidation is performed.
+**请求体:** 无
 
-**HTTP Method:** `POST`  
-**Path:** `/user/logout`  
-**Authentication:** Required
-
-#### Request
-
-No request body.
-
-#### Success Response
-
+**成功响应:**
 ```json
 {
   "code": 0,
@@ -210,23 +154,15 @@ No request body.
   "data": true
 }
 ```
+前端清除本地 token 即可。
 
 ---
 
-### 4. Get Current User (`/me`)
+### GET /user/me — 获取当前用户信息
 
-Retrieve the profile of the currently authenticated user.
+**请求头:** `Authorization: Bearer <token>`
 
-**HTTP Method:** `GET`  
-**Path:** `/user/me`  
-**Authentication:** Required
-
-#### Request
-
-No parameters.
-
-#### Success Response
-
+**成功响应:**
 ```json
 {
   "code": 0,
@@ -241,32 +177,20 @@ No parameters.
 }
 ```
 
-#### Error Responses
-
-| code | Scenario |
-|------|----------|
-| 40100 | Not logged in / token missing or invalid |
-
 ---
 
-### 5. Update Profile
+### POST /user/update — 更新用户名
 
-Update the display name of the currently authenticated user.
+**请求头:** `Authorization: Bearer <token>`
 
-**HTTP Method:** `POST`  
-**Path:** `/user/update`  
-**Authentication:** Required
-
-#### Request Body
-
+**请求体:**
 ```json
 {
   "username": "Alice Chen (Work)"
 }
 ```
 
-#### Success Response
-
+**成功响应:**
 ```json
 {
   "code": 0,
@@ -277,16 +201,11 @@ Update the display name of the currently authenticated user.
 
 ---
 
-### 6. Update Password
+### POST /user/password/update — 修改密码
 
-Change the current user's password.
+**请求头:** `Authorization: Bearer <token>`
 
-**HTTP Method:** `POST`  
-**Path:** `/user/password/update`  
-**Authentication:** Required
-
-#### Request Body
-
+**请求体:**
 ```json
 {
   "oldPassword": "Str0ng!Pass",
@@ -294,8 +213,7 @@ Change the current user's password.
 }
 ```
 
-#### Success Response
-
+**成功响应:**
 ```json
 {
   "code": 0,
@@ -304,29 +222,21 @@ Change the current user's password.
 }
 ```
 
-#### Error Responses
+**错误响应:**
 
-| code | Scenario |
-|------|----------|
-| 40102 | Old password is incorrect |
+| code | 说明 |
+|------|------|
+| 20003 | 旧密码错误 |
 
 ---
 
-## Authentication
+## 错误码
 
-All endpoints marked **Required** expect a valid token in the request header:
-
-```
-Authorization: Bearer <token>
-```
-
-The token is obtained from the `/user/login` response's `data.token` field.
-
-## Error Codes Summary
-
-| code | Meaning |
-|------|---------|
-| `0` | Success |
-| `40100` | Account or password empty / not authenticated |
-| `40101` | Account not found or already exists |
-| `40102` | Password mismatch or incorrect |
+| code | 说明 |
+|------|------|
+| 0 | 成功 |
+| 40000 | 请求参数错误 |
+| 40100 | 未登录 |
+| 20001 | 用户不存在 |
+| 20002 | 账号已存在 |
+| 20003 | 密码错误 |

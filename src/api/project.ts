@@ -6,14 +6,22 @@ export type ProjectListParams = Record<string, string | number | boolean | undef
 
 export interface AddProjectPayload {
   name: string
+  goal?: string
   icon?: string
+  color?: string
+  startDate?: string
+  endDate?: string
 }
 
 export interface UpdateProjectPayload {
   id: EntityId
   name?: string
+  goal?: string
   icon?: string
+  color?: string
   status?: number
+  startDate?: string
+  endDate?: string
 }
 
 export interface ReorderProjectItem {

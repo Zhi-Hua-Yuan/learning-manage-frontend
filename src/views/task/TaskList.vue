@@ -4,9 +4,9 @@
       <div
         class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-3 sm:px-5"
       >
-        <span class="text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
+        <div class="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
           <AppIcon
-            v-if="isTodayView"
+            v-if="isAggregateView"
             name="calendar"
             class="mr-1 inline h-5 w-5 align-[-2px]"
           />
@@ -15,11 +15,16 @@
             :name="getProjectIconName(selectedProject.icon)"
             class="mr-1 inline h-5 w-5 align-[-2px]"
           />
-          {{ pageTitle }}
-        </span>
+          <span>{{ pageTitle }}</span>
+          <span
+            v-if="!isAggregateView && selectedProjectColor"
+            class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70"
+            :style="{ backgroundColor: selectedProjectColor }"
+          ></span>
+        </div>
 
         <div
-          v-if="!isTodayView && selectedProjectId && taskList.length > 0"
+          v-if="!isAggregateView && selectedProjectId && taskList.length > 0"
           class="flex w-full items-center gap-3 sm:w-56"
         >
           <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
@@ -33,7 +38,7 @@
       </div>
 
       <div
-        v-if="!isTodayView"
+        v-if="!isAggregateView"
         class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5"
       >
         <div class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center">
@@ -146,7 +151,7 @@
 
                 <div class="flex shrink-0 items-center gap-2">
                   <span
-                    v-if="isTodayView"
+                    v-if="isAggregateView"
                     class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
                     @click="navigateToProject(task.projectId)"
                   >
@@ -169,10 +174,10 @@
           </section>
 
           <div
-            v-if="isTodayView && groupedTasks.unassigned.length === 0"
+            v-if="isAggregateView && groupedTasks.unassigned.length === 0"
             class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)]"
           >
-            今天还没有截止日期为今天的任务
+            {{ isWeekView ? '本周还没有截止日期在本周的任务' : '今天还没有截止日期为今天的任务' }}
           </div>
 
           <section
@@ -303,7 +308,7 @@
 
                 <div class="flex shrink-0 items-center gap-2">
                   <span
-                    v-if="isTodayView"
+                    v-if="isAggregateView"
                     class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
                     @click="navigateToProject(task.projectId)"
                   >
@@ -325,7 +330,7 @@
             </div>
           </section>
 
-          <div v-if="!isTodayView" class="pt-1">
+          <div v-if="!isAggregateView" class="pt-1">
             <div v-if="isAddingMilestone" class="card-base border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] p-1">
               <input
                 v-model="newMilestoneName"
@@ -602,7 +607,7 @@
           </div>
 
           <div
-            v-if="!isTodayView"
+            v-if="!isAggregateView"
             ref="milestoneRowRef"
             class="relative flex items-center gap-3 border-b border-[var(--color-divider-muted)] py-3"
           >
@@ -723,6 +728,11 @@ import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
 import {
+  offProjectListUpdated,
+  onProjectListUpdated,
+  type ProjectListUpdatedDetail,
+} from '@/utils/projectEvents'
+import {
   readAllProjectsTaskCache,
   readTaskCache,
   writeAllProjectsTaskCache,
@@ -752,6 +762,7 @@ interface Project {
   id: string
   name: string
   icon: string
+  color?: string
 }
 
 interface PriorityOption {
@@ -774,6 +785,8 @@ interface LoadOptions {
   forceRefresh?: boolean
 }
 
+const PROJECT_LIST_EVENT_SOURCE = 'task-list'
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -785,6 +798,8 @@ const selectedTask = ref<Task | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
+const isWeekView = computed(() => route.query.view === 'week')
+const isAggregateView = computed(() => isTodayView.value || isWeekView.value)
 const boardView = computed(() =>
   route.query.view === 'today' || route.query.view === 'week' ? route.query.view : 'project',
 )
@@ -794,8 +809,19 @@ const boardTransitionKey = computed(() =>
 const selectedProject = computed(() =>
   projectList.value.find((project) => project.id === selectedProjectId.value),
 )
-const pageTitle = computed(() => (isTodayView.value ? '今天' : selectedProject.value?.name || '请选择清单'))
-const mainTaskSectionTitle = computed(() => (isTodayView.value ? '今天任务' : '默认列表'))
+const selectedProjectColor = computed(() =>
+  isAggregateView.value ? '' : normalizeProjectColorValue(selectedProject.value?.color),
+)
+const pageTitle = computed(() => {
+  if (isTodayView.value) return '今天'
+  if (isWeekView.value) return '本周'
+  return selectedProject.value?.name || '请选择清单'
+})
+const mainTaskSectionTitle = computed(() => {
+  if (isTodayView.value) return '今天任务'
+  if (isWeekView.value) return '本周任务'
+  return '默认列表'
+})
 
 const newTaskTitle = ref('')
 const newTaskMilestoneId = ref('')
@@ -828,9 +854,38 @@ const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 
 const isMobile = computed(() => viewportWidth.value < 768)
 
+const PROJECT_ICON_FALLBACK: IconName = 'folder'
+const PROJECT_ICON_COMPAT_MAP: Record<string, IconName> = {
+  folder: 'folder',
+  '📁': 'folder',
+  sparkles: 'sparkles',
+  '✨': 'sparkles',
+  flag: 'flag',
+  '🏁': 'flag',
+  star: 'star',
+  '⭐': 'star',
+  '🌟': 'star',
+  book: 'book',
+  '📚': 'book',
+  target: 'target',
+  '🎯': 'target',
+  heart: 'heart',
+  '❤️': 'heart',
+  '❤': 'heart',
+  work: 'work',
+  '💼': 'work',
+  rocket: 'rocket',
+  '🚀': 'rocket',
+}
+
+const normalizeProjectColorValue = (color?: string | null) => {
+  if (!color) return ''
+  const normalized = color.trim()
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalized) ? normalized : ''
+}
+
 const getProjectIconName = (icon: string | undefined): IconName => {
-  if (icon === 'sparkles' || icon === '✨') return 'sparkles'
-  return 'folder'
+  return PROJECT_ICON_COMPAT_MAP[icon || ''] || PROJECT_ICON_FALLBACK
 }
 
 const projectById = computed(() => {
@@ -915,6 +970,38 @@ const parseDateKey = (dateKey?: string | null) => {
 }
 
 const getMonthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1)
+
+const getCurrentWeekRange = () => {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const dayOfWeek = today.getDay()
+  const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offsetToMonday)
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6)
+
+  return {
+    startDateKey: toDateKey(weekStart),
+    endDateKey: toDateKey(weekEnd),
+  }
+}
+
+const filterAggregateTasks = (records: Task[]) => {
+  if (isTodayView.value) {
+    const todayKey = toDateKey(new Date())
+    return records.filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
+  }
+
+  if (isWeekView.value) {
+    const { startDateKey, endDateKey } = getCurrentWeekRange()
+    return records.filter((task) => {
+      const dueDateKey = normalizeTaskDueDate(task.dueDate)
+      if (!dueDateKey) return false
+      return dueDateKey >= startDateKey && dueDateKey <= endDateKey
+    })
+  }
+
+  return records
+}
 
 const calendarMonthCursor = ref(getMonthStart(new Date()))
 
@@ -1110,7 +1197,7 @@ const writeTodayTaskCaches = (records: Task[]) => {
 }
 
 const syncSelectedProject = () => {
-  if (isTodayView.value) {
+  if (isAggregateView.value) {
     selectedProjectId.value = ''
     return
   }
@@ -1135,7 +1222,7 @@ const loadProjects = async (options: LoadOptions = {}) => {
   }
 
   if (cachedRecords && !forceRefresh) {
-    if (!isTodayView.value && !selectedProjectId.value && projectList.value.length > 0) {
+    if (!isAggregateView.value && !selectedProjectId.value && projectList.value.length > 0) {
       const firstProject = projectList.value[0]
       if (!firstProject) return
       const firstId = firstProject.id
@@ -1153,7 +1240,7 @@ const loadProjects = async (options: LoadOptions = {}) => {
     projectList.value = records || []
     writeProjectListCache(0, projectList.value)
 
-    if (!isTodayView.value && !selectedProjectId.value && projectList.value.length > 0) {
+    if (!isAggregateView.value && !selectedProjectId.value && projectList.value.length > 0) {
       const firstProject = projectList.value[0]
       if (!firstProject) return
       const firstId = firstProject.id
@@ -1176,7 +1263,7 @@ const loadTasks = async (options: LoadOptions = {}) => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
 
-  if (isTodayView.value) {
+  if (isAggregateView.value) {
     if (projectList.value.length === 0) {
       taskList.value = []
       selectedTask.value = null
@@ -1186,13 +1273,10 @@ const loadTasks = async (options: LoadOptions = {}) => {
     if (!forceRefresh) {
       const cachedAllProjectsTasks = readAllProjectsTaskCache()
       if (cachedAllProjectsTasks) {
-        const todayKey = toDateKey(new Date())
         const allRecords = Object.values(cachedAllProjectsTasks).flatMap((items) =>
           Array.isArray(items) ? items : [],
         )
-        taskList.value = allRecords
-          .filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
-          .sort(compareTaskByDueDateThenPriority)
+        taskList.value = filterAggregateTasks(allRecords).sort(compareTaskByDueDateThenPriority)
         syncSelectedTaskFromList()
         return
       }
@@ -1209,11 +1293,8 @@ const loadTasks = async (options: LoadOptions = {}) => {
         ),
       )
       if (requestVersion !== taskLoadVersion.value) return
-      const todayKey = toDateKey(new Date())
       const records = responses.flatMap((res) => (res as unknown as { records?: Task[] })?.records || [])
-      taskList.value = records
-        .filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
-        .sort(compareTaskByDueDateThenPriority)
+      taskList.value = filterAggregateTasks(records).sort(compareTaskByDueDateThenPriority)
       writeTodayTaskCaches(records)
       syncSelectedTaskFromList()
     } catch (error) {
@@ -1260,7 +1341,7 @@ const loadTasks = async (options: LoadOptions = {}) => {
 const loadMilestones = async (options: LoadOptions = {}) => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++milestoneLoadVersion.value
-  if (isTodayView.value || !selectedProjectId.value) {
+  if (isAggregateView.value || !selectedProjectId.value) {
     milestoneList.value = []
     return
   }
@@ -1274,7 +1355,7 @@ const loadMilestones = async (options: LoadOptions = {}) => {
   try {
     const res = await fetchMilestoneList({ projectId: requestProjectId })
     if (requestVersion !== milestoneLoadVersion.value) return
-    if (requestProjectId !== selectedProjectId.value || isTodayView.value) return
+    if (requestProjectId !== selectedProjectId.value || isAggregateView.value) return
     const milestones = Array.isArray(res) ? (res as Milestone[]) : []
     const sortedMilestones = milestones.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
     milestoneList.value = sortedMilestones
@@ -1286,6 +1367,12 @@ const loadMilestones = async (options: LoadOptions = {}) => {
     if (requestVersion !== milestoneLoadVersion.value) return
     console.error('加载里程碑失败', error)
   }
+}
+
+const handleProjectListUpdated: EventListener = (event) => {
+  const customEvent = event as CustomEvent<ProjectListUpdatedDetail>
+  if (customEvent.detail?.source === PROJECT_LIST_EVENT_SOURCE) return
+  void loadProjects({ forceRefresh: true })
 }
 
 const addTask = async () => {
@@ -1684,7 +1771,7 @@ const projectProgress = computed(() => {
 })
 
 const groupedTasks = computed(() => {
-  if (isTodayView.value) {
+  if (isAggregateView.value) {
     return {
       unassigned: [...taskList.value].sort(compareTaskByDueDateThenPriority),
       milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
@@ -1767,6 +1854,7 @@ onMounted(async () => {
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
+  onProjectListUpdated(handleProjectListUpdated)
   syncSelectedProject()
   await loadProjects()
   await Promise.all([loadMilestones(), loadTasks()])
@@ -1776,5 +1864,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   stopResizeRight()
   window.removeEventListener('resize', updateViewport)
+  offProjectListUpdated(handleProjectListUpdated)
 })
 </script>

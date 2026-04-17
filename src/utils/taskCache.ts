@@ -1,9 +1,11 @@
-interface CacheEnvelope<T> {
-  updatedAt: number
-  data: T
-}
+import { listStorageKeys, readCache, removeCache, removeRawStorage, writeCache } from '@/utils/cacheClient'
+import {
+  getTaskListAllCacheEntry,
+  getTaskListCacheEntry,
+  TASK_LIST_CACHE_PREFIX,
+} from '@/utils/cacheRegistry'
 
-interface Task {
+export interface Task {
   id: string
   title: string
   description?: string
@@ -16,70 +18,101 @@ interface Task {
 
 export const TASK_LIST_CACHE_TTL_MS = 5 * 60 * 1000
 
-const TASK_LIST_CACHE_PREFIX = 'tick:cache:task-list:v1'
-const TASK_LIST_ALL_CACHE_KEY = 'tick:cache:task-list:all:v1'
+const normalizeTaskArray = (value: unknown): Task[] | null => (Array.isArray(value) ? (value as Task[]) : null)
 
-const readEnvelope = <T>(key: string): CacheEnvelope<T> | null => {
-  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') return null
-  const raw = window.localStorage.getItem(key)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as CacheEnvelope<T>
-    if (!parsed || typeof parsed !== 'object' || typeof parsed.updatedAt !== 'number' || !('data' in parsed)) {
-      return null
-    }
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-const writeEnvelope = <T>(key: string, data: T) => {
-  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') return
-  const envelope: CacheEnvelope<T> = {
-    updatedAt: Date.now(),
-    data,
-  }
-  window.localStorage.setItem(key, JSON.stringify(envelope))
-}
-
-const getTaskCacheKey = (projectId: string) => `${TASK_LIST_CACHE_PREFIX}:${projectId}`
+const upsertTaskList = (tasks: Task[], task: Task) =>
+  tasks.some((item) => item.id === task.id)
+    ? tasks.map((item) => (item.id === task.id ? { ...item, ...task } : item))
+    : [...tasks, task]
 
 export const readTaskCache = (projectId: string, maxAgeMs = TASK_LIST_CACHE_TTL_MS): Task[] | null => {
-  const envelope = readEnvelope<Task[]>(getTaskCacheKey(projectId))
-  if (!envelope) return null
-  if (Date.now() - envelope.updatedAt > maxAgeMs) return null
-  return Array.isArray(envelope.data) ? envelope.data : null
+  if (!projectId) return null
+  const entry = getTaskListCacheEntry(projectId)
+  const cached = readCache<Task[]>(entry, {
+    maxAgeMs,
+    allowLegacyVersionless: true,
+  })
+  return normalizeTaskArray(cached)
 }
 
 export const writeTaskCache = (projectId: string, tasks: Task[]) => {
-  writeEnvelope(getTaskCacheKey(projectId), tasks)
+  if (!projectId) return
+  writeCache(getTaskListCacheEntry(projectId), tasks)
 }
 
 export const clearTaskCache = (projectId?: string) => {
-  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') return
   if (projectId === undefined) {
-    // Clear all task list caches
-    const keysToRemove: string[] = []
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i)
-      if (key && key.startsWith(TASK_LIST_CACHE_PREFIX)) {
-        keysToRemove.push(key)
-      }
-    }
-    keysToRemove.forEach((key) => window.localStorage.removeItem(key))
-  } else {
-    window.localStorage.removeItem(getTaskCacheKey(projectId))
+    listStorageKeys()
+      .filter((key) => key.startsWith(TASK_LIST_CACHE_PREFIX))
+      .forEach((key) => removeRawStorage(key))
+    removeCache(getTaskListAllCacheEntry())
+    return
   }
+
+  removeCache(getTaskListCacheEntry(projectId))
 }
 
 export const readAllProjectsTaskCache = (maxAgeMs = TASK_LIST_CACHE_TTL_MS): Record<string, Task[]> | null => {
-  const envelope = readEnvelope<Record<string, Task[]>>(TASK_LIST_ALL_CACHE_KEY)
-  if (!envelope) return null
-  if (Date.now() - envelope.updatedAt > maxAgeMs) return null
-  return envelope.data && typeof envelope.data === 'object' ? envelope.data : null
+  const cached = readCache<Record<string, Task[]>>(getTaskListAllCacheEntry(), {
+    maxAgeMs,
+    allowLegacyVersionless: true,
+  })
+  if (!cached || typeof cached !== 'object') return null
+  return cached
 }
 
 export const writeAllProjectsTaskCache = (data: Record<string, Task[]>) => {
-  writeEnvelope(TASK_LIST_ALL_CACHE_KEY, data)
+  writeCache(getTaskListAllCacheEntry(), data)
+}
+
+export const upsertTaskInCaches = (task: Task) => {
+  const projectId = String(task.projectId || '')
+  if (!projectId) return
+
+  const nextProjectTasks = upsertTaskList(readTaskCache(projectId, Number.POSITIVE_INFINITY) || [], task)
+  writeTaskCache(projectId, nextProjectTasks)
+
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY) || {}
+  const currentProjectTasks = Array.isArray(cachedAllProjectsTasks[projectId]) ? cachedAllProjectsTasks[projectId]! : []
+  writeAllProjectsTaskCache({
+    ...cachedAllProjectsTasks,
+    [projectId]: upsertTaskList(currentProjectTasks, task),
+  })
+}
+
+export const removeTaskFromCaches = (task: Pick<Task, 'id' | 'projectId'>) => {
+  const projectId = String(task.projectId || '')
+  if (!projectId) return
+
+  const nextProjectTasks = (readTaskCache(projectId, Number.POSITIVE_INFINITY) || []).filter((item) => item.id !== task.id)
+  writeTaskCache(projectId, nextProjectTasks)
+
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY) || {}
+  const currentProjectTasks = Array.isArray(cachedAllProjectsTasks[projectId]) ? cachedAllProjectsTasks[projectId]! : []
+  writeAllProjectsTaskCache({
+    ...cachedAllProjectsTasks,
+    [projectId]: currentProjectTasks.filter((item) => item.id !== task.id),
+  })
+}
+
+export const writeAggregateTaskCacheFromRecords = (records: Task[]) => {
+  const nextCache: Record<string, Task[]> = {}
+  records.forEach((task) => {
+    const projectId = String(task.projectId || '')
+    if (!projectId) return
+    if (!nextCache[projectId]) {
+      nextCache[projectId] = []
+    }
+    nextCache[projectId]!.push(task)
+  })
+  writeAllProjectsTaskCache(nextCache)
+}
+
+export const syncAggregateTaskCacheByProject = (projectId: string, tasks: Task[]) => {
+  if (!projectId) return
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY) || {}
+  writeAllProjectsTaskCache({
+    ...cachedAllProjectsTasks,
+    [projectId]: tasks,
+  })
 }

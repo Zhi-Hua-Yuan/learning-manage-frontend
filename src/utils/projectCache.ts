@@ -1,65 +1,34 @@
-type CacheStatus = 0 | 1
+import { readCache, removeCache, writeCache } from '@/utils/cacheClient'
+import { CACHE_REGISTRY, getProjectListCacheEntry } from '@/utils/cacheRegistry'
 
-interface CacheEnvelope<T> {
-  updatedAt: number
-  data: T
-}
+type CacheStatus = 0 | 1
 
 interface ProjectProgressCacheItem {
   updatedAt: number
   value: number
 }
 
-const PROJECT_LIST_CACHE_PREFIX = 'tick:cache:project-list'
-const PROJECT_PROGRESS_CACHE_KEY = 'tick:cache:project-progress:v1'
-
 export const PROJECT_LIST_CACHE_TTL_MS = 5 * 60 * 1000
 export const PROJECT_PROGRESS_CACHE_TTL_MS = 30 * 60 * 1000
 
-const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
-
-const readEnvelope = <T>(key: string): CacheEnvelope<T> | null => {
-  if (!canUseStorage()) return null
-  const raw = window.localStorage.getItem(key)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as CacheEnvelope<T>
-    if (!parsed || typeof parsed !== 'object' || typeof parsed.updatedAt !== 'number' || !('data' in parsed)) {
-      return null
-    }
-    return parsed
-  } catch {
-    return null
-  }
+const readProjectProgressMap = () => {
+  const cached = readCache<Record<string, ProjectProgressCacheItem>>(CACHE_REGISTRY.projectProgress, {
+    allowLegacyVersionless: true,
+  })
+  if (!cached || typeof cached !== 'object') return null
+  return cached
 }
-
-const writeEnvelope = <T>(key: string, data: T) => {
-  if (!canUseStorage()) return
-  const envelope: CacheEnvelope<T> = {
-    updatedAt: Date.now(),
-    data,
-  }
-  window.localStorage.setItem(key, JSON.stringify(envelope))
-}
-
-const getProjectListKey = (status: CacheStatus) => `${PROJECT_LIST_CACHE_PREFIX}:status-${status}:v1`
 
 export const readProjectListCache = <T>(status: CacheStatus, maxAgeMs = PROJECT_LIST_CACHE_TTL_MS): T[] | null => {
-  const envelope = readEnvelope<T[]>(getProjectListKey(status))
-  if (!envelope) return null
-  if (Date.now() - envelope.updatedAt > maxAgeMs) return null
-  return Array.isArray(envelope.data) ? envelope.data : null
+  const cached = readCache<T[]>(getProjectListCacheEntry(status), {
+    maxAgeMs,
+    allowLegacyVersionless: true,
+  })
+  return Array.isArray(cached) ? cached : null
 }
 
 export const writeProjectListCache = <T>(status: CacheStatus, records: T[]) => {
-  writeEnvelope(getProjectListKey(status), records)
-}
-
-const readProjectProgressMap = () => {
-  const envelope = readEnvelope<Record<string, ProjectProgressCacheItem>>(PROJECT_PROGRESS_CACHE_KEY)
-  if (!envelope) return null
-  if (!envelope.data || typeof envelope.data !== 'object') return null
-  return envelope.data
+  writeCache(getProjectListCacheEntry(status), records)
 }
 
 export const readProjectProgressCache = (projectId: string, maxAgeMs = PROJECT_PROGRESS_CACHE_TTL_MS): number | null => {
@@ -79,7 +48,19 @@ export const writeProjectProgressCache = (projectId: string, progress: number) =
     updatedAt: Date.now(),
     value: nextValue,
   }
-  writeEnvelope(PROJECT_PROGRESS_CACHE_KEY, progressMap)
+  writeCache(CACHE_REGISTRY.projectProgress, progressMap)
+}
+
+export const clearProjectProgressCache = (projectId?: string) => {
+  if (!projectId) {
+    removeCache(CACHE_REGISTRY.projectProgress)
+    return
+  }
+
+  const progressMap = readProjectProgressMap()
+  if (!progressMap || !(projectId in progressMap)) return
+  delete progressMap[projectId]
+  writeCache(CACHE_REGISTRY.projectProgress, progressMap)
 }
 
 export const normalizeProjectProgress = (value: unknown): number => {
@@ -93,13 +74,13 @@ export const normalizeProjectProgress = (value: unknown): number => {
 }
 
 const getProjectProgressCandidates = (project: Record<string, unknown>) => [
-    project.progress,
-    project.completionRate,
-    project.completeRate,
-    project.completion,
-    project.percent,
-    project.process,
-  ]
+  project.progress,
+  project.completionRate,
+  project.completeRate,
+  project.completion,
+  project.percent,
+  project.process,
+]
 
 export const hasProjectProgressValue = (project: Record<string, unknown>) =>
   getProjectProgressCandidates(project).some(

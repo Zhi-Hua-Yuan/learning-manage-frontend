@@ -92,6 +92,7 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginApi, registerApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
+import { writeAuthToken } from '@/utils/authToken'
 
 const router = useRouter()
 const toast = useToast()
@@ -171,7 +172,7 @@ const handleSubmit = async () => {
       password: form.value.password,
     })) as unknown as LoginResponse
 
-    localStorage.setItem('token', res.token)
+    writeAuthToken(res.token)
 
     router.push('/')
   } catch (error: unknown) {

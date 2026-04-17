@@ -545,6 +545,12 @@ import {
 import { getUserMeApi, logoutApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import {
+  clearSelectedProjectIdCache,
+  readSelectedProjectIdCache,
+  writeSelectedProjectIdCache,
+} from '@/utils/appCache'
+import { clearAuthToken } from '@/utils/authToken'
 import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
 import {
   emitProjectListUpdated,
@@ -925,7 +931,7 @@ const stopResizeLeft = () => {
 const selectedProjectId = computed(() => {
   const routeId = route.query.projectId
   if (typeof routeId === 'string' && routeId) return routeId
-  return localStorage.getItem('tick_selectedProjectId') || ''
+  return readSelectedProjectIdCache()
 })
 
 const deleteProjectConfirmTitle = computed(() => {
@@ -955,7 +961,7 @@ const ensureDefaultProject = async () => {
   const firstProject = projectList.value[0]
   if (!firstProject) return
   const firstProjectId = firstProject.id
-  localStorage.setItem('tick_selectedProjectId', firstProjectId)
+  writeSelectedProjectIdCache(firstProjectId)
 
   if (route.path === '/tasks') {
     const view = typeof route.query.view === 'string' ? route.query.view : ''
@@ -996,7 +1002,7 @@ const loadProjects = async () => {
 
 const selectProject = async (id: string) => {
   closeProjectActionMenu()
-  localStorage.setItem('tick_selectedProjectId', id)
+  writeSelectedProjectIdCache(id)
   await router.push({ path: '/tasks', query: { projectId: id } })
   closeSidebar()
 }
@@ -1029,7 +1035,7 @@ const deleteProject = async (id: string, name: string) => {
   projectList.value = snapshot.filter((item) => item.id !== id)
 
   if (wasSelected) {
-    localStorage.removeItem('tick_selectedProjectId')
+    clearSelectedProjectIdCache()
     await router.push('/tasks')
   }
 
@@ -1052,7 +1058,7 @@ const deleteProject = async (id: string, name: string) => {
       }
 
       if (wasSelected) {
-        localStorage.setItem('tick_selectedProjectId', id)
+        writeSelectedProjectIdCache(id)
         if (route.path === '/tasks') {
           await router.push({ path: '/tasks', query: { projectId: id } })
         }
@@ -1079,7 +1085,7 @@ const executeLogout = async () => {
   } catch {
     // force logout even when API request fails
   }
-  localStorage.removeItem('token')
+  clearAuthToken()
   router.push('/login')
 }
 

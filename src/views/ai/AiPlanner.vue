@@ -23,6 +23,7 @@
             </label>
             <input
               v-model="aiForm.target"
+              :disabled="isGeneratingPlan"
               type="text"
               placeholder="例如：三个月内通过英语六级 / 独立开发一款小程序"
               class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
@@ -35,6 +36,7 @@
             </label>
             <input
               v-model="aiForm.duration"
+              :disabled="isGeneratingPlan"
               type="text"
               placeholder="例如：12周 / 1个月"
               class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
@@ -47,6 +49,7 @@
             </label>
             <textarea
               v-model="aiForm.description"
+              :disabled="isGeneratingPlan"
               placeholder="例如：我目前的基础比较薄弱，希望前两周以背单词和基础语法为主..."
               class="focus-ring min-h-[80px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
             ></textarea>
@@ -313,7 +316,10 @@ import { aiBreakdownApi } from '@/api/ai'
 import { addMilestoneApi } from '@/api/milestone'
 import { addProjectApi, fetchProjectList } from '@/api/project'
 import { addTaskApi } from '@/api/task'
+import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
+import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useToast } from '@/composables/useToast'
+import { clearAiPlannerDraftCache, readAiPlannerDraftCache, writeAiPlannerDraftCache } from '@/utils/appCache'
 
 const emit = defineEmits(['refresh-projects'])
 
@@ -360,13 +366,14 @@ interface PersistedPlannerDraft {
   selectedTaskMap: Record<string, boolean>
 }
 
-const AI_PLANNER_DRAFT_STORAGE_KEY = 'tick_aiPlannerDraft_v1'
-
 const router = useRouter()
 const toast = useToast()
+const aiPendingRegistry = useAiPendingRegistryStore()
+const { runAiRequest } = useAiPendingRequest()
+const TASK_TITLE_MAX_LENGTH = 50
 
 const aiForm = ref({ target: '', description: '', duration: '' })
-const isGeneratingPlan = ref(false)
+const isViewMounted = ref(false)
 const generatedPlan = ref<DraftMilestone[]>([])
 const selectedTaskMap = ref<Record<string, boolean>>({})
 const isApplying = ref(false)
@@ -377,6 +384,11 @@ const importProjectId = ref('')
 const isDraftPersistencePaused = ref(false)
 let persistDraftTimer: ReturnType<typeof setTimeout> | null = null
 
+const plannerBreakdownEntry = computed(
+  () => aiPendingRegistry.boards[AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN],
+)
+const isGeneratingPlan = computed(() => plannerBreakdownEntry.value.status === 'pending')
+
 const getTaskKey = (mIndex: number, tIndex: number) => `${mIndex}-${tIndex}`
 
 const getTaskTitle = (task: DraftTask) => {
@@ -386,7 +398,8 @@ const getTaskTitle = (task: DraftTask) => {
 
 const getErrorMessage = (error: unknown) => {
   if (error && typeof error === 'object' && 'message' in error) {
-    return String((error as { message?: unknown }).message || '请求失败')
+    const message = String((error as { message?: unknown }).message || '请求失败')
+    return message.replace(/不能超过\s*60\s*字符/g, '不能超过 50 字符')
   }
   return '请求失败'
 }
@@ -439,7 +452,7 @@ const pauseDraftPersistenceOnce = () => {
 
 const clearPersistedDraft = () => {
   if (typeof window === 'undefined') return
-  localStorage.removeItem(AI_PLANNER_DRAFT_STORAGE_KEY)
+  clearAiPlannerDraftCache()
 }
 
 const persistPlannerDraft = () => {
@@ -458,7 +471,7 @@ const persistPlannerDraft = () => {
     selectedTaskMap: selectedTaskMap.value,
   }
 
-  localStorage.setItem(AI_PLANNER_DRAFT_STORAGE_KEY, JSON.stringify(payload))
+  writeAiPlannerDraftCache(payload)
 }
 
 const schedulePersistPlannerDraft = () => {
@@ -477,12 +490,10 @@ const schedulePersistPlannerDraft = () => {
 const hydrateDraftFromStorage = () => {
   if (typeof window === 'undefined') return
 
-  const raw = localStorage.getItem(AI_PLANNER_DRAFT_STORAGE_KEY)
-  if (!raw) return
+  const parsed = readAiPlannerDraftCache<Partial<PersistedPlannerDraft>>()
+  if (!parsed) return
 
   try {
-    const parsed = JSON.parse(raw) as Partial<PersistedPlannerDraft>
-
     const nextForm = {
       target: typeof parsed.aiForm?.target === 'string' ? parsed.aiForm.target : '',
       description: typeof parsed.aiForm?.description === 'string' ? parsed.aiForm.description : '',
@@ -602,32 +613,56 @@ const clearDraftTasks = () => {
   selectedTaskMap.value = nextMap
 }
 
+const applyGeneratedPlan = (payload: unknown) => {
+  const normalized = normalizePlan(payload)
+  generatedPlan.value = normalized
+  initializeSelection(normalized)
+
+  if (normalized.length === 0) {
+    toast.warning('AI 未生成有效草稿，请补充描述后重试。')
+  }
+  return true
+}
+
+const consumePendingGeneratedPlan = () => {
+  const entry = plannerBreakdownEntry.value
+  if (entry.status !== 'success') return
+
+  const applied = applyGeneratedPlan(entry.responsePayload)
+  if (applied) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN, entry.requestId)
+  }
+}
+
 const generatePlan = async () => {
   if (!aiForm.value.target.trim() || !aiForm.value.duration.trim()) {
     toast.error('请先填写目标和期望周期。')
     return
   }
 
-  isGeneratingPlan.value = true
-  generatedPlan.value = []
-  selectedTaskMap.value = {}
-  failedImportItems.value = []
-  importProjectId.value = ''
+  const result = await runAiRequest({
+    board: AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN,
+    requestMeta: {
+      target: aiForm.value.target.trim(),
+      duration: aiForm.value.duration.trim(),
+      hasDescription: Boolean(aiForm.value.description?.trim()),
+    },
+    onStart: () => {
+      generatedPlan.value = []
+      selectedTaskMap.value = {}
+      failedImportItems.value = []
+      importProjectId.value = ''
+    },
+    request: () => aiBreakdownApi(aiForm.value),
+    successMessage: 'AI 智能规划响应完成。',
+    errorMessage: 'AI 拆解失败，请检查网络后重试。',
+  })
 
-  try {
-    const res = await aiBreakdownApi(aiForm.value)
-    const normalized = normalizePlan(res)
-    generatedPlan.value = normalized
-    initializeSelection(normalized)
+  if (result.status !== 'success' || !result.ticket || !isViewMounted.value) return
 
-    if (normalized.length === 0) {
-      toast.warning('AI 未生成有效草稿，请补充描述后重试。')
-    }
-  } catch (error) {
-    console.error('AI 拆解失败', error)
-    toast.error('AI 拆解失败，请检查网络后重试。')
-  } finally {
-    isGeneratingPlan.value = false
+  const applied = applyGeneratedPlan(result.payload)
+  if (applied) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN, result.ticket.requestId)
   }
 }
 
@@ -641,8 +676,9 @@ const openConfirmModal = () => {
 }
 
 const createTask = async (projectId: string, milestoneId: string, task: DraftTask) => {
+  const finalTitle = getTaskTitle(task).slice(0, TASK_TITLE_MAX_LENGTH)
   await addTaskApi({
-    title: getTaskTitle(task),
+    title: finalTitle,
     description: task.description || '',
     projectId,
     priority: 0,
@@ -849,11 +885,23 @@ watch(
   { deep: true },
 )
 
+watch(
+  () => plannerBreakdownEntry.value.status,
+  (status) => {
+    if (status === 'success' && isViewMounted.value) {
+      consumePendingGeneratedPlan()
+    }
+  },
+)
+
 onMounted(() => {
+  isViewMounted.value = true
   hydrateDraftFromStorage()
+  consumePendingGeneratedPlan()
 })
 
 onBeforeUnmount(() => {
+  isViewMounted.value = false
   if (!persistDraftTimer || typeof window === 'undefined') return
   window.clearTimeout(persistDraftTimer)
   persistDraftTimer = null

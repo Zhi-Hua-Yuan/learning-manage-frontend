@@ -24,7 +24,7 @@
         </div>
 
         <div
-          v-if="!isAggregateView && selectedProjectId && taskList.length > 0"
+          v-if="shouldRenderBoardData && !isAggregateView && selectedProjectId && taskList.length > 0"
           class="flex w-full items-center gap-3 sm:w-56"
         >
           <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
@@ -95,8 +95,8 @@
 
       <Transition name="content-fade" mode="out-in">
         <div :key="boardTransitionKey" class="flex-1 overflow-y-auto p-3 sm:p-4">
-          <div class="space-y-4">
-          <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
+          <div v-if="shouldRenderBoardData" class="space-y-4">
+            <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
             <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
               {{ mainTaskSectionTitle }}
             </h3>
@@ -116,14 +116,15 @@
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
-                    task.status === 2
+                    isTaskCompleted(task.status)
                       ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
                       : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
+                  :style="{ borderColor: getTaskCheckboxBorderColor(task.status) }"
                   @click.stop="toggleTaskStatus(task)"
                 >
                   <svg
-                    v-if="task.status === 2"
+                    v-if="isTaskCompleted(task.status)"
                     class="h-3 w-3 text-[var(--color-text-secondary)]"
                     fill="none"
                     stroke="currentColor"
@@ -141,7 +142,7 @@
                 <span
                   class="min-w-0 flex-1 text-sm transition-colors"
                   :class="
-                    task.status === 2
+                    isTaskCompleted(task.status)
                       ? 'text-[var(--color-text-tertiary)] line-through'
                       : 'text-[var(--color-text-primary)]'
                   "
@@ -273,14 +274,15 @@
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
                   :class="
-                    task.status === 2
+                    isTaskCompleted(task.status)
                       ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
                       : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
                   "
+                  :style="{ borderColor: getTaskCheckboxBorderColor(task.status) }"
                   @click.stop="toggleTaskStatus(task)"
                 >
                   <svg
-                    v-if="task.status === 2"
+                    v-if="isTaskCompleted(task.status)"
                     class="h-3 w-3 text-[var(--color-text-secondary)]"
                     fill="none"
                     stroke="currentColor"
@@ -298,7 +300,7 @@
                 <span
                   class="min-w-0 flex-1 text-sm transition-colors"
                   :class="
-                    task.status === 2
+                    isTaskCompleted(task.status)
                       ? 'text-[var(--color-text-tertiary)] line-through'
                       : 'text-[var(--color-text-primary)]'
                   "
@@ -330,7 +332,7 @@
             </div>
           </section>
 
-          <div v-if="!isAggregateView" class="pt-1">
+            <div v-if="!isAggregateView" class="pt-1">
             <div v-if="isAddingMilestone" class="card-base border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] p-1">
               <input
                 v-model="newMilestoneName"
@@ -350,8 +352,42 @@
             >
               + 添加阶段
             </button>
+            </div>
           </div>
-        </div>
+
+          <div v-else-if="shouldShowBoardSkeleton" class="space-y-3" aria-live="polite">
+            <div class="card-base space-y-3 bg-[var(--color-bg-surface)] p-3 sm:p-4">
+              <div class="h-4 w-1/3 animate-pulse rounded bg-[var(--color-bg-surface-muted)]"></div>
+              <div class="space-y-2">
+                <div
+                  v-for="index in 5"
+                  :key="`task-skeleton-${index}`"
+                  class="flex items-center gap-3 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-3 py-3"
+                >
+                  <div class="h-5 w-5 animate-pulse rounded border border-[var(--color-input-border)]"></div>
+                  <div class="h-3 w-2/3 animate-pulse rounded bg-[var(--color-bg-surface-muted)]"></div>
+                  <div class="ml-auto h-3 w-12 animate-pulse rounded bg-[var(--color-bg-surface-muted)]"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="space-y-3">
+            <div class="card-base bg-[var(--color-bg-surface)] p-4 sm:p-5">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm text-[var(--color-text-secondary)]">
+                  {{ shouldShowSlowState ? '加载较慢，正在继续获取最新任务。' : boardErrorMessage }}
+                </p>
+                <button
+                  type="button"
+                  class="btn-secondary rounded-lg px-4 py-2 text-sm font-semibold"
+                  @click="retryCurrentContextLoad"
+                >
+                  重试
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </Transition>
     </main>
@@ -708,6 +744,58 @@
       cancel-text="取消"
       @confirm="confirmDeleteMilestone"
     />
+
+    <transition name="completion-overlay">
+      <div
+        v-if="showCompletionQualityModal && pendingCompletionTask"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="选择任务完成情况"
+      >
+        <div class="completion-backdrop absolute inset-0" @click="closeCompletionQualityModal">
+          <div class="completion-backdrop-base absolute inset-0"></div>
+          <div class="completion-backdrop-blur absolute inset-0"></div>
+        </div>
+
+        <div
+          class="completion-panel surface-panel relative z-[var(--z-modal-panel)] w-full max-w-md overflow-hidden rounded-2xl"
+          @click.stop
+        >
+          <div class="completion-header h-1.5 w-full"></div>
+          <div class="p-6 text-center">
+            <div
+              class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary-soft-2)] text-[var(--color-primary)]"
+            >
+              <AppIcon name="target" class="h-7 w-7" />
+            </div>
+            <h3 class="text-xl font-bold text-[var(--color-text-primary)]">选择完成情况</h3>
+            <p class="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+              任务「{{ pendingCompletionTask.title }}」本次完成情况是？
+            </p>
+            <div class="mt-5 grid grid-cols-3 gap-3">
+              <button
+                v-for="option in completionQualityOptions"
+                :key="option.status"
+                type="button"
+                class="completion-option focus-ring rounded-xl px-2 py-3 transition-all"
+                :class="option.toneClass"
+                @click="confirmCompletionQuality(option.status)"
+              >
+                <span class="block text-3xl leading-none">{{ option.emoji }}</span>
+                <span class="mt-2 block text-base font-semibold">{{ option.label }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex justify-end p-4 pt-0">
+            <button type="button" class="btn-secondary rounded-xl px-4 py-2.5 text-sm font-semibold" @click="closeCompletionQualityModal">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -735,9 +823,23 @@ import {
 import {
   readAllProjectsTaskCache,
   readTaskCache,
-  writeAllProjectsTaskCache,
+  removeTaskFromCaches,
+  syncAggregateTaskCacheByProject,
+  upsertTaskInCaches,
+  writeAggregateTaskCacheFromRecords,
   writeTaskCache,
 } from '@/utils/taskCache'
+import {
+  readSelectedProjectIdCache,
+  writeSelectedProjectIdCache,
+} from '@/utils/appCache'
+import {
+  isTaskCompleted,
+  TASK_STATUS_DONE_BASIC,
+  TASK_STATUS_DONE_EXCELLENT,
+  TASK_STATUS_DONE_STANDARD,
+  TASK_STATUS_TODO,
+} from '@/utils/taskStatus'
 
 interface Task {
   id: string
@@ -772,6 +874,13 @@ interface PriorityOption {
   textClass: string
 }
 
+interface CompletionQualityOption {
+  status: number
+  label: string
+  emoji: string
+  toneClass: string
+}
+
 interface CalendarCell {
   key: string
   iso: string
@@ -785,9 +894,27 @@ interface LoadOptions {
   forceRefresh?: boolean
 }
 
+type DisplayPhase = 'loading' | 'slow' | 'ready' | 'error'
+type LoadOutcomeStatus = 'ok' | 'stale' | 'error'
+
+interface LoadOutcome {
+  status: LoadOutcomeStatus
+  error?: unknown
+}
+
+interface ContextLoadOptions {
+  forceProjectRefresh?: boolean
+  forceMilestoneRefresh?: boolean
+  forceTaskRefresh?: boolean
+}
+
 const PROJECT_LIST_EVENT_SOURCE = 'task-list'
 const AGGREGATE_PAGE_SIZE = 100
 const AGGREGATE_MAX_PAGES = 200
+const BOARD_SLOW_THRESHOLD_MS = 1200
+const PROJECT_CONTEXT_PREFIX = 'project:'
+const AGGREGATE_CONTEXT_PREFIX = 'aggregate:'
+const DEFAULT_BOARD_ERROR_MESSAGE = '加载失败，请稍后重试。'
 
 const route = useRoute()
 const router = useRouter()
@@ -808,6 +935,9 @@ const boardView = computed(() =>
 const boardTransitionKey = computed(() =>
   boardView.value === 'project' ? `project:${selectedProjectId.value || 'none'}` : String(boardView.value),
 )
+const displayContextKey = ref(`${PROJECT_CONTEXT_PREFIX}none`)
+const displayPhase = ref<DisplayPhase>('loading')
+const boardErrorMessage = ref(DEFAULT_BOARD_ERROR_MESSAGE)
 const selectedProject = computed(() =>
   projectList.value.find((project) => project.id === selectedProjectId.value),
 )
@@ -824,6 +954,20 @@ const mainTaskSectionTitle = computed(() => {
   if (isWeekView.value) return '本周任务'
   return '默认列表'
 })
+const currentContextKey = computed(() => {
+  if (isTodayView.value) return 'aggregate:today'
+  if (isWeekView.value) return 'aggregate:week'
+  return `project:${selectedProjectId.value || 'none'}`
+})
+const boardRenderPhase = computed<DisplayPhase>(() => {
+  if (!isCurrentDisplayContext(currentContextKey.value)) {
+    return 'loading'
+  }
+  return displayPhase.value
+})
+const shouldRenderBoardData = computed(() => boardRenderPhase.value === 'ready')
+const shouldShowBoardSkeleton = computed(() => boardRenderPhase.value === 'loading')
+const shouldShowSlowState = computed(() => boardRenderPhase.value === 'slow')
 
 const newTaskTitle = ref('')
 const newTaskMilestoneId = ref('')
@@ -838,8 +982,10 @@ const isMilestoneMenuOpen = ref(false)
 const isNewTaskMilestoneMenuOpen = ref(false)
 const showDeleteTaskConfirm = ref(false)
 const showDeleteMilestoneConfirm = ref(false)
+const showCompletionQualityModal = ref(false)
 const pendingDeleteTask = ref<Task | null>(null)
 const pendingDeleteMilestone = ref<{ id: string; name: string } | null>(null)
+const pendingCompletionTask = ref<Task | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
 const milestoneRowRef = ref<HTMLElement | null>(null)
@@ -855,6 +1001,7 @@ const milestoneLoadVersion = ref(0)
 const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 
 const isMobile = computed(() => viewportWidth.value < 768)
+let boardSlowTimer: ReturnType<typeof setTimeout> | null = null
 
 const PROJECT_ICON_FALLBACK: IconName = 'folder'
 const PROJECT_ICON_COMPAT_MAP: Record<string, IconName> = {
@@ -912,6 +1059,27 @@ const priorityOptions: PriorityOption[] = [
 const getPriorityOption = (priority: number) =>
   priorityOptions.find((option) => option.value === priority) || priorityOptions[priorityOptions.length - 1]!
 
+const completionQualityOptions: CompletionQualityOption[] = [
+  {
+    status: TASK_STATUS_DONE_BASIC,
+    label: '差',
+    emoji: '😢',
+    toneClass: 'completion-option--danger',
+  },
+  {
+    status: TASK_STATUS_DONE_STANDARD,
+    label: '中',
+    emoji: '😐',
+    toneClass: 'completion-option--warning',
+  },
+  {
+    status: TASK_STATUS_DONE_EXCELLENT,
+    label: '好',
+    emoji: '😄',
+    toneClass: 'completion-option--success',
+  },
+]
+
 const taskItemPriorityBorderColorMap: Record<number, string> = {
   3: 'var(--color-danger)',
   2: 'var(--color-warning)',
@@ -921,6 +1089,17 @@ const taskItemPriorityBorderColorMap: Record<number, string> = {
 
 const getTaskItemBorderColor = (priority: number) =>
   taskItemPriorityBorderColorMap[priority] || taskItemPriorityBorderColorMap[0]
+
+const taskCheckboxCompletedBorderColorMap: Record<number, string> = {
+  [TASK_STATUS_DONE_BASIC]: 'var(--color-danger)',
+  [TASK_STATUS_DONE_STANDARD]: 'var(--color-warning)',
+  [TASK_STATUS_DONE_EXCELLENT]: 'var(--color-success)',
+}
+
+const getTaskCheckboxBorderColor = (status: number): string | undefined => {
+  if (!isTaskCompleted(status)) return undefined
+  return taskCheckboxCompletedBorderColorMap[status] || 'var(--color-border-strong)'
+}
 
 const TASK_TITLE_MAX_LENGTH = 50
 const TASK_DESCRIPTION_MAX_LENGTH = 500
@@ -932,8 +1111,8 @@ const getTaskDueDateTimestamp = (dueDate?: string | null) => {
 }
 
 const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
-  const isACompleted = a.status === 2
-  const isBCompleted = b.status === 2
+  const isACompleted = isTaskCompleted(a.status)
+  const isBCompleted = isTaskCompleted(b.status)
   if (isACompleted !== isBCompleted) {
     return isACompleted ? 1 : -1
   }
@@ -1136,66 +1315,8 @@ const vFocus = {
 }
 
 const navigateToProject = (projectId: string) => {
-  localStorage.setItem('tick_selectedProjectId', projectId)
+  writeSelectedProjectIdCache(projectId)
   router.push({ path: '/tasks', query: { projectId } })
-}
-
-const upsertTaskCache = (task: Task) => {
-  const projectId = String(task.projectId || '')
-  if (!projectId) return
-
-  const cachedProjectTasks = readTaskCache(projectId, Number.POSITIVE_INFINITY)
-  if (cachedProjectTasks) {
-    const nextProjectTasks = cachedProjectTasks.some((item) => item.id === task.id)
-      ? cachedProjectTasks.map((item) => (item.id === task.id ? { ...item, ...task } : item))
-      : [...cachedProjectTasks, task]
-    writeTaskCache(projectId, nextProjectTasks)
-  }
-
-  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY)
-  if (cachedAllProjectsTasks && Array.isArray(cachedAllProjectsTasks[projectId])) {
-    const nextAllProjectsTasks = cachedAllProjectsTasks[projectId]!.some((item) => item.id === task.id)
-      ? cachedAllProjectsTasks[projectId]!.map((item) => (item.id === task.id ? { ...item, ...task } : item))
-      : [...cachedAllProjectsTasks[projectId]!, task]
-    writeAllProjectsTaskCache({
-      ...cachedAllProjectsTasks,
-      [projectId]: nextAllProjectsTasks,
-    })
-  }
-}
-
-const removeTaskFromCache = (task: Task) => {
-  const projectId = String(task.projectId || '')
-  if (!projectId) return
-
-  const cachedProjectTasks = readTaskCache(projectId, Number.POSITIVE_INFINITY)
-  if (cachedProjectTasks) {
-    writeTaskCache(
-      projectId,
-      cachedProjectTasks.filter((item) => item.id !== task.id),
-    )
-  }
-
-  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY)
-  if (cachedAllProjectsTasks && Array.isArray(cachedAllProjectsTasks[projectId])) {
-    writeAllProjectsTaskCache({
-      ...cachedAllProjectsTasks,
-      [projectId]: cachedAllProjectsTasks[projectId]!.filter((item) => item.id !== task.id),
-    })
-  }
-}
-
-const writeTodayTaskCaches = (records: Task[]) => {
-  const nextCache: Record<string, Task[]> = {}
-  records.forEach((task) => {
-    const projectId = String(task.projectId || '')
-    if (!projectId) return
-    if (!nextCache[projectId]) {
-      nextCache[projectId] = []
-    }
-    nextCache[projectId]!.push(task)
-  })
-  writeAllProjectsTaskCache(nextCache)
 }
 
 const syncSelectedProject = () => {
@@ -1207,14 +1328,77 @@ const syncSelectedProject = () => {
   const queryId = route.query.projectId
   if (typeof queryId === 'string' && queryId) {
     selectedProjectId.value = queryId
-    localStorage.setItem('tick_selectedProjectId', queryId)
+    writeSelectedProjectIdCache(queryId)
     return
   }
 
-  selectedProjectId.value = localStorage.getItem('tick_selectedProjectId') || ''
+  selectedProjectId.value = readSelectedProjectIdCache()
 }
 
-const loadProjects = async (options: LoadOptions = {}) => {
+const okOutcome = (): LoadOutcome => ({ status: 'ok' })
+const staleOutcome = (): LoadOutcome => ({ status: 'stale' })
+const errorOutcome = (error: unknown): LoadOutcome => ({ status: 'error', error })
+const isCurrentDisplayContext = (contextKey: string) => displayContextKey.value === contextKey
+
+const clearBoardSlowTimer = () => {
+  if (!boardSlowTimer || typeof window === 'undefined') return
+  window.clearTimeout(boardSlowTimer)
+  boardSlowTimer = null
+}
+
+const armBoardSlowTimer = (contextKey: string) => {
+  if (typeof window === 'undefined') return
+  clearBoardSlowTimer()
+  boardSlowTimer = window.setTimeout(() => {
+    if (!isCurrentDisplayContext(contextKey)) return
+    if (displayPhase.value !== 'loading') return
+    displayPhase.value = 'slow'
+  }, BOARD_SLOW_THRESHOLD_MS)
+}
+
+const getLoadErrorMessage = (error: unknown) => {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message?: unknown }).message || '')
+    if (message) return message
+  }
+  return DEFAULT_BOARD_ERROR_MESSAGE
+}
+
+const enterBoardLoading = (contextKey: string) => {
+  displayContextKey.value = contextKey
+  displayPhase.value = 'loading'
+  boardErrorMessage.value = DEFAULT_BOARD_ERROR_MESSAGE
+  armBoardSlowTimer(contextKey)
+}
+
+const markBoardReady = (contextKey: string) => {
+  if (!isCurrentDisplayContext(contextKey)) return
+  displayPhase.value = 'ready'
+  boardErrorMessage.value = DEFAULT_BOARD_ERROR_MESSAGE
+  clearBoardSlowTimer()
+}
+
+const markBoardError = (contextKey: string, error: unknown) => {
+  if (!isCurrentDisplayContext(contextKey)) return
+  displayPhase.value = 'error'
+  boardErrorMessage.value = getLoadErrorMessage(error)
+  clearBoardSlowTimer()
+}
+
+const isProjectContextKey = (contextKey: string) => contextKey.startsWith(PROJECT_CONTEXT_PREFIX)
+const hasRouteProjectId = () => typeof route.query.projectId === 'string' && route.query.projectId.length > 0
+const ensureSelectedProjectFromList = async () => {
+  if (isAggregateView.value || selectedProjectId.value || projectList.value.length === 0) return
+  const firstProject = projectList.value[0]
+  if (!firstProject) return
+
+  const firstId = firstProject.id
+  selectedProjectId.value = firstId
+  writeSelectedProjectIdCache(firstId)
+  await router.replace({ path: '/tasks', query: { projectId: firstId } })
+}
+
+const loadProjects = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++projectLoadVersion.value
   const cachedRecords = !forceRefresh ? readProjectListCache<Project>(0) : null
@@ -1224,34 +1408,22 @@ const loadProjects = async (options: LoadOptions = {}) => {
   }
 
   if (cachedRecords && !forceRefresh) {
-    if (!isAggregateView.value && !selectedProjectId.value && projectList.value.length > 0) {
-      const firstProject = projectList.value[0]
-      if (!firstProject) return
-      const firstId = firstProject.id
-      selectedProjectId.value = firstId
-      localStorage.setItem('tick_selectedProjectId', firstId)
-      await router.replace({ path: '/tasks', query: { projectId: firstId } })
-    }
-    return
+    await ensureSelectedProjectFromList()
+    return okOutcome()
   }
 
   try {
     const res = await fetchProjectList({ status: 0 })
-    if (requestVersion !== projectLoadVersion.value) return
+    if (requestVersion !== projectLoadVersion.value) return staleOutcome()
     const records = (res as unknown as { records?: Project[] })?.records
     projectList.value = records || []
     writeProjectListCache(0, projectList.value)
 
-    if (!isAggregateView.value && !selectedProjectId.value && projectList.value.length > 0) {
-      const firstProject = projectList.value[0]
-      if (!firstProject) return
-      const firstId = firstProject.id
-      selectedProjectId.value = firstId
-      localStorage.setItem('tick_selectedProjectId', firstId)
-      await router.replace({ path: '/tasks', query: { projectId: firstId } })
-    }
+    await ensureSelectedProjectFromList()
+    return okOutcome()
   } catch (error) {
     console.error('加载项目失败', error)
+    return errorOutcome(error)
   }
 }
 
@@ -1304,7 +1476,7 @@ const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean)
   return aggregated
 }
 
-const loadTasks = async (options: LoadOptions = {}) => {
+const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
 
@@ -1312,7 +1484,7 @@ const loadTasks = async (options: LoadOptions = {}) => {
     if (projectList.value.length === 0) {
       taskList.value = []
       selectedTask.value = null
-      return
+      return okOutcome()
     }
 
     if (!forceRefresh) {
@@ -1323,7 +1495,7 @@ const loadTasks = async (options: LoadOptions = {}) => {
         )
         taskList.value = filterAggregateTasks(allRecords).sort(compareTaskByDueDateThenPriority)
         syncSelectedTaskFromList()
-        return
+        return okOutcome()
       }
     }
 
@@ -1333,22 +1505,23 @@ const loadTasks = async (options: LoadOptions = {}) => {
           fetchAllTasksByProject(project.id, () => requestVersion !== taskLoadVersion.value),
         ),
       )
-      if (requestVersion !== taskLoadVersion.value) return
+      if (requestVersion !== taskLoadVersion.value) return staleOutcome()
       const records = responses.flat()
       taskList.value = filterAggregateTasks(records).sort(compareTaskByDueDateThenPriority)
-      writeTodayTaskCaches(records)
+      writeAggregateTaskCacheFromRecords(records)
       syncSelectedTaskFromList()
+      return okOutcome()
     } catch (error) {
-      if (requestVersion !== taskLoadVersion.value) return
+      if (requestVersion !== taskLoadVersion.value) return staleOutcome()
       console.error('加载今日任务失败', error)
+      return errorOutcome(error)
     }
-    return
   }
 
   if (!selectedProjectId.value) {
     taskList.value = []
     selectedTask.value = null
-    return
+    return okOutcome()
   }
 
   if (!forceRefresh) {
@@ -1356,7 +1529,7 @@ const loadTasks = async (options: LoadOptions = {}) => {
     if (cachedProjectTasks) {
       taskList.value = cachedProjectTasks
       syncSelectedTaskFromList()
-      return
+      return okOutcome()
     }
   }
 
@@ -1367,36 +1540,39 @@ const loadTasks = async (options: LoadOptions = {}) => {
       current: 1,
       size: 100,
     })
-    if (requestVersion !== taskLoadVersion.value) return
-    if (requestProjectId !== selectedProjectId.value) return
+    if (requestVersion !== taskLoadVersion.value) return staleOutcome()
+    if (requestProjectId !== selectedProjectId.value) return staleOutcome()
     const records = (res as unknown as { records?: Task[] })?.records
     taskList.value = records || []
     writeTaskCache(requestProjectId, taskList.value)
+    syncAggregateTaskCacheByProject(requestProjectId, taskList.value)
     syncSelectedTaskFromList()
+    return okOutcome()
   } catch (error) {
-    if (requestVersion !== taskLoadVersion.value) return
+    if (requestVersion !== taskLoadVersion.value) return staleOutcome()
     console.error('加载任务失败', error)
+    return errorOutcome(error)
   }
 }
 
-const loadMilestones = async (options: LoadOptions = {}) => {
+const loadMilestones = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++milestoneLoadVersion.value
   if (isAggregateView.value || !selectedProjectId.value) {
     milestoneList.value = []
-    return
+    return okOutcome()
   }
 
   const requestProjectId = selectedProjectId.value
   if (!forceRefresh && Array.isArray(milestoneCacheByProject.value[requestProjectId])) {
     milestoneList.value = [...milestoneCacheByProject.value[requestProjectId]!]
-    return
+    return okOutcome()
   }
 
   try {
     const res = await fetchMilestoneList({ projectId: requestProjectId })
-    if (requestVersion !== milestoneLoadVersion.value) return
-    if (requestProjectId !== selectedProjectId.value || isAggregateView.value) return
+    if (requestVersion !== milestoneLoadVersion.value) return staleOutcome()
+    if (requestProjectId !== selectedProjectId.value || isAggregateView.value) return staleOutcome()
     const milestones = Array.isArray(res) ? (res as Milestone[]) : []
     const sortedMilestones = milestones.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
     milestoneList.value = sortedMilestones
@@ -1404,10 +1580,48 @@ const loadMilestones = async (options: LoadOptions = {}) => {
       ...milestoneCacheByProject.value,
       [requestProjectId]: sortedMilestones,
     }
+    return okOutcome()
   } catch (error) {
-    if (requestVersion !== milestoneLoadVersion.value) return
+    if (requestVersion !== milestoneLoadVersion.value) return staleOutcome()
     console.error('加载里程碑失败', error)
+    return errorOutcome(error)
   }
+}
+
+const loadContextData = async (contextKey: string, options: ContextLoadOptions = {}) => {
+  enterBoardLoading(contextKey)
+
+  const projectContext = isProjectContextKey(contextKey)
+  const projectOutcome = await loadProjects({ forceRefresh: options.forceProjectRefresh === true })
+  if (!isCurrentDisplayContext(contextKey)) return
+
+  const [milestoneOutcome, taskOutcome] = await Promise.all([
+    loadMilestones({ forceRefresh: options.forceMilestoneRefresh === true }),
+    loadTasks({ forceRefresh: options.forceTaskRefresh === true }),
+  ])
+
+  if (!isCurrentDisplayContext(contextKey)) return
+
+  const outcomes = [projectOutcome, milestoneOutcome, taskOutcome]
+  const failedOutcome = outcomes.find((outcome) => outcome.status === 'error')
+  if (failedOutcome) {
+    markBoardError(contextKey, failedOutcome.error)
+    return
+  }
+
+  if (projectContext || contextKey.startsWith(AGGREGATE_CONTEXT_PREFIX)) {
+    markBoardReady(contextKey)
+  }
+}
+
+const retryCurrentContextLoad = async () => {
+  const contextKey = currentContextKey.value
+  const isProjectMode = hasRouteProjectId()
+  await loadContextData(contextKey, {
+    forceProjectRefresh: isProjectMode,
+    forceMilestoneRefresh: isProjectMode,
+    forceTaskRefresh: true,
+  })
 }
 
 const handleProjectListUpdated: EventListener = (event) => {
@@ -1436,18 +1650,46 @@ const addTask = async () => {
   }
 }
 
-const toggleTaskStatus = async (task: Task) => {
+const setTaskStatus = async (task: Task, nextStatus: number) => {
   const oldStatus = task.status
-  const newStatus = oldStatus === 2 ? 0 : 2
-
+  task.status = nextStatus
   try {
-    task.status = newStatus
-    await updateTaskApi({ ...task, status: newStatus })
-    upsertTaskCache(task)
+    await updateTaskApi({ ...task, status: nextStatus })
+    upsertTaskInCaches(task)
   } catch {
     task.status = oldStatus
     toast.error('更新状态失败，请检查网络后重试。')
+    throw new Error('update-task-status-failed')
   }
+}
+
+const closeCompletionQualityModal = () => {
+  showCompletionQualityModal.value = false
+  pendingCompletionTask.value = null
+}
+
+const confirmCompletionQuality = async (status: number) => {
+  const task = pendingCompletionTask.value
+  if (!task) return
+  closeCompletionQualityModal()
+  try {
+    await setTaskStatus(task, status)
+  } catch {
+    // toast already handled in setTaskStatus
+  }
+}
+
+const toggleTaskStatus = async (task: Task) => {
+  if (isTaskCompleted(task.status)) {
+    try {
+      await setTaskStatus(task, TASK_STATUS_TODO)
+    } catch {
+      // toast already handled in setTaskStatus
+    }
+    return
+  }
+  pendingCompletionTask.value = task
+  showCompletionQualityModal.value = true
 }
 
 const selectTask = (task: Task) => {
@@ -1602,7 +1844,7 @@ const selectPriority = async (val: number) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, priority: val })
-    upsertTaskCache(selectedTask.value)
+    upsertTaskInCaches(selectedTask.value)
   } catch {
     selectedTask.value.priority = oldPriority
     toast.error('更新优先级失败，请检查网络后重试。')
@@ -1691,7 +1933,7 @@ const confirmDeleteTask = async () => {
 
   const originalIndex = taskList.value.findIndex((task) => task.id === taskToDelete.id)
   taskList.value = taskList.value.filter((task) => task.id !== taskToDelete.id)
-  removeTaskFromCache(taskToDelete)
+  removeTaskFromCaches(taskToDelete)
   selectedTask.value = null
 
   undoDelete.scheduleUndoDelete({
@@ -1711,7 +1953,7 @@ const confirmDeleteTask = async () => {
         nextTasks.splice(insertIndex, 0, taskToDelete)
         taskList.value = nextTasks
       }
-      upsertTaskCache(taskToDelete)
+      upsertTaskInCaches(taskToDelete)
     },
   })
 }
@@ -1807,7 +2049,7 @@ const deleteMilestone = async (id: string, name: string) => {
 
 const projectProgress = computed(() => {
   if (taskList.value.length === 0) return 0
-  const completedCount = taskList.value.filter((t) => t.status === 2).length
+  const completedCount = taskList.value.filter((t) => isTaskCompleted(t.status)).length
   return Math.round((completedCount / taskList.value.length) * 100)
 })
 
@@ -1849,7 +2091,7 @@ const groupedTasks = computed(() => {
     if (g.tasks.length === 0) {
       g.progress = 0
     } else {
-      const completedCount = g.tasks.filter((t) => t.status === 2).length
+      const completedCount = g.tasks.filter((t) => isTaskCompleted(t.status)).length
       g.progress = Math.round((completedCount / g.tasks.length) * 100)
     }
   })
@@ -1860,14 +2102,14 @@ const groupedTasks = computed(() => {
 watch(
   [() => route.query.projectId, () => route.query.view],
   async () => {
+    closeCompletionQualityModal()
     syncSelectedProject()
     closeDueDatePicker()
     selectedTask.value = null
     isPriorityMenuOpen.value = false
     isMilestoneMenuOpen.value = false
     isNewTaskMilestoneMenuOpen.value = false
-    await loadProjects()
-    await Promise.all([loadMilestones(), loadTasks()])
+    await loadContextData(currentContextKey.value)
   },
 )
 
@@ -1897,14 +2139,95 @@ onMounted(async () => {
   window.addEventListener('resize', updateViewport)
   onProjectListUpdated(handleProjectListUpdated)
   syncSelectedProject()
-  await loadProjects()
-  await Promise.all([loadMilestones(), loadTasks()])
+  await loadContextData(currentContextKey.value)
 })
 
 onBeforeUnmount(() => {
+  closeCompletionQualityModal()
+  clearBoardSlowTimer()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   stopResizeRight()
   window.removeEventListener('resize', updateViewport)
   offProjectListUpdated(handleProjectListUpdated)
 })
 </script>
+
+<style scoped>
+.completion-backdrop {
+  overflow: hidden;
+}
+
+.completion-backdrop-base {
+  background-color: var(--color-backdrop-strong);
+  opacity: 1;
+}
+
+.completion-backdrop-blur {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 1;
+}
+
+.completion-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.completion-header {
+  background: var(--color-primary);
+}
+
+.completion-option {
+  border: 1px solid var(--color-input-border);
+  background: var(--color-bg-surface-muted);
+}
+
+.completion-option:hover {
+  transform: translateY(-1px);
+}
+
+.completion-option--danger {
+  color: var(--color-danger);
+}
+
+.completion-option--warning {
+  color: var(--color-warning);
+}
+
+.completion-option--success {
+  color: var(--color-success);
+}
+
+.completion-overlay-enter-active .completion-backdrop-base,
+.completion-overlay-leave-active .completion-backdrop-base,
+.completion-overlay-enter-active .completion-backdrop-blur,
+.completion-overlay-leave-active .completion-backdrop-blur {
+  transition: opacity 220ms var(--ease-standard);
+}
+
+.completion-overlay-enter-from .completion-backdrop-base,
+.completion-overlay-leave-to .completion-backdrop-base,
+.completion-overlay-enter-from .completion-backdrop-blur,
+.completion-overlay-leave-to .completion-backdrop-blur {
+  opacity: 0;
+}
+
+.completion-overlay-enter-active .completion-panel,
+.completion-overlay-leave-active .completion-panel {
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
+}
+
+.completion-overlay-enter-from .completion-panel,
+.completion-overlay-leave-to .completion-panel {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
+
+.completion-overlay-enter-to .completion-panel,
+.completion-overlay-leave-from .completion-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+</style>

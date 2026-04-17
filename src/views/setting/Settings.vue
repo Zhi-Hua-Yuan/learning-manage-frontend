@@ -66,19 +66,19 @@
                 v-for="option in themeOptions"
                 :key="option.value"
                 type="button"
-                class="rounded-xl border px-4 py-3 text-sm font-semibold transition-colors"
-                :class="
-                  themeMode === option.value
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft-2)] text-[var(--color-primary)]'
-                    : 'border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] text-[var(--color-text-body)] hover:bg-[var(--color-bg-surface-secondary)]'
-                "
+                class="rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-colors"
+                :style="{
+                  backgroundColor: option.bg,
+                  color: option.text,
+                  borderColor: themeMode === option.value ? option.bg : 'transparent',
+                }"
                 @click="applyThemeMode(option.value)"
               >
                 {{ option.label }}
               </button>
             </div>
             <p class="mt-2 text-xs text-[var(--color-text-secondary)]">
-              跟随系统模式会根据设备的深浅色设置自动切换。
+              选择配色方案后界面将立即更新。
             </p>
           </div>
           <div class="pt-4">
@@ -208,10 +208,13 @@ const toast = useToast()
 const showReLoginModal = ref(false)
 const { themeMode, setThemeMode } = useTheme()
 
-const themeOptions: Array<{ value: ThemeMode; label: string }> = [
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'system', label: '跟随系统' },
+const themeOptions: Array<{ value: ThemeMode; label: string; bg: string; text: string }> = [
+  { value: 'light', label: '浅色', bg: '#f2f2ef', text: '#374151' },
+  { value: 'dark', label: '深色', bg: '#1f2937', text: '#f3f4f6' },
+  { value: 'blue', label: '蓝色', bg: '#4a90d9', text: '#ffffff' },
+  { value: 'green', label: '绿色', bg: '#48c078', text: '#ffffff' },
+  { value: 'brown', label: '棕色', bg: '#8b6914', text: '#ffffff' },
+  { value: 'pink', label: '粉色', bg: '#e879a9', text: '#ffffff' },
 ]
 
 const confirmReLogin = async () => {

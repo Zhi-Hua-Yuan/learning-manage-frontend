@@ -2,43 +2,38 @@ import { readonly, ref } from 'vue'
 import { readThemeModeCache, writeThemeModeCache } from '@/utils/appCache'
 import { CACHE_REGISTRY } from '@/utils/cacheRegistry'
 
-export type ThemeMode = 'light' | 'dark' | 'system'
-export type ResolvedTheme = 'light' | 'dark'
+export type ThemeMode = 'light' | 'dark' | 'blue' | 'green' | 'brown' | 'pink'
+export type ResolvedTheme = 'light' | 'dark' | 'blue' | 'green' | 'brown' | 'pink'
 
 export const THEME_STORAGE_KEY = CACHE_REGISTRY.themeMode.key
 
-const SYSTEM_THEME_QUERY = '(prefers-color-scheme: dark)'
-
-const themeModeRef = ref<ThemeMode>('system')
+const themeModeRef = ref<ThemeMode>('light')
 const resolvedThemeRef = ref<ResolvedTheme>('light')
 
-let mediaQueryList: MediaQueryList | null = null
-let hasBoundSystemListener = false
-
 const isThemeMode = (value: string | null): value is ThemeMode =>
-  value === 'light' || value === 'dark' || value === 'system'
+  value === 'light' || value === 'dark' || value === 'blue' || value === 'green' || value === 'brown' || value === 'pink'
 
 const isBrowser = () => typeof window !== 'undefined' && typeof document !== 'undefined'
 
 const readStoredThemeMode = (): { mode: ThemeMode; needsRepair: boolean } => {
   if (!isBrowser()) {
-    return { mode: 'system', needsRepair: false }
+    return { mode: 'light', needsRepair: false }
   }
 
   try {
     const stored = readThemeModeCache()
     if (stored === null) {
-      return { mode: 'system', needsRepair: false }
+      return { mode: 'light', needsRepair: false }
     }
 
     if (isThemeMode(stored)) {
       return { mode: stored, needsRepair: false }
     }
   } catch {
-    return { mode: 'system', needsRepair: false }
+    return { mode: 'light', needsRepair: false }
   }
 
-  return { mode: 'system', needsRepair: true }
+  return { mode: 'light', needsRepair: true }
 }
 
 const writeStoredThemeMode = (mode: ThemeMode) => {
@@ -51,57 +46,14 @@ const writeStoredThemeMode = (mode: ThemeMode) => {
   }
 }
 
-const getSystemResolvedTheme = (): ResolvedTheme => {
-  if (!isBrowser() || typeof window.matchMedia !== 'function') {
-    return 'light'
-  }
-
-  return window.matchMedia(SYSTEM_THEME_QUERY).matches ? 'dark' : 'light'
-}
-
-const resolveTheme = (mode: ThemeMode): ResolvedTheme => {
-  if (mode === 'system') {
-    return getSystemResolvedTheme()
-  }
-
-  return mode
-}
-
 const applyResolvedTheme = (theme: ResolvedTheme) => {
   if (!isBrowser()) return
   document.documentElement.dataset.theme = theme
 }
 
 const syncResolvedTheme = () => {
-  const nextResolvedTheme = resolveTheme(themeModeRef.value)
-  resolvedThemeRef.value = nextResolvedTheme
-  applyResolvedTheme(nextResolvedTheme)
-}
-
-const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-  if (themeModeRef.value !== 'system') {
-    return
-  }
-
-  const nextResolvedTheme: ResolvedTheme = event.matches ? 'dark' : 'light'
-  resolvedThemeRef.value = nextResolvedTheme
-  applyResolvedTheme(nextResolvedTheme)
-}
-
-const ensureSystemThemeListener = () => {
-  if (!isBrowser() || hasBoundSystemListener || typeof window.matchMedia !== 'function') {
-    return
-  }
-
-  mediaQueryList = window.matchMedia(SYSTEM_THEME_QUERY)
-
-  if (typeof mediaQueryList.addEventListener === 'function') {
-    mediaQueryList.addEventListener('change', handleSystemThemeChange)
-  } else {
-    mediaQueryList.addListener(handleSystemThemeChange)
-  }
-
-  hasBoundSystemListener = true
+  resolvedThemeRef.value = themeModeRef.value
+  applyResolvedTheme(themeModeRef.value)
 }
 
 const setThemeMode = (mode: ThemeMode) => {
@@ -119,7 +71,6 @@ const initTheme = () => {
   }
 
   syncResolvedTheme()
-  ensureSystemThemeListener()
 }
 
 export const useTheme = () => ({

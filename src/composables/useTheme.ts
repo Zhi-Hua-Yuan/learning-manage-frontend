@@ -1,9 +1,11 @@
 import { readonly, ref } from 'vue'
+import { readThemeModeCache, writeThemeModeCache } from '@/utils/appCache'
+import { CACHE_REGISTRY } from '@/utils/cacheRegistry'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 export type ResolvedTheme = 'light' | 'dark'
 
-export const THEME_STORAGE_KEY = 'tick_themeMode'
+export const THEME_STORAGE_KEY = CACHE_REGISTRY.themeMode.key
 
 const SYSTEM_THEME_QUERY = '(prefers-color-scheme: dark)'
 
@@ -24,7 +26,7 @@ const readStoredThemeMode = (): { mode: ThemeMode; needsRepair: boolean } => {
   }
 
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    const stored = readThemeModeCache()
     if (stored === null) {
       return { mode: 'system', needsRepair: false }
     }
@@ -43,7 +45,7 @@ const writeStoredThemeMode = (mode: ThemeMode) => {
   if (!isBrowser()) return
 
   try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, mode)
+    writeThemeModeCache(mode)
   } catch {
     // Ignore storage write errors (private mode or restricted environment)
   }

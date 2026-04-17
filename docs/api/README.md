@@ -109,9 +109,10 @@ Project (1) ──────< (many) Milestone
 
 | 值 | 含义 |
 |----|------|
-| 0 | 待办（To Do） |
-| 1 | 进行中（In Progress） |
-| 2 | 已完成（Completed） |
+| 0 | 未完成（TODO） |
+| 1 | 一般完成（DONE_BASIC） |
+| 2 | 正常完成（DONE_STANDARD） |
+| 3 | 超额完成（DONE_EXCELLENT） |
 
 ### deleteSource 字段说明
 

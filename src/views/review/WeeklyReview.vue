@@ -4,7 +4,7 @@
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">
           <AppIcon name="calendar" class="h-5 w-5" />
-          周报回顾与规划
+          周报回顾
         </h2>
         <span class="text-sm text-[var(--color-text-secondary)]">看看这周做得怎么样</span>
       </div>
@@ -107,20 +107,9 @@
               </div>
               <textarea
                 v-model="currentReview.reflection"
+                :disabled="isPolishing"
                 class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
-                placeholder="这周做的好与不好的地方？有什么感悟？..."
-              ></textarea>
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-[var(--color-text-body)] mb-2 flex items-center gap-2">
-                <AppIcon name="target" class="h-4 w-4" />
-                下周计划
-              </label>
-              <textarea
-                v-model="currentReview.nextPlan"
-                class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
-                placeholder="下周的核心目标是什么？打算怎么安排时间？..."
+                placeholder="可选补充内容（如感受、问题与改进点）..."
               ></textarea>
             </div>
 
@@ -229,18 +218,6 @@
               {{ selectedReview.reflection || '无内容' }}
             </div>
           </section>
-          <section>
-            <h4
-              class="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[var(--color-text-body)]"
-            >
-              / 下周计划 /
-            </h4>
-            <div
-              class="whitespace-pre-wrap rounded-2xl border border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] p-5 leading-relaxed text-[var(--color-text-body)]"
-            >
-              {{ selectedReview.nextPlan || '无内容' }}
-            </div>
-          </section>
         </div>
         <div class="bg-[var(--color-bg-surface-muted)] p-6 text-center">
           <div class="flex items-center justify-center gap-4">
@@ -295,11 +272,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import { aiPolishApi } from '@/api/ai'
+import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { fetchProjectList } from '@/api/project'
 import { fetchTaskList } from '@/api/task'
 import {
@@ -310,8 +288,10 @@ import {
   updateReviewApi,
   saveReviewApi,
 } from '@/api/review'
+import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { isTaskCompleted } from '@/utils/taskStatus'
 
 interface ReviewItem {
   id?: string | number
@@ -322,7 +302,6 @@ interface ReviewItem {
   completedTaskCount?: number
   focusProjectName?: string
   reflection?: string
-  nextPlan?: string
 }
 
 interface ProjectItem {
@@ -369,7 +348,6 @@ const SUMMARY_PAGE_SIZE = 100
 const MAX_PAGES_PER_PROJECT = 10
 const MAX_TOTAL_REQUESTS = 60
 const MAX_CONCURRENT_PROJECT_FETCHES = 3
-const COMPLETED_TASK_STATUS = 2
 const TIMEZONE_BASELINE = 'Asia/Shanghai'
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const DATE_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
@@ -382,10 +360,12 @@ const DATE_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
 const router = useRouter()
 const toast = useToast()
 const undoDelete = useUndoDelete()
+const aiPendingRegistry = useAiPendingRegistryStore()
+const { runAiRequest } = useAiPendingRequest()
 
 const currentReview = ref<ReviewItem>({})
 const historyReviews = ref<ReviewItem[]>([])
-const isPolishing = ref(false)
+const isViewMounted = ref(false)
 const showDetailModal = ref(false)
 const selectedReview = ref<ReviewItem | null>(null)
 const showSaveConfirmModal = ref(false)
@@ -394,7 +374,7 @@ const summaryLoading = ref(false)
 const summaryReady = ref(false)
 const summaryError = ref('')
 const summaryGuardHit = ref(false)
-const weeklyCompletedTaskIds = ref<number[]>([])
+const weeklyCompletedTaskIds = ref<string[]>([])
 const summaryMetrics = ref<SummaryMetrics>({
   completedCount: null,
   assignedCount: null,
@@ -409,6 +389,9 @@ const summaryMetrics = ref<SummaryMetrics>({
   currentCompletionRateRaw: null,
   previousCompletionRateRaw: null,
 })
+
+const weeklyPolishEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH])
+const isPolishing = computed(() => weeklyPolishEntry.value.status === 'pending')
 
 const jumpToRelatedTasks = async () => {
   try {
@@ -493,7 +476,7 @@ const calcWeekMetrics = (tasks: TaskItem[], startDate: string, endDate: string):
 
     if (isDateKeyWithinRange(dueDateKey, startDate, endDate)) {
       currentAssignedCount += 1
-      if (task.status === COMPLETED_TASK_STATUS) {
+      if (isTaskCompleted(task.status)) {
         currentCompletedCount += 1
       }
       return
@@ -501,7 +484,7 @@ const calcWeekMetrics = (tasks: TaskItem[], startDate: string, endDate: string):
 
     if (previousStartDate && previousEndDate && isDateKeyWithinRange(dueDateKey, previousStartDate, previousEndDate)) {
       previousAssignedCount += 1
-      if (task.status === COMPLETED_TASK_STATUS) {
+      if (isTaskCompleted(task.status)) {
         previousCompletedCount += 1
       }
     }
@@ -530,17 +513,15 @@ const calcWeekMetrics = (tasks: TaskItem[], startDate: string, endDate: string):
 }
 
 const collectCompletedTaskIdsInRange = (tasks: TaskItem[], startDate: string, endDate: string) => {
-  const idSet = new Set<number>()
+  const idSet = new Set<string>()
 
   tasks.forEach((task) => {
     const dueDateKey = normalizeDueDateKey(task.dueDate)
     if (!dueDateKey || !isDateKeyWithinRange(dueDateKey, startDate, endDate)) return
-    if (task.status !== COMPLETED_TASK_STATUS) return
+    if (!isTaskCompleted(task.status)) return
 
-    const parsedId = typeof task.id === 'number' ? task.id : Number(task.id)
-    if (Number.isFinite(parsedId)) {
-      idSet.add(parsedId)
-    }
+    const normalizedId = String(task.id).trim()
+    if (normalizedId) idSet.add(normalizedId)
   })
 
   return Array.from(idSet)
@@ -787,6 +768,7 @@ const summaryNoticeToneClass = computed(() => {
 
 const loadReviewData = async () => {
   await loadHistory()
+  consumePendingWeeklyPolish()
 }
 
 const loadHistory = async () => {
@@ -820,7 +802,6 @@ const executeSave = async () => {
       completedTaskCount: currentReview.value.completedTaskCount,
       focusProjectName: currentReview.value.focusProjectName,
       reflection: currentReview.value.reflection,
-      nextPlan: currentReview.value.nextPlan,
     }
 
     if (currentReview.value.id) {
@@ -903,7 +884,6 @@ const handleEditReview = () => {
   currentReview.value.startDate = selectedReview.value.startDate
   currentReview.value.endDate = selectedReview.value.endDate
   currentReview.value.reflection = selectedReview.value.reflection
-  currentReview.value.nextPlan = selectedReview.value.nextPlan
   showDetailModal.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
   toast.success('已加载至编辑器，修改后点击保存即可。')
@@ -925,9 +905,6 @@ const exportToMarkdown = () => {
 ## 本周复盘
 ${review.reflection || '无复盘内容'}
 
-## 下周计划
-${review.nextPlan || '无计划内容'}
-
 ---
 *由 [智径 SmartPath] 智能生成*
 `
@@ -947,50 +924,86 @@ ${review.nextPlan || '无计划内容'}
   toast.success('Markdown 导出成功。')
 }
 
-const handleAiPolish = async () => {
-  if (!currentReview.value.reflection || currentReview.value.reflection.trim() === '') {
-    toast.error('请先填写复盘内容，再进行 AI 润色。')
-    return
+const applyWeeklyPolishResponse = (payload: unknown) => {
+  if (payload && typeof payload === 'object') {
+    const response = payload as { review?: unknown }
+    if (typeof response.review === 'string' && response.review.trim()) {
+      currentReview.value.reflection = response.review
+      return true
+    }
   }
 
-  isPolishing.value = true
+  if (typeof payload !== 'string' || !payload) return false
+
   try {
-    const taskIds = weeklyCompletedTaskIds.value.length > 0 ? weeklyCompletedTaskIds.value : undefined
-    const res = await aiPolishApi({
-      taskIds,
-      reflection: currentReview.value.reflection,
-    })
-
-    if (typeof res === 'string' && res) {
-      try {
-        // 尝试解析 AI 返回的 JSON 字符串
-        const parsedData = JSON.parse(res)
-
-        // 精准回填到对应的响应式变量中
-        if (parsedData.review) {
-          currentReview.value.reflection = parsedData.review
-        }
-        if (parsedData.plan) {
-          currentReview.value.nextPlan = parsedData.plan
-        }
-
-        toast.success('AI 润色完成。')
-      } catch {
-        console.error('JSON 解析失败, AI 返回的原始数据为:', res)
-        // 兜底策略：如果解析失败（说明 AI 还是输出了废话），就全部塞进复盘框里，防止数据丢失
-        currentReview.value.reflection = res
-        toast.error('AI 返回格式异常，内容已填入复盘区，请手动调整。')
-      }
+    const parsedData = JSON.parse(payload) as { review?: unknown }
+    if (typeof parsedData.review === 'string' && parsedData.review.trim()) {
+      currentReview.value.reflection = parsedData.review
+      return true
     }
-  } catch (error) {
-    console.error('AI 润色失败:', error)
-    toast.error('AI 润色失败，请检查网络后重试。')
-  } finally {
-    isPolishing.value = false
+  } catch {
+    console.error('JSON 解析失败, AI 返回的原始数据为:', payload)
+    currentReview.value.reflection = payload
+    toast.error('AI 返回格式异常，内容已填入复盘区，请手动调整。')
+    return true
+  }
+
+  currentReview.value.reflection = payload
+  return true
+}
+
+const consumePendingWeeklyPolish = () => {
+  const entry = weeklyPolishEntry.value
+  if (entry.status !== 'success') return
+
+  const applied = applyWeeklyPolishResponse(entry.responsePayload)
+  if (applied) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH, entry.requestId)
   }
 }
 
-onMounted(() => {
-  loadReviewData()
+const handleAiPolish = async () => {
+  const reflectionInput = currentReview.value.reflection?.trim() || ''
+  const taskIds = weeklyCompletedTaskIds.value.length > 0 ? weeklyCompletedTaskIds.value : undefined
+
+  const result = await runAiRequest({
+    board: AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH,
+    requestMeta: {
+      taskCount: taskIds?.length || 0,
+      hasReflection: Boolean(reflectionInput),
+    },
+    request: () =>
+      aiPolishApi({
+        taskIds,
+        reflection: reflectionInput || undefined,
+      }),
+    successMessage: '周报回顾 AI 响应完成。',
+    errorMessage: 'AI 润色失败，请检查网络后重试。',
+  })
+
+  if (result.status !== 'success' || !result.ticket || !isViewMounted.value) return
+
+  const applied = applyWeeklyPolishResponse(result.payload)
+  if (applied) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH, result.ticket.requestId)
+  }
+}
+
+onMounted(async () => {
+  isViewMounted.value = true
+  await loadReviewData()
+})
+
+watch(
+  () => weeklyPolishEntry.value.status,
+  (status) => {
+    if (status === 'success' && isViewMounted.value) {
+      consumePendingWeeklyPolish()
+    }
+  },
+)
+
+onBeforeUnmount(() => {
+  isViewMounted.value = false
 })
 </script>

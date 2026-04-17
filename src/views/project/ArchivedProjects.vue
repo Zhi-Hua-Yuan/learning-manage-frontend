@@ -31,7 +31,12 @@
               <div class="text-xs text-[var(--color-text-secondary)]">完成 {{ project.displayProgress }}%</div>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex items-center gap-2">
+            <span
+              v-if="getProjectColor(project.color)"
+              class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70"
+              :style="{ backgroundColor: getProjectColor(project.color) }"
+            ></span>
             <button
               class="btn-secondary rounded-lg px-4 py-3 text-sm font-bold"
               @click="handleRecover(project.id)"
@@ -70,6 +75,7 @@ import { deleteProjectApi, fetchArchivedProjectsApi, updateProjectApi } from '@/
 import { fetchTaskList } from '@/api/task'
 import { useToast } from '@/composables/useToast'
 import {
+  clearProjectProgressCache,
   hasProjectProgressValue,
   readProjectListCache,
   readProjectProgressCache,
@@ -78,11 +84,13 @@ import {
   writeProjectProgressCache,
 } from '@/utils/projectCache'
 import { emitProjectListUpdated } from '@/utils/projectEvents'
+import { isTaskCompleted } from '@/utils/taskStatus'
 
 interface ArchivedProject {
   id: string
   name: string
   icon: string
+  color?: string
   progress?: number
   completionRate?: number
   completeRate?: number
@@ -111,14 +119,42 @@ const loading = ref(false)
 const showDeleteConfirm = ref(false)
 const pendingDelete = ref<{ id: string; name: string } | null>(null)
 
+const PROJECT_ICON_FALLBACK: IconName = 'folder'
+const PROJECT_ICON_COMPAT_MAP: Record<string, IconName> = {
+  folder: 'folder',
+  '📁': 'folder',
+  sparkles: 'sparkles',
+  '✨': 'sparkles',
+  flag: 'flag',
+  '🏁': 'flag',
+  star: 'star',
+  '⭐': 'star',
+  '🌟': 'star',
+  book: 'book',
+  '📚': 'book',
+  target: 'target',
+  '🎯': 'target',
+  heart: 'heart',
+  '❤️': 'heart',
+  '❤': 'heart',
+  work: 'work',
+  '💼': 'work',
+  rocket: 'rocket',
+  '🚀': 'rocket',
+}
+
+const normalizeProjectColorValue = (color?: string | null) => {
+  if (!color) return ''
+  const normalized = color.trim()
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalized) ? normalized : ''
+}
+
 const getProjectIconName = (icon?: string): IconName => {
-  const iconMap: Record<string, IconName> = {
-    folder: 'folder',
-    flag: 'flag',
-    target: 'target',
-    document: 'document',
-  }
-  return iconMap[icon || 'folder'] || 'folder'
+  return PROJECT_ICON_COMPAT_MAP[icon || ''] || PROJECT_ICON_FALLBACK
+}
+
+const getProjectColor = (color?: string | null) => {
+  return normalizeProjectColorValue(color)
 }
 
 const toProjectRecord = (project: ArchivedProject) => project as unknown as Record<string, unknown>
@@ -132,6 +168,21 @@ const toArchivedProjectView = (project: ArchivedProject): ArchivedProjectView =>
     ...project,
     displayProgress: serverHasProgress ? serverProgress : (cachedProgress ?? serverProgress),
   }
+}
+
+const toArchivedProjectRecord = (project: ArchivedProjectView): ArchivedProject => {
+  const { displayProgress, ...rest } = project
+  void displayProgress
+  return rest
+}
+
+const removeArchivedProjectLocally = (projectId: string) => {
+  archivedProjectList.value = archivedProjectList.value.filter((project) => project.id !== projectId)
+  writeProjectListCache(
+    1,
+    archivedProjectList.value.map((project) => toArchivedProjectRecord(project)),
+  )
+  clearProjectProgressCache(projectId)
 }
 
 const loadProjectTasksForProgress = async (projectId: string) => {
@@ -168,8 +219,7 @@ const refreshArchivedProgress = async (records: ArchivedProject[]) => {
   const recordsToRefresh = records.filter((project) => {
     const record = toProjectRecord(project)
     const serverHasProgress = hasProjectProgressValue(record)
-    const cachedProgress = readProjectProgressCache(project.id)
-    return !serverHasProgress && cachedProgress === null
+    return !serverHasProgress
   })
 
   if (!recordsToRefresh.length) return
@@ -183,7 +233,7 @@ const refreshArchivedProgress = async (records: ArchivedProject[]) => {
         return { id: project.id, progress: fallback }
       }
 
-      const completedCount = tasks.filter((task) => task.status === 2).length
+      const completedCount = tasks.filter((task) => isTaskCompleted(task.status)).length
       const progress = Math.round((completedCount / tasks.length) * 100)
       writeProjectProgressCache(project.id, progress)
       return { id: project.id, progress }
@@ -237,6 +287,7 @@ const loadArchivedProjects = async () => {
 const handleRecover = async (id: string) => {
   try {
     await updateProjectApi({ id, status: 0 })
+    removeArchivedProjectLocally(id)
     emitProjectListUpdated('archived-projects')
     toast.success('清单已恢复。')
     await loadArchivedProjects()
@@ -253,7 +304,9 @@ const handleDelete = (id: string, name: string) => {
 const executeDelete = async () => {
   if (!pendingDelete.value) return
   try {
-    await deleteProjectApi(pendingDelete.value.id)
+    const target = pendingDelete.value.id
+    await deleteProjectApi(target)
+    removeArchivedProjectLocally(target)
     toast.success('清单已删除。')
     showDeleteConfirm.value = false
     pendingDelete.value = null

@@ -53,10 +53,10 @@
 | userId | Long | 所属用户 ID |
 | title | String | 任务标题（最大60字符） |
 | description | String | 任务描述（最大550字符） |
-| status | Integer | 0=待办，1=进行中，2=已完成 |
+| status | Integer | 0=未完成，1=一般完成，2=正常完成，3=超额完成 |
 | priority | Integer | 优先级（数值越大优先级越高，默认0） |
 | dueDate | LocalDate | 截止日期 |
-| completedAt | LocalDateTime | 完成时间（status=2 时自动记录） |
+| completedAt | LocalDateTime | 完成时间（status >= 1 时自动记录） |
 | deleteSource | Integer | 删除来源：0=无，1=手动删除，2=级联删除 |
 | isDelete | Integer | 软删除标记：0=正常，1=已删除 |
 | deletedAt | LocalDateTime | 软删除时间 |
@@ -78,9 +78,12 @@
 
 | 值 | 含义 |
 |----|------|
-| 0 | 待办（To Do） |
-| 1 | 进行中（In Progress） |
-| 2 | 已完成（Completed） |
+| 0 | 未完成（TODO） |
+| 1 | 一般完成（DONE_BASIC） |
+| 2 | 正常完成（DONE_STANDARD） |
+| 3 | 超额完成（DONE_EXCELLENT） |
+
+**说明**：status >= 1 均视为"已完成"，用于统计完成数。
 
 ### deleteSource（删除来源）
 
@@ -99,6 +102,7 @@
 #### POST /project/add — 创建项目
 
 **请求体（ProjectCreateRequest）:**
+
 ```json
 {
   "name": "英语六级冲刺",
@@ -128,6 +132,7 @@
 **路径参数:** `id` (Long) — 项目 ID
 
 **成功响应:** `BaseResponse<ProjectVo>`
+
 ```json
 {
   "code": 0,
@@ -148,6 +153,7 @@
   }
 }
 ```
+
 注意：ProjectVo 不包含 progress 字段。
 
 ---
@@ -164,6 +170,7 @@
 | keyword | String | 无 | 模糊搜索项目名称 |
 
 **成功响应:** `BaseResponse<Page<ProjectVo>>`
+
 ```json
 {
   "code": 0,
@@ -182,6 +189,7 @@
 #### POST /project/update — 更新项目
 
 **请求体（ProjectUpdateRequest）:**
+
 ```json
 {
   "id": 1901234567890123456,
@@ -211,6 +219,7 @@
 #### POST /project/reorder — 批量排序
 
 **请求体:** `List<ProjectReorderRequest>`
+
 ```json
 [
   { "id": 1901234567890123456, "orderNo": 0 },
@@ -229,6 +238,7 @@
 #### POST /project/archive — 归档项目
 
 **请求体:** `List<Long>` — 项目 ID 列表
+
 ```json
 [1901234567890123456, 1901234567890123457]
 ```
@@ -256,6 +266,7 @@
 #### POST /milestone/add — 创建里程碑
 
 **请求体（MilestoneCreateRequest）:**
+
 ```json
 {
   "projectId": 1901234567890123456,
@@ -280,6 +291,7 @@
 | keyword | String | 否 | 模糊搜索名称 |
 
 **成功响应:** `BaseResponse<List<MilestoneVo>>`
+
 ```json
 {
   "code": 0,
@@ -304,6 +316,7 @@
 #### POST /milestone/update — 更新里程碑
 
 **请求体（MilestoneUpdateRequest）:**
+
 ```json
 {
   "id": 2901234567890123456,
@@ -333,6 +346,7 @@
 #### POST /task/add — 创建任务
 
 **请求体（TaskCreateRequest）:**
+
 ```json
 {
   "title": "每天背诵50个单词",
@@ -370,7 +384,7 @@
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | projectId | Long | 无 | 筛选项目 |
-| status | Integer | 无 | 筛选状态：0=待办，1=进行中，2=完成 |
+| status | Integer | 无 | 筛选状态：0=未完成，1/2/3=已完成 |
 | isOverdue | Boolean | 无 | true=只返回已逾期且未完成的任务 |
 | current | Integer | 1 | 页码 |
 | size | Integer | 10 | 每页数量 |
@@ -382,6 +396,7 @@
 #### POST /task/update — 更新任务
 
 **请求体（TaskUpdateRequest）:**
+
 ```json
 {
   "id": 3901234567890123456,
@@ -398,12 +413,12 @@
 | id | Long | 是 | 任务 ID |
 | title | String | 否 | 新标题 |
 | description | String | 否 | 新描述 |
-| status | Integer | 否 | 新状态：0=待办，1=进行中，2=完成 |
+| status | Integer | 否 | 新状态：0=未完成，1/2/3=已完成 |
 | priority | Integer | 否 | 新优先级 |
 | dueDate | LocalDate | 否 | 新截止日期 |
 | milestoneId | Long | 否 | 新里程碑 ID（设为 null 可取消归组） |
 
-注意：设置 status=2 时，completedAt 会自动记录当前时间。
+注意：设置 status >= 1 时，completedAt 会自动记录当前时间。
 
 ---
 

@@ -192,6 +192,7 @@ import { useRouter } from 'vue-router'
 import { getUserMeApi, updatePasswordApi, updateUserInfoApi } from '@/api/user'
 import { type ThemeMode, useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
+import { clearAuthToken } from '@/utils/authToken'
 
 interface CurrentUserInfo {
   username?: string
@@ -214,7 +215,7 @@ const themeOptions: Array<{ value: ThemeMode; label: string }> = [
 ]
 
 const confirmReLogin = async () => {
-  localStorage.removeItem('token')
+  clearAuthToken()
   await router.push('/login')
 }
 

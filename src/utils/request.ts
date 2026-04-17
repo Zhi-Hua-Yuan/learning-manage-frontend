@@ -1,16 +1,17 @@
 import axios from 'axios'
 import router from '../router' // 引入路由用于跳转
 import { useToastStore } from '@/stores/toast'
+import { clearAuthToken, readAuthToken } from '@/utils/authToken'
 
 const request = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 300000,
 })
 
 // 1. 请求拦截器 (Request Interceptor)
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = readAuthToken()
     if (token) {
       config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`
     }
@@ -35,7 +36,7 @@ request.interceptors.response.use(
       } catch (error) {
         console.error('弹出登录过期提示失败', error)
       }
-      localStorage.removeItem('token') // 清除失效的 token
+      clearAuthToken() // 清除失效的 token
       router.push('/login') // 强制跳回登录页
       return Promise.reject(new Error(res.message || '未登录'))
     }

@@ -12,7 +12,7 @@ export const aiBreakdownApi = (data: {
 
 // AI 周总结润色
 export const aiPolishApi = (data: {
-  taskIds?: Array<string | number>
+  taskIds?: string[]
   reflection?: string
 }) => {
   return request.post('/ai/polish', data)

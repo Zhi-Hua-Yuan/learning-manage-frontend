@@ -296,21 +296,112 @@
     {
       "name": "第1-2周：词汇基础夯实",
       "tasks": [
-        { "name": "每天背诵50个六级核心词汇" },
-        { "name": "完成词根词缀笔记整理" },
-        { "name": "周末词汇小测，正确率需达80%" }
+        { "name": "每天背诵50个六级核心词汇", "priority": 2, "dueDate": "2026-04-28" },
+        { "name": "完成词根词缀笔记整理", "priority": 1, "dueDate": "2026-04-30" },
+        { "name": "周末词汇小测，正确率需达80%", "priority": 2, "dueDate": "2026-05-03" }
       ]
     },
     {
       "name": "第3-4周：听力入门",
       "tasks": [
-        { "name": "每天听写一段短对话" },
-        { "name": "整理高频场景词汇表" }
+        { "name": "每天听写一段短对话", "priority": 2, "dueDate": "2026-05-05" },
+        { "name": "整理高频场景词汇表", "priority": 1, "dueDate": "2026-05-07" }
       ]
     }
   ]
 }
 ```
+
+**MilestoneDraftVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| name | String | 里程碑名称 |
+| tasks | List\<TaskDraftVO\> | 该里程碑下的任务草稿列表 |
+
+**TaskDraftVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| name | String | 任务名称 |
+| priority | Integer | 任务优先级：0=无/稍后，1=低，2=中，3=高 |
+| dueDate | String | 任务截止日期（yyyy-MM-dd） |
+
+---
+
+### POST /ai/today-order/recommend — 今日任务推荐顺序
+
+根据今天到期任务，结合难度、成本、效益等因素，AI 生成推荐完成顺序。
+
+**请求体（AiTodayOrderRequest）:**
+
+```json
+{
+  "taskIds": [101, 102, 103],
+  "timezone": "Asia/Shanghai",
+  "now": "2026-04-17T10:30:00",
+  "strategy": "balanced",
+  "limit": 20
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| taskIds | List\<Long\> | 否 | 任务ID列表（为空则自动查询今天到期且未完成的任务） |
+| timezone | String | 否 | 时区，默认 Asia/Shanghai |
+| now | String | 否 | 当前时间（ISO-8601格式），用于指定"今天" |
+| strategy | String | 否 | 偏好策略：balanced/benefit_first/quick_win，默认 balanced |
+| limit | Integer | 否 | 最多返回任务数（1-50），默认 20 |
+
+**成功响应:** `BaseResponse<AiTodayOrderVO>`
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "strategy": "balanced",
+    "generatedAt": "2026-04-17T10:30:02",
+    "fallbackUsed": false,
+    "items": [
+      {
+        "taskId": 102,
+        "title": "完成核心词汇第1-10单元",
+        "rank": 1,
+        "score": 88,
+        "difficulty": 3,
+        "cost": 2,
+        "benefit": 5,
+        "estimatedMinutes": 30,
+        "reason": "效益高且可在30分钟内完成，建议优先处理"
+      }
+    ]
+  }
+}
+```
+
+**AiTodayOrderVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| strategy | String | 采用的策略：balanced/benefit_first/quick_win |
+| generatedAt | String | 生成时间（ISO-8601） |
+| fallbackUsed | Boolean | 是否使用规则兜底（AI失败时启用按优先级/创建时间的备用排序） |
+| items | List\<AiTaskOrderItemVO\> | 推荐任务列表 |
+
+**AiTaskOrderItemVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| taskId | Long | 任务 ID |
+| title | String | 任务标题 |
+| rank | Integer | 推荐顺位（从 1 开始） |
+| score | Integer | 综合评分（0-100） |
+| difficulty | Integer | 难度（1-5） |
+| cost | Integer | 成本/耗时（1-5） |
+| benefit | Integer | 效益（1-5） |
+| estimatedMinutes | Integer | 预估耗时（分钟） |
+| reason | String | 推荐原因 |
 
 ---
 
@@ -352,6 +443,70 @@
 
 - 此接口不再返回 `plan` 字段
 - 如果本周无已完成任务，返回的 review 中会包含建议内容
+
+### POST /ai/daily-review/suggest-rename — 日报回顾任务改名建议
+
+根据当天（或指定日期）未完成任务，AI 为其生成仅标题层面的改名建议（不落库）。前端展示建议后，用户可选择性批量应用。
+
+**请求体（DailyReviewSuggestRenameRequest）:**
+
+```json
+{
+  "reviewDate": "2026-04-18",
+  "strategy": "balanced",
+  "maxEdits": 10,
+  "taskIds": [101, 102, 103]
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| reviewDate | String | 否 | 回顾日期（yyyy-MM-dd），为空默认今天 |
+| strategy | String | 否 | 偏好策略：balanced（平衡）/clarity_first（清晰优先），默认 balanced |
+| maxEdits | Integer | 否 | 最大改名数（1-50），为空默认全部未完成任务 |
+| taskIds | List\<Long\> | 否 | 任务ID列表（空则使用当天到期任务） |
+
+**成功响应:** `BaseResponse<DailyReviewSuggestRenameVO>`
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "operationId": "20260418_rename_9ab27d5f",
+    "generatedAt": "2026-04-18T21:10:12",
+    "reviewDate": "2026-04-18",
+    "items": [
+      {
+        "taskId": 101,
+        "oldTitle": "背单词",
+        "newTitle": "完成核心词汇第11-12单元记忆",
+        "reason": "标题更具体，可直接执行和验收",
+        "confidence": 86
+      }
+    ]
+  }
+}
+```
+
+**DailyReviewSuggestRenameVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| operationId | String | 建议批次ID（后续批量改名/回滚时需传入） |
+| generatedAt | String | 建议生成时间（ISO-8601） |
+| reviewDate | String | 回顾日期 |
+| items | List\<TitleRenameSuggestionItemVO\> | 改名建议列表 |
+
+**TitleRenameSuggestionItemVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| taskId | Long | 任务 ID |
+| oldTitle | String | 原任务名称 |
+| newTitle | String | 建议新任务名称 |
+| reason | String | 建议原因 |
+| confidence | Integer | 建议置信度（0-100） |
 
 ---
 

@@ -87,6 +87,8 @@ Authorization: Bearer <token>
 | GET | /task/list | 获取任务列表（分页+筛选） |
 | POST | /task/update | 更新任务 |
 | POST | /task/delete/{id} | 删除任务（软删除） |
+| POST | /task/batch-rename | 批量应用AI改名建议 |
+| POST | /task/batch-rename/rollback | 回滚批量改名 |
 
 ### 实体关系
 
@@ -154,6 +156,8 @@ Project (1) ──────< (many) Milestone
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | /ai/breakdown | AI 任务拆解（目标 → 里程碑 → 任务） |
+| POST | /ai/today-order/recommend | AI 今日任务推荐顺序 |
+| POST | /ai/daily-review/suggest-rename | AI 日报回顾任务改名建议 |
 | POST | /ai/polish | AI 周总结润色 |
 
 ---

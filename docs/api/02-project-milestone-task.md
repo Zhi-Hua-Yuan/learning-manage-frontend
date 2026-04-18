@@ -428,6 +428,99 @@
 
 ---
 
+#### POST /task/batch-rename — 批量应用改名建议
+
+根据 AI 生成的改名建议（operationId 关联），批量更新任务标题。只更新标题字段，且只有旧标题与数据库当前标题一致的任务才会被更新（防并发冲突）。
+
+**请求体（TaskBatchRenameRequest）:**
+
+```json
+{
+  "operationId": "20260418_rename_9ab27d5f",
+  "items": [
+    { "taskId": 101, "oldTitle": "背单词", "newTitle": "完成核心词汇第11-12单元记忆" },
+    { "taskId": 102, "oldTitle": "听力练习", "newTitle": "完成听力短对话练习10篇" }
+  ]
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| operationId | String | 是 | 建议批次ID（来自 /ai/daily-review/suggest-rename 返回的 operationId） |
+| items | List\<TaskRenameItemDTO\> | 是 | 确认改名条目列表 |
+
+**TaskRenameItemDTO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| taskId | Long | 任务 ID |
+| oldTitle | String | 改名前标题（用于校验，防止并发修改冲突） |
+| newTitle | String | 改名后标题 |
+
+**成功响应:** `BaseResponse<TaskBatchRenameVO>`
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "operationId": "20260418_rename_9ab27d5f",
+    "successCount": 5,
+    "skipCount": 1,
+    "updatedTaskIds": [101, 102, 103, 104, 105]
+  }
+}
+```
+
+**TaskBatchRenameVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| operationId | String | 建议批次ID |
+| successCount | Integer | 成功改名数量 |
+| skipCount | Integer | 跳过数量（标题已被他人修改，不一致） |
+| updatedTaskIds | List\<Long\> | 成功更新的任务ID列表 |
+
+---
+
+#### POST /task/batch-rename/rollback — 回滚批量改名
+
+根据批次ID，将该批次下所有成功改名的任务恢复到原标题。
+
+**请求体（TaskBatchRollbackRequest）:**
+
+```json
+{
+  "operationId": "20260418_rename_9ab27d5f"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| operationId | String | 是 | 建议批次ID |
+
+**成功响应:** `BaseResponse<TaskBatchRollbackVO>`
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "operationId": "20260418_rename_9ab27d5f",
+    "rollbackCount": 5
+  }
+}
+```
+
+**TaskBatchRollbackVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| operationId | String | 建议批次ID |
+| rollbackCount | Integer | 成功回滚数量 |
+
+---
+
 ## 实体关系
 
 ```

@@ -1,46 +1,52 @@
-<template>
-  <main class="flex-1 flex flex-col relative bg-gray-50 overflow-y-auto p-8">
-    <div class="max-w-5xl mx-auto w-full space-y-8">
-      <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">📊 数据仪表盘</h2>
-        <span class="text-sm text-gray-500">数据实时更新</span>
+﻿<template>
+  <main class="relative flex flex-1 flex-col overflow-y-auto bg-[var(--color-bg-page)] p-4 sm:p-6 lg:p-8">
+    <div class="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)] sm:text-2xl">
+          <AppIcon name="dashboard" class="h-5 w-5" />
+          数据仪表盘
+        </h2>
+        <span class="text-sm text-[var(--color-text-secondary)]">数据实时更新</span>
       </div>
 
-      <div class="grid grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-6">
         <div
-          class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6"
         >
-          <span class="text-gray-500 text-sm font-medium mb-2">进行中项目</span>
-          <span class="text-4xl font-black text-blue-500">{{ statsData.activeProjects || 0 }}</span>
+          <span class="text-sm font-medium text-[var(--color-text-secondary)]">进行中项目</span>
+          <span class="mono text-4xl font-black text-[var(--color-text-primary)]">{{ statsData.activeProjects || 0 }}</span>
         </div>
         <div
-          class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6"
         >
-          <span class="text-gray-500 text-sm font-medium mb-2">今日到期任务</span>
-          <span class="text-4xl font-black text-orange-500">{{ statsData.todayTasks || 0 }}</span>
+          <span class="text-sm font-medium text-[var(--color-text-secondary)]">今日到期任务</span>
+          <span class="mono text-4xl font-black text-[var(--color-warning)]">{{ statsData.todayTasks || 0 }}</span>
         </div>
         <div
-          class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1"
+          class="card-base flex flex-col items-center justify-center gap-2 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6 md:col-span-2 xl:col-span-1"
         >
-          <span class="text-gray-500 text-sm font-medium mb-2">已逾期任务</span>
-          <span class="text-4xl font-black text-red-500">{{ statsData.overdueTasks || 0 }}</span>
+          <span class="text-sm font-medium text-[var(--color-text-secondary)]">已逾期任务</span>
+          <span class="mono text-4xl font-black text-[var(--color-danger)]">{{ statsData.overdueTasks || 0 }}</span>
         </div>
       </div>
 
-      <div class="grid grid-cols-3 gap-6">
-        <div class="col-span-2 bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-          <h3 class="text-lg font-bold text-gray-700 mb-4">近 7 天完成趋势</h3>
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
+        <div class="card-base rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6 xl:col-span-2">
+          <h3 class="mb-4 text-lg font-bold text-[var(--color-text-body)]">近 7 天完成趋势</h3>
           <div ref="trendChartRef" class="w-full h-64"></div>
         </div>
 
         <div
-          class="col-span-1 bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex flex-col"
+          class="card-base flex max-h-[420px] flex-col rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6 xl:max-h-none"
         >
-          <h3 class="text-lg font-bold text-gray-700 mb-4">🏆 完成率 Top 排行</h3>
-          <div class="flex-1 overflow-y-auto space-y-4 pr-2">
+          <h3 class="mb-4 flex items-center gap-2 text-lg font-bold text-[var(--color-text-body)]">
+            <AppIcon name="trophy" class="h-5 w-5" />
+            完成率 Top 排行
+          </h3>
+          <div class="flex-1 space-y-4 overflow-y-auto pr-2">
             <div
               v-if="!statsData.topProjects || statsData.topProjects.length === 0"
-              class="text-center text-gray-400 mt-10 text-sm"
+              class="mt-10 text-center text-sm text-[var(--color-text-tertiary)]"
             >
               暂无数据
             </div>
@@ -53,16 +59,16 @@
                 class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                 :class="
                   index === 0
-                    ? 'bg-yellow-100 text-yellow-600'
+                    ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'
                     : index === 1
-                      ? 'bg-gray-100 text-gray-500'
-                      : 'bg-orange-50 text-orange-400'
+                      ? 'bg-[var(--color-bg-surface-secondary)] text-[var(--color-text-secondary)]'
+                      : 'bg-[var(--color-primary-soft-2)] text-[var(--color-primary)]'
                 "
               >
                 {{ index + 1 }}
               </div>
-              <div class="flex-1 truncate text-sm font-medium text-gray-700">{{ proj.name }}</div>
-              <div class="text-sm font-bold text-green-500">{{ proj.rate }}%</div>
+              <div class="flex-1 truncate text-sm font-medium text-[var(--color-text-body)]">{{ proj.name }}</div>
+              <div class="text-sm font-bold text-[var(--color-success)]">{{ proj.rate }}%</div>
             </div>
           </div>
         </div>
@@ -72,9 +78,18 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import * as echarts from 'echarts'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+defineOptions({ name: 'DashboardView' })
+import AppIcon from '@/components/AppIcon.vue'
+import { BarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import { use, init, graphic, type ECharts, type EChartsCoreOption } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
 import { fetchStatsOverview } from '@/api/stats'
+import { useTheme } from '@/composables/useTheme'
+
+use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 interface DashboardStats {
   activeProjects: number
@@ -94,37 +109,51 @@ const statsData = ref<DashboardStats>({
   topProjects: [],
 })
 
+const { resolvedTheme } = useTheme()
 const trendChartRef = ref<HTMLElement | null>(null)
-let trendChart: echarts.ECharts | null = null
+let trendChart: ECharts | null = null
 
-const initTrendChart = () => {
-  if (!trendChartRef.value) return
-  if (!trendChart) {
-    trendChart = echarts.init(trendChartRef.value)
-  }
+const handleResize = () => {
+  trendChart?.resize()
+}
 
-  trendChart.setOption({
+const getCssVar = (name: string, fallback: string) => {
+  if (typeof window === 'undefined') return fallback
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
+const buildTrendChartOption = (): EChartsCoreOption => {
+  const axisColor = getCssVar('--color-chart-axis', '#9CA3AF')
+  const gridColor = getCssVar('--color-chart-grid', '#F3F4F6')
+  const tooltipBg = getCssVar('--color-chart-tooltip-bg', 'rgba(255, 255, 255, 0.95)')
+  const tooltipText = getCssVar('--color-chart-tooltip-text', '#374151')
+  const tooltipShadow = getCssVar('--color-chart-tooltip-shadow', '0 4px 6px -1px rgba(0, 0, 0, 0.1)')
+  const gradientStart = getCssVar('--color-chart-gradient-start', '#60A5FA')
+  const gradientEnd = getCssVar('--color-chart-gradient-end', '#3B82F6')
+
+  return {
     grid: { top: 10, right: 10, bottom: 20, left: 30 },
     xAxis: {
       type: 'category',
       data: statsData.value.trendDates,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#9CA3AF', margin: 12 },
+      axisLabel: { color: axisColor, margin: 12 },
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { type: 'dashed', color: '#F3F4F6' } },
-      axisLabel: { color: '#9CA3AF' },
+      splitLine: { lineStyle: { type: 'dashed', color: gridColor } },
+      axisLabel: { color: axisColor },
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      backgroundColor: tooltipBg,
       borderRadius: 8,
       borderWidth: 0,
       padding: [10, 15],
-      textStyle: { color: '#374151', fontWeight: 'bold' },
-      extraCssText: 'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);',
+      textStyle: { color: tooltipText, fontWeight: 'bold' },
+      extraCssText: `box-shadow: ${tooltipShadow};`,
     },
     series: [
       {
@@ -132,15 +161,24 @@ const initTrendChart = () => {
         type: 'bar',
         barWidth: '25%',
         itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#60A5FA' },
-            { offset: 1, color: '#3B82F6' },
+          color: new graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: gradientStart },
+            { offset: 1, color: gradientEnd },
           ]),
           borderRadius: [6, 6, 0, 0],
         },
       },
     ],
-  })
+  }
+}
+
+const initTrendChart = () => {
+  if (!trendChartRef.value) return
+  if (!trendChart) {
+    trendChart = init(trendChartRef.value)
+  }
+
+  trendChart.setOption(buildTrendChartOption(), true)
 }
 
 const loadDashboard = async () => {
@@ -177,9 +215,16 @@ const loadDashboard = async () => {
 
 onMounted(() => {
   loadDashboard()
+  window.addEventListener('resize', handleResize)
+})
+
+watch(resolvedTheme, async () => {
+  await nextTick()
+  initTrendChart()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
   if (trendChart) {
     trendChart.dispose()
     trendChart = null

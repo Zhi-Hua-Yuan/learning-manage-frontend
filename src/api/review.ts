@@ -8,7 +8,6 @@ export interface ReviewPayload {
   completedTaskCount?: number
   focusProjectName?: string
   reflection?: string
-  nextPlan?: string
 }
 
 // 获取当前周总结草稿或已保存记录

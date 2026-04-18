@@ -1,11 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import BasicLayout from '@/layout/BasicLayout.vue'
-import LoginView from '@/views/LoginView.vue'
-import TaskList from '@/views/task/TaskList.vue'
-import Dashboard from '@/views/dashboard/Dashboard.vue'
-import WeeklyReview from '@/views/review/WeeklyReview.vue'
-import AiPlanner from '@/views/ai/AiPlanner.vue'
-import Settings from '@/views/setting/Settings.vue'
+import { readAuthToken } from '@/utils/authToken'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,36 +11,41 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: LoginView,
+      component: () => import('@/views/LoginView.vue'),
     },
     {
       path: '/',
-      component: BasicLayout,
+      component: () => import('@/layout/BasicLayout.vue'),
       children: [
         {
           path: 'tasks',
           name: 'tasks',
-          component: TaskList,
+          component: () => import('@/views/task/TaskList.vue'),
         },
         {
           path: 'dashboard',
           name: 'dashboard',
-          component: Dashboard,
+          component: () => import('@/views/dashboard/Dashboard.vue'),
         },
         {
           path: 'review',
           name: 'review',
-          component: WeeklyReview,
+          component: () => import('@/views/review/WeeklyReview.vue'),
         },
         {
           path: 'ai-planner',
           name: 'ai-planner',
-          component: AiPlanner,
+          component: () => import('@/views/ai/AiPlanner.vue'),
         },
         {
           path: 'settings',
           name: 'settings',
-          component: Settings,
+          component: () => import('@/views/setting/Settings.vue'),
+        },
+        {
+          path: 'projects/archived',
+          name: 'archived-projects',
+          component: () => import('@/views/project/ArchivedProjects.vue'),
         },
       ],
     },
@@ -54,7 +53,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const hasToken = localStorage.getItem('token')
+  const hasToken = readAuthToken()
 
   if (to.path !== '/login' && !hasToken) {
     next('/login')

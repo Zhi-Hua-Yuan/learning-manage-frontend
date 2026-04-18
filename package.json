@@ -10,6 +10,8 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s lint:*",
+    "lint:cache-views": "node scripts/check-view-localstorage.mjs",
+    "lint:task-cache-sync": "node scripts/check-task-cache-consistency.mjs",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli src/"

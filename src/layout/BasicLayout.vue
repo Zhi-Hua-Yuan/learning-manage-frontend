@@ -1,152 +1,293 @@
-<template>
-  <div class="flex h-screen w-screen bg-white overflow-hidden text-gray-800">
-    <aside
-      class="relative bg-gray-50 border-r border-gray-200 flex flex-col z-10"
-      :style="{ width: sidebarWidth + 'px' }"
+﻿<template>
+  <div class="relative flex h-screen w-screen overflow-hidden bg-[var(--color-bg-page)] text-[var(--color-text-body)]">
+    <button
+      v-if="isCompactViewport"
+      @click="isSidebarOpen = true"
+      class="fixed left-3 top-3 z-[var(--z-popover)] rounded-lg border border-[var(--color-sidebar-border)] bg-[var(--color-popover-bg)] p-2 text-[var(--color-text-body)] shadow-[var(--shadow-card)]"
+      aria-label="打开侧栏"
     >
-      <div class="p-6 border-b border-gray-100 flex items-center justify-center gap-3">
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+
+    <transition
+      enter-active-class="transition-opacity duration-200"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-200"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isCompactViewport && isSidebarOpen"
+        class="fixed inset-0 z-[var(--z-popover)] bg-[var(--color-bg-mask)] backdrop-blur-[1px]"
+        @click="isSidebarOpen = false"
+      ></div>
+    </transition>
+
+    <aside
+      class="z-[var(--z-drawer)] flex flex-col border-r border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] transition-transform duration-200"
+      :class="
+        isCompactViewport
+          ? `fixed inset-y-0 left-0 w-[280px] max-w-[85vw] ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+          : 'relative translate-x-0'
+      "
+      :style="sidebarStyle"
+    >
+      <div class="flex items-center justify-center gap-3 border-b border-[var(--color-sidebar-border)] p-6">
         <img
           src="@/assets/logo.png"
           alt="SmartPath Logo"
           class="w-8 h-8 rounded-lg shadow-sm object-cover"
         />
-        <span class="text-xl font-black text-gray-800 tracking-wider">智 径</span>
+        <span class="text-xl font-black text-[var(--color-text-primary)] tracking-wider">智 径</span>
       </div>
 
-      <div class="px-2 py-3 border-b border-gray-100">
-        <div
-          @click="router.push('/dashboard')"
-          class="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-colors"
-          :class="
-            route.path === '/dashboard'
-              ? 'bg-indigo-100 text-indigo-700 font-medium'
-              : 'text-gray-600 hover:bg-gray-200'
-          "
-        >
-          <span class="text-xl">📊</span>
-          <span class="flex-1 text-sm">数据仪表盘</span>
-        </div>
+      <div class="border-b border-[var(--color-sidebar-border)] px-2 py-3">
+        <div class="px-3 pb-2 text-xs font-medium text-[var(--color-text-tertiary)]">功能</div>
 
-        <div
-          @click="router.push('/review')"
-          class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
-          :class="
-            route.path === '/review'
-              ? 'bg-indigo-100 text-indigo-700 font-medium'
-              : 'text-gray-600 hover:bg-gray-200'
-          "
-        >
-          <span class="text-xl">📅</span>
-          <span class="flex-1 text-sm">周报回顾</span>
-        </div>
-
-        <div
-          @click="router.push('/ai-planner')"
-          class="flex items-center gap-3 px-4 py-2 mt-1 rounded-lg cursor-pointer transition-colors"
-          :class="
-            route.path === '/ai-planner'
-              ? 'bg-indigo-100 text-indigo-700 font-medium'
-              : 'text-gray-600 hover:bg-gray-200'
-          "
-        >
-          <span class="text-xl">✨</span>
-          <span
-            class="flex-1 text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-indigo-500"
-          >
-            AI 智能规划
-          </span>
-        </div>
-      </div>
-
-      <div class="flex-1 overflow-y-auto py-2">
-        <div
-          v-for="project in projectList"
-          :key="project.id"
-          @click="selectProject(project.id)"
-          class="flex items-center gap-3 px-4 py-2 mx-2 rounded-lg cursor-pointer transition-colors group"
-          :class="
-            (route.path === '/tasks' || route.path === '/') && selectedProjectId === project.id
-              ? 'bg-blue-100 text-blue-700 font-medium'
-              : 'text-gray-600 hover:bg-gray-200'
-          "
-        >
-          <span class="text-xl">{{ project.icon || '📁' }}</span>
-          <span class="flex-1 text-sm truncate">{{ project.name }}</span>
-
-          <button
-            @click.stop="deleteProject(project.id, project.name)"
-            class="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-600 transition-all rounded hover:bg-white"
-            title="删除清单"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              ></path>
-            </svg>
-          </button>
-        </div>
-
-        <div v-if="isAddingProject" class="px-4 py-2 mx-2 mt-1">
+        <div class="space-y-1">
           <div
-            class="flex items-center bg-white rounded border border-blue-400 overflow-hidden shadow-sm"
+            @click="navigateTo('/dashboard')"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              route.path === '/dashboard'
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
           >
-            <input
-              v-model="newProjectName"
-              @keyup.enter="submitNewProject"
-              @blur="isAddingProject = false"
-              autofocus
-              type="text"
-              placeholder="清单名称 (按回车)"
-              class="w-full text-sm px-3 py-1.5 outline-none text-gray-700 placeholder-gray-400"
-            />
+            <AppIcon name="dashboard" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">数据仪表盘</span>
+          </div>
+
+          <div
+            @click="navigateToToday"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              isTodayRoute
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="calendar" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">今天</span>
+          </div>
+
+          <div
+            @click="navigateToWeek"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              isWeekRoute
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="calendar" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">本周</span>
+          </div>
+
+          <div
+            @click="navigateTo('/review')"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              route.path === '/review'
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="calendar" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] leading-5">周报回顾</span>
+          </div>
+
+          <div
+            @click="navigateTo('/ai-planner')"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              route.path === '/ai-planner'
+                ? 'bg-[var(--color-success-soft)] text-[var(--color-ai)] font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="sparkles" class="h-4 w-4" />
+            <span
+              class="flex-1 text-[13px] font-semibold leading-5"
+              :class="
+                route.path === '/ai-planner'
+                  ? 'text-[var(--color-ai)]'
+                  : 'text-[var(--color-success)]'
+              "
+              >AI 智能规划</span
+            >
           </div>
         </div>
       </div>
 
-      <div class="p-3 border-t border-gray-200">
-        <button
-          v-if="!isAddingProject"
-          @click="openAddProjectInput"
-          class="w-full flex items-center gap-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors text-sm font-medium"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            ></path>
-          </svg>
-          添加清单
-        </button>
+      <div class="flex-1 overflow-y-auto px-2 py-3">
+        <div class="px-3 pb-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-[var(--color-text-tertiary)]">清单</span>
+            <button
+              @click="openAddProjectInput"
+              type="button"
+              class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+              aria-label="添加清单"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 4v16m8-8H4"
+                ></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <div
+            v-for="project in projectList"
+            :key="project.id"
+            @click="handleProjectRowClick(project.id)"
+            class="interactive-row group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              (route.path === '/tasks' || route.path === '/') && !isTodayRoute && !isWeekRoute && selectedProjectId === project.id
+                ? 'is-active font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon :name="getProjectIconName(project.icon)" class="h-4 w-4" />
+            <span class="flex-1 truncate text-[13px] leading-5">{{ project.name }}</span>
+            <span
+              v-if="getProjectColor(project.color)"
+              class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70"
+              :style="{ backgroundColor: getProjectColor(project.color) }"
+            ></span>
+
+            <div
+              class="relative flex items-center"
+              data-project-action-root
+              :data-project-id="project.id"
+              @click.stop
+              @pointerdown.stop
+            >
+              <button
+                type="button"
+                class="rounded p-1.5 text-[var(--color-text-secondary)] transition-all hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                :class="projectActionButtonClass(project.id)"
+                :title="activeProjectActionId === project.id ? '关闭操作' : '更多操作'"
+                @click.stop="toggleProjectActionMenu(project.id)"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 6h.01M12 12h.01M12 18h.01"
+                  ></path>
+                </svg>
+              </button>
+
+              <Teleport
+                v-if="activeProjectActionId === project.id"
+                to="body"
+              >
+                <div
+                  class="surface-panel absolute right-0 top-9 z-[var(--z-overlay)] w-36 overflow-hidden rounded-lg py-1"
+                  :style="getActionMenuStyle(project.id)"
+                  data-project-action-menu
+                  :data-project-id="project.id"
+                  @pointerdown.stop
+                  @click.stop
+                >
+                <button
+                  type="button"
+                  class="interactive-row flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-text-body)]"
+                  @click="openProjectSettings(project)"
+                >
+                  自定义
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full items-center px-3 py-2 text-left text-sm"
+                  :class="
+                    isFirstProject(project.id)
+                      ? 'cursor-not-allowed text-[var(--color-text-tertiary)] opacity-60'
+                      : 'interactive-row text-[var(--color-text-body)]'
+                  "
+                  :disabled="isFirstProject(project.id)"
+                  @click="moveProject(project.id, -1)"
+                >
+                  上移
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full items-center px-3 py-2 text-left text-sm"
+                  :class="
+                    isLastProject(project.id)
+                      ? 'cursor-not-allowed text-[var(--color-text-tertiary)] opacity-60'
+                      : 'interactive-row text-[var(--color-text-body)]'
+                  "
+                  :disabled="isLastProject(project.id)"
+                  @click="moveProject(project.id, 1)"
+                >
+                  下移
+                </button>
+                <div class="my-1 h-px bg-[var(--color-popover-border)]"></div>
+                <button
+                  type="button"
+                  class="flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-text-body)] hover:bg-[var(--color-menu-hover)]"
+                  @click="archiveProject(project.id)"
+                >
+                  归档
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full items-center px-3 py-2 text-left text-sm text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
+                  @click="openDeleteProjectConfirm(project.id, project.name)"
+                >
+                  删除
+                </button>
+                </div>
+              </Teleport>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="mt-auto p-4 border-t border-gray-200 bg-gray-50 group relative">
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+        @click="router.push('/projects/archived')"
+      >
+        <AppIcon name="archive" class="h-4 w-4" />
+        归档清单
+      </button>
+
+      <div class="group relative mt-auto border-t border-[var(--color-sidebar-border)] bg-[var(--color-sidebar-bg)] p-4">
         <div
           class="flex items-center justify-between cursor-pointer"
           @click="isUserMenuOpen = !isUserMenuOpen"
         >
           <div class="flex items-center gap-2 overflow-hidden">
             <div
-              class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-sm"
+              class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-[var(--color-text-on-accent)] shadow-[var(--shadow-card)]"
             >
               {{
                 currentUserInfo.username ? currentUserInfo.username.charAt(0).toUpperCase() : 'U'
               }}
             </div>
             <div class="flex flex-col">
-              <span class="text-sm font-bold text-gray-700 truncate">{{
+              <span class="truncate text-sm font-bold text-[var(--color-text-body)]">{{
                 currentUserInfo.username || '加载中...'
               }}</span>
-              <span class="text-xs text-gray-400 truncate">{{
+              <span class="truncate text-xs text-[var(--color-text-tertiary)]">{{
                 currentUserInfo.account || '@user'
               }}</span>
             </div>
           </div>
-          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-4 w-4 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -158,31 +299,181 @@
 
         <div
           v-if="isUserMenuOpen"
-          class="absolute bottom-16 left-4 w-[calc(100%-2rem)] bg-white border border-gray-100 rounded-lg shadow-xl z-50 py-1 overflow-hidden"
+          class="surface-panel absolute bottom-16 left-4 z-[var(--z-popover)] w-[calc(100%-2rem)] overflow-hidden rounded-lg py-1"
         >
           <div
             @click="goToSettings"
-            class="flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer hover:bg-gray-50 transition-colors text-gray-700"
+            class="interactive-row flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-text-body)]"
           >
-            <span>⚙️</span> 个人设置
+            <AppIcon name="settings" class="h-4 w-4" /> 个人设置
           </div>
-          <div class="h-px bg-gray-100 my-1"></div>
+          <div class="my-1 h-px bg-[var(--color-popover-border)]"></div>
           <div
             @click="openLogoutModal"
-            class="flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer hover:bg-red-50 transition-colors text-red-600 font-medium"
+            class="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
           >
-            <span>🚪</span> 退出登录
+            <AppIcon name="logout" class="h-4 w-4" /> 退出登录
           </div>
         </div>
       </div>
 
       <div
-        class="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-400 active:bg-blue-500 transition-all z-20"
+        v-if="!isCompactViewport"
+        class="absolute top-0 right-0 z-[var(--z-resizer)] h-full w-1 cursor-col-resize bg-transparent transition-all hover:bg-[var(--color-primary-soft-2)] active:bg-[var(--color-primary)]"
         @mousedown="startResizeLeft"
       ></div>
     </aside>
 
-    <router-view class="flex-1 overflow-y-auto bg-gray-50" @refresh-projects="loadProjects" />
+    <router-view v-slot="{ Component }">
+      <Transition name="content-fade" mode="out-in">
+        <component
+          :is="Component"
+          :key="pageTransitionKey"
+          class="flex-1 overflow-y-auto bg-[var(--color-bg-page)]"
+          :class="isCompactViewport ? 'pt-14' : ''"
+          @refresh-projects="loadProjects"
+        />
+      </Transition>
+    </router-view>
+
+    <AppConfirmDialog
+      v-model="showDeleteProjectConfirm"
+      variant="danger"
+      icon-name="trash"
+      :title="deleteProjectConfirmTitle"
+      message="相关的任务可能会一并丢失，请确认后再继续。"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      @confirm="confirmDeleteProject"
+    />
+
+    <transition name="project-settings-overlay">
+      <div
+        v-if="showProjectSettingsModal"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto px-4 outline-none focus:outline-none"
+      >
+        <div
+          class="project-settings-backdrop fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm"
+          @click="closeProjectSettingsModal"
+        ></div>
+
+        <div class="project-settings-panel relative z-[var(--z-modal-panel)] mx-auto my-6 w-full max-w-lg transform">
+          <div class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl border-0 outline-none focus:outline-none">
+            <div class="h-1 w-full bg-[var(--color-primary)]"></div>
+            <div class="space-y-5 p-5 sm:p-6">
+              <div>
+                <h3 class="text-lg font-black text-[var(--color-text-primary)]">{{ projectSettingsTitle }}</h3>
+                <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  配置清单名称、图标和颜色展示。
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-semibold text-[var(--color-text-body)]">清单名称</label>
+                <input
+                  ref="projectNameInputRef"
+                  v-model="projectSettingsForm.name"
+                  type="text"
+                  maxlength="100"
+                  placeholder="请输入清单名称"
+                  class="input-base w-full px-3 py-2 text-sm"
+                  @keyup.enter="submitProjectSettings"
+                />
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-semibold text-[var(--color-text-body)]">图标</label>
+                <div class="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                  <button
+                    type="button"
+                    class="flex h-10 items-center justify-center rounded-lg border transition-colors"
+                    :class="
+                      projectSettingsForm.icon === ''
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                        : 'border-[var(--color-input-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-body)]'
+                    "
+                    @click="selectProjectIcon('')"
+                    title="默认文件夹"
+                  >
+                    <AppIcon name="folder" class="h-4 w-4" />
+                  </button>
+                  <button
+                    v-for="option in projectIconOptions"
+                    :key="option.value"
+                    type="button"
+                    class="flex h-10 items-center justify-center rounded-lg border transition-colors"
+                    :class="
+                      projectSettingsForm.icon === option.value
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                        : 'border-[var(--color-input-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-body)]'
+                    "
+                    :title="option.label"
+                    @click="selectProjectIcon(option.value)"
+                  >
+                    <AppIcon :name="option.icon" class="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-semibold text-[var(--color-text-body)]">颜色</label>
+                <div class="grid grid-cols-5 gap-2">
+                  <button
+                    type="button"
+                    class="flex h-9 items-center justify-center rounded-lg border text-xs font-medium transition-colors"
+                    :class="
+                      projectSettingsForm.color === ''
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                        : 'border-[var(--color-input-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-body)]'
+                    "
+                    @click="selectProjectColor('')"
+                  >
+                    无
+                  </button>
+                  <button
+                    v-for="option in projectColorOptions"
+                    :key="option.value"
+                    type="button"
+                    class="flex h-9 items-center justify-center rounded-lg border transition-colors"
+                    :class="
+                      projectSettingsForm.color === option.value
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
+                        : 'border-[var(--color-input-border)] hover:border-[var(--color-border-strong)]'
+                    "
+                    :title="option.label"
+                    @click="selectProjectColor(option.value)"
+                  >
+                    <span
+                      class="h-4 w-4 rounded-full border border-white/70"
+                      :style="{ backgroundColor: option.value }"
+                    ></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-3 pt-1">
+                <button
+                  class="btn-secondary rounded-xl px-4 py-2"
+                  type="button"
+                  :disabled="isProjectSettingsSubmitting"
+                  @click="closeProjectSettingsModal"
+                >
+                  取消
+                </button>
+                <button
+                  class="btn-primary rounded-xl px-5 py-2"
+                  type="button"
+                  :disabled="isProjectSettingsSubmitting"
+                  @click="submitProjectSettings"
+                >
+                  {{ projectSettingsSubmitText }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <transition
       enter-active-class="ease-out duration-300"
@@ -194,37 +485,37 @@
     >
       <div
         v-if="showLogoutModal"
-        class="fixed inset-0 z-[100] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
       >
         <div
-          class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
+          class="fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm transition-opacity"
           @click="showLogoutModal = false"
         ></div>
 
-        <div class="relative w-auto max-w-sm mx-auto my-6 z-[101] transform transition-all">
+        <div class="relative w-auto max-w-sm mx-auto my-6 z-[var(--z-modal-panel)] transform transition-all">
           <div
-            class="relative flex flex-col w-full bg-white border-0 rounded-2xl shadow-2xl outline-none focus:outline-none overflow-hidden"
+            class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl border-0 outline-none focus:outline-none"
           >
-            <div class="h-1 w-full bg-gradient-to-r from-red-500 to-rose-500"></div>
+            <div class="h-1 w-full bg-[var(--color-danger-strong)]"></div>
             <div class="p-6 pb-0 flex flex-col items-center text-center">
-              <div class="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
-                <span class="text-2xl">🚪</span>
+              <div class="danger-soft mb-4 flex h-14 w-14 items-center justify-center rounded-full">
+                <AppIcon name="logout" class="h-7 w-7" />
               </div>
-              <h3 class="text-xl font-black text-gray-800 mb-2">准备离开？</h3>
-              <p class="text-sm text-gray-500 leading-relaxed px-4">
+              <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">准备离开？</h3>
+              <p class="px-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
                 确定要退出当前账号吗？未保存的草稿可能会丢失。
               </p>
             </div>
             <div class="flex items-center justify-center p-6 gap-3 rounded-b mt-2">
               <button
-                class="flex-1 px-4 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors outline-none focus:outline-none"
+                class="btn-secondary flex-1 rounded-xl outline-none focus:outline-none"
                 type="button"
                 @click="showLogoutModal = false"
               >
                 取消
               </button>
               <button
-                class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-500 rounded-xl shadow hover:bg-red-600 hover:shadow-lg transition-all outline-none focus:outline-none"
+                class="btn-danger flex-1 rounded-xl outline-none focus:outline-none"
                 type="button"
                 @click="executeLogout"
               >
@@ -239,15 +530,40 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addProjectApi, deleteProjectApi, fetchProjectList } from '@/api/project'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import {
+  addProjectApi,
+  archiveProjectApi,
+  deleteProjectApi,
+  fetchProjectList,
+  reorderProjectApi,
+  updateProjectApi,
+} from '@/api/project'
 import { getUserMeApi, logoutApi } from '@/api/user'
+import { useToast } from '@/composables/useToast'
+import { useUndoDelete } from '@/composables/useUndoDelete'
+import {
+  clearSelectedProjectIdCache,
+  readSelectedProjectIdCache,
+  writeSelectedProjectIdCache,
+} from '@/utils/appCache'
+import { clearAuthToken } from '@/utils/authToken'
+import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
+import {
+  emitProjectListUpdated,
+  offProjectListUpdated,
+  onProjectListUpdated,
+  type ProjectListUpdatedDetail,
+} from '@/utils/projectEvents'
 
 interface Project {
   id: string
   name: string
   icon: string
+  color?: string
 }
 
 interface CurrentUserInfo {
@@ -255,19 +571,341 @@ interface CurrentUserInfo {
   account?: string
 }
 
+const USER_INFO_UPDATED_EVENT = 'tick:user-updated'
+const PROJECT_LIST_EVENT_SOURCE = 'basic-layout'
+const PROJECT_ICON_FALLBACK: IconName = 'folder'
+
+const PROJECT_ICON_COMPAT_MAP: Record<string, IconName> = {
+  folder: 'folder',
+  '📁': 'folder',
+  sparkles: 'sparkles',
+  '✨': 'sparkles',
+  flag: 'flag',
+  '🏁': 'flag',
+  star: 'star',
+  '⭐': 'star',
+  '🌟': 'star',
+  book: 'book',
+  '📚': 'book',
+  target: 'target',
+  '🎯': 'target',
+  heart: 'heart',
+  '❤️': 'heart',
+  '❤': 'heart',
+  work: 'work',
+  '💼': 'work',
+  rocket: 'rocket',
+  '🚀': 'rocket',
+}
+
+const projectIconOptions: Array<{ value: string; label: string; icon: IconName }> = [
+  { value: 'sparkles', label: '灵感', icon: 'sparkles' },
+  { value: 'flag', label: '阶段', icon: 'flag' },
+  { value: 'book', label: '学习', icon: 'book' },
+  { value: 'target', label: '目标', icon: 'target' },
+  { value: 'star', label: '重点', icon: 'star' },
+  { value: 'heart', label: '兴趣', icon: 'heart' },
+  { value: 'work', label: '工作', icon: 'work' },
+  { value: 'rocket', label: '冲刺', icon: 'rocket' },
+]
+
+const projectColorOptions: Array<{ value: string; label: string }> = [
+  { value: '#2563EB', label: '蓝色' },
+  { value: '#10B981', label: '绿色' },
+  { value: '#F59E0B', label: '橙色' },
+  { value: '#EF4444', label: '红色' },
+  { value: '#8B5CF6', label: '紫色' },
+  { value: '#EC4899', label: '粉色' },
+  { value: '#14B8A6', label: '青绿' },
+  { value: '#6B7280', label: '灰色' },
+]
+
 const router = useRouter()
 const route = useRoute()
+const toast = useToast()
+const undoDelete = useUndoDelete()
 
 const projectList = ref<Project[]>([])
-const isAddingProject = ref(false)
-const newProjectName = ref('')
 const isUserMenuOpen = ref(false)
 const showLogoutModal = ref(false)
+const showDeleteProjectConfirm = ref(false)
+const pendingDeleteProject = ref<{ id: string; name: string } | null>(null)
+const activeProjectActionId = ref('')
+const showProjectSettingsModal = ref(false)
+const projectSettingsMode = ref<'create' | 'update'>('create')
+const projectSettingsProjectId = ref('')
+const projectSettingsForm = ref({
+  name: '',
+  icon: '',
+  color: '',
+})
+const isProjectSettingsSubmitting = ref(false)
+const projectNameInputRef = ref<HTMLInputElement | null>(null)
 const currentUserInfo = ref<CurrentUserInfo>({})
 const sidebarWidth = ref(Number(localStorage.getItem('tick_sidebarWidth')) || 256)
 const isResizingLeft = ref(false)
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const isSidebarOpen = ref(false)
+
+const isCompactViewport = computed(() => viewportWidth.value < 1024)
+const isTodayRoute = computed(() => route.path === '/tasks' && route.query.view === 'today')
+const isWeekRoute = computed(() => route.path === '/tasks' && route.query.view === 'week')
+const pageTransitionKey = computed(() => route.path)
+const sidebarStyle = computed(() =>
+  isCompactViewport.value ? undefined : { width: `${sidebarWidth.value}px` },
+)
+const projectSettingsTitle = computed(() =>
+  projectSettingsMode.value === 'create' ? '创建清单' : '自定义清单',
+)
+const projectSettingsSubmitText = computed(() =>
+  projectSettingsMode.value === 'create' ? '创建' : '保存',
+)
+
+const updateViewport = () => {
+  viewportWidth.value = window.innerWidth
+  if (!isCompactViewport.value) {
+    isSidebarOpen.value = false
+  }
+}
+
+const closeSidebar = () => {
+  if (isCompactViewport.value) {
+    isSidebarOpen.value = false
+  }
+}
+
+const normalizeProjectColorValue = (color?: string | null) => {
+  if (!color) return ''
+  const normalized = color.trim()
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalized) ? normalized : ''
+}
+
+const normalizeProjectIconValue = (icon?: string | null) => {
+  if (!icon) return ''
+  const mapped = PROJECT_ICON_COMPAT_MAP[icon] || null
+  if (!mapped || mapped === PROJECT_ICON_FALLBACK) return ''
+  return mapped
+}
+
+const getProjectIconName = (icon: string | undefined): IconName => {
+  return PROJECT_ICON_COMPAT_MAP[icon || ''] || PROJECT_ICON_FALLBACK
+}
+
+const getProjectColor = (color?: string | null) => {
+  return normalizeProjectColorValue(color)
+}
+
+const projectActionButtonClass = (projectId: string) => {
+  if (isCompactViewport.value || activeProjectActionId.value === projectId) {
+    return 'opacity-100'
+  }
+
+  return 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+}
+
+const closeProjectActionMenu = () => {
+  activeProjectActionId.value = ''
+}
+
+const toggleProjectActionMenu = (projectId: string) => {
+  activeProjectActionId.value = activeProjectActionId.value === projectId ? '' : projectId
+}
+
+const getActionMenuStyle = (projectId: string): Record<string, string> => {
+  const el = document.querySelector(`[data-project-action-root][data-project-id="${projectId}"]`)
+  if (!el) return { display: 'none' }
+  const rect = el.getBoundingClientRect()
+  return {
+    position: 'fixed',
+    right: `${window.innerWidth - rect.right}px`,
+    top: `${rect.bottom + 4}px`,
+  }
+}
+
+const isFirstProject = (projectId: string) => {
+  const index = projectList.value.findIndex((item) => item.id === projectId)
+  return index <= 0
+}
+
+const isLastProject = (projectId: string) => {
+  const index = projectList.value.findIndex((item) => item.id === projectId)
+  return index === projectList.value.length - 1
+}
+
+const cloneProjectList = () => projectList.value.map((item) => ({ ...item }))
+
+const navigateTo = async (path: string) => {
+  await router.push(path)
+  closeSidebar()
+}
+
+const navigateToToday = async () => {
+  await router.push({ path: '/tasks', query: { view: 'today' } })
+  closeSidebar()
+}
+
+const navigateToWeek = async () => {
+  await router.push({ path: '/tasks', query: { view: 'week' } })
+  closeSidebar()
+}
+
+const handleProjectRowClick = async (id: string) => {
+  await selectProject(id)
+}
+
+const resetProjectSettingsForm = () => {
+  projectSettingsForm.value = {
+    name: '',
+    icon: '',
+    color: '',
+  }
+}
+
+const closeProjectSettingsModal = () => {
+  if (isProjectSettingsSubmitting.value) return
+  showProjectSettingsModal.value = false
+  projectSettingsProjectId.value = ''
+  resetProjectSettingsForm()
+}
+
+const openProjectSettings = async (project: Project) => {
+  projectSettingsMode.value = 'update'
+  projectSettingsProjectId.value = project.id
+  projectSettingsForm.value = {
+    name: project.name || '',
+    icon: normalizeProjectIconValue(project.icon),
+    color: normalizeProjectColorValue(project.color),
+  }
+  closeProjectActionMenu()
+  await nextTick()
+  showProjectSettingsModal.value = true
+  await nextTick()
+  projectNameInputRef.value?.focus()
+  projectNameInputRef.value?.select()
+}
+
+const openCreateProjectSettings = async () => {
+  projectSettingsMode.value = 'create'
+  projectSettingsProjectId.value = ''
+  resetProjectSettingsForm()
+  closeProjectActionMenu()
+  showProjectSettingsModal.value = true
+  if (isCompactViewport.value) {
+    isSidebarOpen.value = true
+  }
+  await nextTick()
+  projectNameInputRef.value?.focus()
+}
+
+const selectProjectIcon = (icon: string) => {
+  projectSettingsForm.value.icon = icon
+}
+
+const selectProjectColor = (color: string) => {
+  projectSettingsForm.value.color = color
+}
+
+const submitProjectSettings = async () => {
+  const name = projectSettingsForm.value.name.trim()
+  if (!name) {
+    toast.warning('清单名称不能为空。')
+    return
+  }
+
+  const normalizedIcon = projectSettingsForm.value.icon || ''
+  const normalizedColor = normalizeProjectColorValue(projectSettingsForm.value.color)
+
+  isProjectSettingsSubmitting.value = true
+  try {
+    if (projectSettingsMode.value === 'create') {
+      await addProjectApi({
+        name,
+        icon: normalizedIcon,
+        color: normalizedColor,
+      })
+    } else {
+      const id = projectSettingsProjectId.value
+      if (!id) return
+      await updateProjectApi({
+        id,
+        name,
+        icon: normalizedIcon,
+        color: normalizedColor,
+      })
+    }
+
+    showProjectSettingsModal.value = false
+    projectSettingsProjectId.value = ''
+    resetProjectSettingsForm()
+    await loadProjects()
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
+  } catch {
+    toast.error(projectSettingsMode.value === 'create' ? '创建清单失败，请检查网络后重试。' : '保存清单设置失败，请检查网络后重试。')
+  } finally {
+    isProjectSettingsSubmitting.value = false
+  }
+}
+
+const archiveProject = async (id: string) => {
+  closeProjectActionMenu()
+  try {
+    await archiveProjectApi([id])
+    toast.success('清单已归档。')
+    await loadProjects()
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
+  } catch {
+    toast.error('归档失败，请重试。')
+  }
+}
+
+const moveProject = async (projectId: string, direction: -1 | 1) => {
+  const fromIndex = projectList.value.findIndex((item) => item.id === projectId)
+  if (fromIndex < 0) return
+
+  const toIndex = fromIndex + direction
+  if (toIndex < 0 || toIndex >= projectList.value.length) return
+
+  const snapshot = cloneProjectList()
+  const next = cloneProjectList()
+  const [moved] = next.splice(fromIndex, 1)
+  if (!moved) return
+  next.splice(toIndex, 0, moved)
+  projectList.value = next
+  closeProjectActionMenu()
+
+  try {
+    await reorderProjectApi(
+      next.map((item, index) => ({
+        id: item.id,
+        orderNo: index,
+      })),
+    )
+    emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
+  } catch {
+    projectList.value = snapshot
+    toast.error('调整清单顺序失败，请检查网络后重试。')
+  }
+}
+
+const handleDocumentPointerDown = (event: PointerEvent) => {
+  const target = event.target as HTMLElement | null
+  if (!target || !activeProjectActionId.value) return
+
+  const rootSelector = `[data-project-action-root][data-project-id="${activeProjectActionId.value}"]`
+  const menuSelector = `[data-project-action-menu][data-project-id="${activeProjectActionId.value}"]`
+  if (!target.closest(rootSelector) && !target.closest(menuSelector)) {
+    closeProjectActionMenu()
+  }
+}
+
+const handleProjectListUpdated: EventListener = (event) => {
+  const customEvent = event as CustomEvent<ProjectListUpdatedDetail>
+  if (customEvent.detail?.source === PROJECT_LIST_EVENT_SOURCE) return
+  void loadProjects()
+}
 
 const startResizeLeft = () => {
+  if (isCompactViewport.value) return
   isResizingLeft.value = true
   document.addEventListener('mousemove', handleMouseMoveLeft)
   document.addEventListener('mouseup', stopResizeLeft)
@@ -293,7 +931,12 @@ const stopResizeLeft = () => {
 const selectedProjectId = computed(() => {
   const routeId = route.query.projectId
   if (typeof routeId === 'string' && routeId) return routeId
-  return localStorage.getItem('tick_selectedProjectId') || ''
+  return readSelectedProjectIdCache()
+})
+
+const deleteProjectConfirmTitle = computed(() => {
+  if (!pendingDeleteProject.value) return '确认删除清单？'
+  return `确认删除清单“${pendingDeleteProject.value.name}”？`
 })
 
 const loadUserInfo = async () => {
@@ -305,78 +948,129 @@ const loadUserInfo = async () => {
   }
 }
 
+const handleUserInfoUpdated = (event: Event) => {
+  const customEvent = event as CustomEvent<CurrentUserInfo>
+  const nextUserInfo = customEvent.detail
+  if (!nextUserInfo || typeof nextUserInfo !== 'object') return
+  currentUserInfo.value = { ...currentUserInfo.value, ...nextUserInfo }
+}
+
 const ensureDefaultProject = async () => {
   if (selectedProjectId.value || projectList.value.length === 0) return
 
   const firstProject = projectList.value[0]
   if (!firstProject) return
   const firstProjectId = firstProject.id
-  localStorage.setItem('tick_selectedProjectId', firstProjectId)
+  writeSelectedProjectIdCache(firstProjectId)
 
   if (route.path === '/tasks') {
-    await router.replace({ path: '/tasks', query: { projectId: firstProjectId } })
+    const view = typeof route.query.view === 'string' ? route.query.view : ''
+    if (view === 'today' || view === 'week') {
+      return
+    }
+    await router.replace({
+      path: '/tasks',
+      query: { ...route.query, projectId: firstProjectId },
+    })
   }
 }
 
 const loadProjects = async () => {
+  const cachedRecords = readProjectListCache<Project>(0)
+  if (cachedRecords && cachedRecords.length > 0) {
+    projectList.value = cachedRecords
+    await ensureDefaultProject()
+  }
+
   try {
-    const res = await fetchProjectList()
+    const res = await fetchProjectList({ status: 0 })
     const records = (res as unknown as { records?: Project[] })?.records
     projectList.value = records || []
+    writeProjectListCache(0, projectList.value)
+
+    if (activeProjectActionId.value && !projectList.value.some((item) => item.id === activeProjectActionId.value)) {
+      closeProjectActionMenu()
+    }
+
     await ensureDefaultProject()
   } catch (error) {
-    console.error('加载项目失败', error)
+    if (!cachedRecords) {
+      console.error('加载项目失败', error)
+    }
   }
 }
 
 const selectProject = async (id: string) => {
-  localStorage.setItem('tick_selectedProjectId', id)
+  closeProjectActionMenu()
+  writeSelectedProjectIdCache(id)
   await router.push({ path: '/tasks', query: { projectId: id } })
-}
-
-const submitNewProject = async () => {
-  const name = newProjectName.value.trim()
-  if (!name) {
-    isAddingProject.value = false
-    return
-  }
-
-  try {
-    await addProjectApi({ name, icon: '📁' })
-    newProjectName.value = ''
-    isAddingProject.value = false
-    await loadProjects()
-  } catch (error) {
-    alert('创建清单失败，请检查控制台')
-  }
+  closeSidebar()
 }
 
 const openAddProjectInput = () => {
-  isAddingProject.value = true
-  newProjectName.value = ''
+  void openCreateProjectSettings()
+}
+
+const openDeleteProjectConfirm = (id: string, name: string) => {
+  closeProjectActionMenu()
+  pendingDeleteProject.value = { id, name }
+  showDeleteProjectConfirm.value = true
+}
+
+const confirmDeleteProject = async () => {
+  const target = pendingDeleteProject.value
+  if (!target) return
+
+  showDeleteProjectConfirm.value = false
+  await deleteProject(target.id, target.name)
 }
 
 const deleteProject = async (id: string, name: string) => {
-  const isConfirm = window.confirm(`确定要删除清单 "${name}" 吗？相关的任务可能会一并丢失！`)
-  if (!isConfirm) return
+  const snapshot = [...projectList.value]
+  const removedIndex = snapshot.findIndex((item) => item.id === id)
+  const removedProject = snapshot.find((item) => item.id === id)
+  if (!removedProject) return
 
-  try {
-    await deleteProjectApi(id)
+  const wasSelected = selectedProjectId.value === id
+  projectList.value = snapshot.filter((item) => item.id !== id)
 
-    if (selectedProjectId.value === id) {
-      localStorage.removeItem('tick_selectedProjectId')
-      await router.push('/tasks')
-    }
-
-    await loadProjects()
-  } catch (error) {
-    alert('删除清单失败，请检查控制台报错')
+  if (wasSelected) {
+    clearSelectedProjectIdCache()
+    await router.push('/tasks')
   }
+
+  undoDelete.scheduleUndoDelete({
+    label: `清单「${name}」`,
+    pendingMessage: `清单「${name}」已移除，5 秒内可撤销。`,
+    onCommit: async () => {
+      await deleteProjectApi(id)
+    },
+    onCommitSuccess: async () => {
+      await loadProjects()
+      emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
+    },
+    onRollback: async () => {
+      if (!projectList.value.some((item) => item.id === id)) {
+        const next = [...projectList.value]
+        const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
+        next.splice(insertIndex, 0, removedProject)
+        projectList.value = next
+      }
+
+      if (wasSelected) {
+        writeSelectedProjectIdCache(id)
+        if (route.path === '/tasks') {
+          await router.push({ path: '/tasks', query: { projectId: id } })
+        }
+      }
+      emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
+    },
+  })
 }
 
 const goToSettings = async () => {
   isUserMenuOpen.value = false
-  await router.push('/settings')
+  await navigateTo('/settings')
 }
 
 const openLogoutModal = () => {
@@ -391,7 +1085,7 @@ const executeLogout = async () => {
   } catch {
     // force logout even when API request fails
   }
-  localStorage.removeItem('token')
+  clearAuthToken()
   router.push('/login')
 }
 
@@ -399,15 +1093,59 @@ watch(
   () => route.fullPath,
   () => {
     isUserMenuOpen.value = false
+    closeProjectActionMenu()
+    showProjectSettingsModal.value = false
+    projectSettingsProjectId.value = ''
+    resetProjectSettingsForm()
+    closeSidebar()
   },
 )
+
+watch(showDeleteProjectConfirm, (next) => {
+  if (!next) {
+    pendingDeleteProject.value = null
+  }
+})
 
 onMounted(() => {
   loadUserInfo()
   loadProjects()
+  updateViewport()
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
+  onProjectListUpdated(handleProjectListUpdated)
+  window.addEventListener('resize', updateViewport)
+  window.addEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })
 
 onBeforeUnmount(() => {
   stopResizeLeft()
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  offProjectListUpdated(handleProjectListUpdated)
+  window.removeEventListener('resize', updateViewport)
+  window.removeEventListener(USER_INFO_UPDATED_EVENT, handleUserInfoUpdated as EventListener)
 })
 </script>
+
+<style scoped>
+.project-settings-backdrop {
+  transition: opacity 220ms var(--ease-standard);
+}
+
+.project-settings-panel {
+  transition:
+    opacity 260ms var(--ease-emphasized),
+    transform 260ms var(--ease-emphasized);
+  transform-origin: center;
+}
+
+.project-settings-overlay-enter-from .project-settings-backdrop,
+.project-settings-overlay-leave-to .project-settings-backdrop {
+  opacity: 0;
+}
+
+.project-settings-overlay-enter-from .project-settings-panel,
+.project-settings-overlay-leave-to .project-settings-panel {
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+}
+</style>

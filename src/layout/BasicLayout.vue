@@ -70,7 +70,7 @@
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <AppIcon name="calendar" class="h-4 w-4" />
+            <AppIcon name="sun" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">今天</span>
           </div>
 
@@ -96,7 +96,7 @@
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <AppIcon name="calendar" class="h-4 w-4" />
+            <AppIcon name="clipboard-list" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">周报回顾</span>
           </div>
 

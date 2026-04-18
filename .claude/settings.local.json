@@ -19,7 +19,10 @@
       "Bash([ -f \"$HOME/.claude/CLAUDE.md\" ])",
       "Bash(npx tsc:*)",
       "Bash(git checkout:*)",
-      "Bash(ls .omc/state/*.json)"
+      "Bash(ls .omc/state/*.json)",
+      "Bash(mkdir -p ~/.claude/projects/C--source-learning-manage-frontend/memory/)",
+      "Read(//c/Users/Administrator/.claude/projects/**)",
+      "Bash(git:*)"
     ]
   }
 }

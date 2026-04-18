@@ -45,49 +45,100 @@
           <div class="flex min-w-0 flex-1 items-center">
             <span class="mr-2 text-lg font-bold text-[var(--color-text-tertiary)]">+</span>
             <input
+              ref="newTaskTitleInputRef"
               v-model="newTaskTitle"
               @keyup.enter="addTask"
+              @focus="onNewTaskInputFocus"
+              @blur="onNewTaskInputBlur"
               type="text"
               maxlength="50"
               placeholder="输入任务标题（最多 50 字），按回车保存"
               class="w-full min-w-0 bg-transparent text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
             />
-          </div>
-
-          <div ref="newTaskMilestoneMenuRef" class="relative w-full sm:w-56">
             <button
+              v-if="isInputFocused"
               type="button"
-              class="task-detail-select-trigger"
-              @click.stop="toggleNewTaskMilestoneMenu"
+              class="ml-1 shrink-0 rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-surface-secondary)]"
+              @mousedown.prevent="toggleNewTaskFlagMenu"
             >
-              <span class="truncate text-sm text-[var(--color-text-body)]">{{ newTaskMilestoneLabel }}</span>
-              <svg class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
+              </svg>
+            </button>
+            <button
+              v-if="isInputFocused"
+              type="button"
+              class="shrink-0 rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-surface-secondary)]"
+              @mousedown.prevent="toggleNewTaskMoreOptions"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </button>
+          </div>
 
-            <div
-              v-if="isNewTaskMilestoneMenuOpen"
-              @click.stop
-              class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
+          <!-- Flag Menu Popup - shows milestone/stage options -->
+          <div
+            v-if="isNewTaskFlagMenuOpen"
+            ref="newTaskFlagMenuRef"
+            @click.stop
+            @pointerdown.stop
+            class="surface-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-48 overflow-hidden rounded-lg py-1"
+          >
+            <button
+              v-for="option in milestoneOptions"
+              :key="option.value ?? 'default'"
+              @click="selectNewTaskMilestone(option.value)"
+              class="interactive-row flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
             >
-              <button
-                v-for="option in newTaskMilestoneOptions"
-                :key="option.value || 'new-task-milestone-default'"
-                @click="selectNewTaskMilestone(option.value)"
-                class="interactive-row flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+              <span class="truncate text-[var(--color-text-body)]">{{ option.label }}</span>
+              <svg
+                v-if="(option.value === null && newTaskMilestoneId === '') || newTaskMilestoneId === option.value"
+                class="ml-auto h-4 w-4 text-[var(--color-text-secondary)]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <span class="truncate text-[var(--color-text-body)]">{{ option.label }}</span>
-                <svg
-                  v-if="newTaskMilestoneId === option.value"
-                  class="ml-auto h-4 w-4 text-[var(--color-text-secondary)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- More Options Panel -->
+          <div
+            v-if="isNewTaskMoreOptionsOpen"
+            ref="newTaskMoreOptionsRef"
+            @click.stop
+            @pointerdown.stop
+            class="surface-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-72 rounded-lg py-2"
+          >
+            <!-- Priority Dots Row -->
+            <div class="flex items-center gap-3 px-3 py-2">
+              <span class="text-sm text-[var(--color-text-secondary)]">优先级</span>
+              <div class="flex gap-2">
+                <button
+                  v-for="option in priorityOptions"
+                  :key="option.value"
+                  @click="setNewTaskPriority(option.value)"
+                  type="button"
+                  class="priority-dot"
+                  :class="[option.dotClass, newTaskPriority === option.value ? 'ring-2 ring-offset-1' : '']"
+                />
+              </div>
+            </div>
+
+            <!-- Due Date Row -->
+            <div class="flex items-center gap-3 px-3 py-2">
+              <span class="text-sm text-[var(--color-text-secondary)]">截止日期</span>
+              <button type="button" @click="openNewTaskDueDatePicker" class="text-sm text-[var(--color-text-body)]">
+                {{ newTaskDueDateLabel }}
               </button>
+            </div>
+
+            <!-- Mode Toggle -->
+            <div class="flex items-center justify-between px-3 py-2 border-t">
+              <span class="text-sm text-[var(--color-text-secondary)]">详细模式</span>
+              <span class="text-xs text-[var(--color-text-tertiary)]">(暂不可用)</span>
             </div>
           </div>
         </div>
@@ -980,6 +1031,11 @@ const isPriorityMenuOpen = ref(false)
 const isDueDatePickerOpen = ref(false)
 const isMilestoneMenuOpen = ref(false)
 const isNewTaskMilestoneMenuOpen = ref(false)
+const isNewTaskFlagMenuOpen = ref(false)
+const isNewTaskMoreOptionsOpen = ref(false)
+const newTaskPriority = ref(0)
+const newTaskDueDate = ref<string | null>(null)
+const isInputFocused = ref(false)
 const showDeleteTaskConfirm = ref(false)
 const showDeleteMilestoneConfirm = ref(false)
 const showCompletionQualityModal = ref(false)
@@ -989,7 +1045,9 @@ const pendingCompletionTask = ref<Task | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
 const milestoneRowRef = ref<HTMLElement | null>(null)
-const newTaskMilestoneMenuRef = ref<HTMLElement | null>(null)
+const newTaskFlagMenuRef = ref<HTMLElement | null>(null)
+const newTaskMoreOptionsRef = ref<HTMLElement | null>(null)
+const newTaskTitleInputRef = ref<HTMLInputElement | null>(null)
 const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 340)
@@ -1638,11 +1696,17 @@ const addTask = async () => {
     await addTaskApi({
       title: finalTitle,
       projectId: selectedProjectId.value,
-      priority: 0,
+      priority: newTaskPriority.value,
+      dueDate: newTaskDueDate.value,
       milestoneId: newTaskMilestoneId.value || undefined,
     })
     newTaskTitle.value = ''
     newTaskMilestoneId.value = ''
+    newTaskPriority.value = 0
+    newTaskDueDate.value = null
+    isInputFocused.value = false
+    isNewTaskFlagMenuOpen.value = false
+    isNewTaskMoreOptionsOpen.value = false
     isNewTaskMilestoneMenuOpen.value = false
     await loadTasks({ forceRefresh: true })
   } catch {
@@ -1737,18 +1801,53 @@ const selectedMilestoneValue = computed(() => {
   return String(milestoneId)
 })
 
-const newTaskMilestoneOptions = computed(() => [
-  { value: '', label: '默认列表' },
-  ...milestoneList.value.map((milestone) => ({
-    value: String(milestone.id),
-    label: `阶段：${milestone.name}`,
-  })),
-])
-
-const newTaskMilestoneLabel = computed(() => {
-  const option = newTaskMilestoneOptions.value.find((item) => item.value === newTaskMilestoneId.value)
-  return option?.label || '默认列表'
+const newTaskDueDateLabel = computed(() => {
+  if (!newTaskDueDate.value) return '设置截止日期'
+  return formatTaskDueDate(newTaskDueDate.value)
 })
+
+const setNewTaskPriority = (priority: number) => {
+  newTaskPriority.value = priority
+}
+
+const openNewTaskDueDatePicker = () => {
+  isNewTaskFlagMenuOpen.value = false
+  isNewTaskMoreOptionsOpen.value = false
+
+  const input = document.createElement('input')
+  input.type = 'date'
+  input.value = newTaskDueDate.value || ''
+  input.style.cssText = 'position:absolute;opacity:0;pointer-events:none;'
+
+  const container = document.createElement('div')
+  container.style.position = 'relative'
+  container.appendChild(input)
+  document.body.appendChild(container)
+
+  if (typeof (input as HTMLInputElement).showPicker === 'function') {
+    try {
+      ;(input as HTMLInputElement).showPicker()
+    } catch {
+      input.click()
+    }
+  } else {
+    input.click()
+  }
+
+  input.addEventListener('change', (e) => {
+    const target = e.target as HTMLInputElement
+    newTaskDueDate.value = target.value || null
+    document.body.removeChild(container)
+  })
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (document.body.contains(container)) {
+        document.body.removeChild(container)
+      }
+    }, 100)
+  })
+}
 
 const deleteTaskConfirmTitle = computed(() => {
   if (!pendingDeleteTask.value) return '确认删除任务？'
@@ -1760,16 +1859,29 @@ const deleteMilestoneConfirmTitle = computed(() => {
   return `确认删除阶段“${pendingDeleteMilestone.value.name}”？`
 })
 
-const toggleNewTaskMilestoneMenu = () => {
-  isPriorityMenuOpen.value = false
-  closeDueDatePicker()
-  isMilestoneMenuOpen.value = false
-  isNewTaskMilestoneMenuOpen.value = !isNewTaskMilestoneMenuOpen.value
+const onNewTaskInputFocus = () => {
+  isInputFocused.value = true
 }
 
-const selectNewTaskMilestone = (milestoneId: string) => {
-  newTaskMilestoneId.value = milestoneId
-  isNewTaskMilestoneMenuOpen.value = false
+const onNewTaskInputBlur = () => {
+  isInputFocused.value = false
+  isNewTaskFlagMenuOpen.value = false
+  isNewTaskMoreOptionsOpen.value = false
+}
+
+const toggleNewTaskFlagMenu = () => {
+  isNewTaskMoreOptionsOpen.value = false
+  isNewTaskFlagMenuOpen.value = !isNewTaskFlagMenuOpen.value
+}
+
+const selectNewTaskMilestone = (value: string | null) => {
+  newTaskMilestoneId.value = value ?? ''
+  isNewTaskFlagMenuOpen.value = false
+}
+
+const toggleNewTaskMoreOptions = () => {
+  isNewTaskFlagMenuOpen.value = false
+  isNewTaskMoreOptionsOpen.value = !isNewTaskMoreOptionsOpen.value
 }
 
 const togglePriorityMenu = () => {
@@ -1826,12 +1938,24 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
     isMilestoneMenuOpen.value = false
   }
 
+  // Close new task flag menu when clicking outside
   if (
-    isNewTaskMilestoneMenuOpen.value &&
-    newTaskMilestoneMenuRef.value &&
-    !newTaskMilestoneMenuRef.value.contains(targetNode)
+    isNewTaskFlagMenuOpen.value &&
+    newTaskFlagMenuRef.value &&
+    !newTaskFlagMenuRef.value.contains(targetNode) &&
+    !newTaskTitleInputRef.value?.contains(targetNode)
   ) {
-    isNewTaskMilestoneMenuOpen.value = false
+    isNewTaskFlagMenuOpen.value = false
+  }
+
+  // Close more options panel when clicking outside
+  if (
+    isNewTaskMoreOptionsOpen.value &&
+    newTaskMoreOptionsRef.value &&
+    !newTaskMoreOptionsRef.value.contains(targetNode) &&
+    !newTaskTitleInputRef.value?.contains(targetNode)
+  ) {
+    isNewTaskMoreOptionsOpen.value = false
   }
 }
 

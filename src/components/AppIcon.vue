@@ -23,6 +23,36 @@
       <rect x="3" y="5" width="18" height="16" rx="2" ry="2" />
     </template>
 
+    <template v-else-if="name === 'sun'">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="M4.93 4.93l1.41 1.41" />
+      <path d="M17.66 17.66l1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="M6.34 17.66l-1.41 1.41" />
+      <path d="M19.07 4.93l-1.41 1.41" />
+    </template>
+
+    <template v-else-if="name === 'calendar-check'">
+      <path d="M8 3v3" />
+      <path d="M16 3v3" />
+      <path d="M3 10h18" />
+      <rect x="3" y="5" width="18" height="16" rx="2" ry="2" />
+      <path d="M9 14l2 2 4-4" />
+    </template>
+
+    <template v-else-if="name === 'clipboard-list'">
+      <path d="M9 3h6v2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3V3z" />
+      <path d="M9 3h6" />
+      <path d="M9 12h6" />
+      <path d="M9 16h6" />
+      <path d="M6 8h.01" />
+      <path d="M6 12h.01" />
+      <path d="M6 16h.01" />
+    </template>
+
     <template v-else-if="name === 'sparkles'">
       <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
       <path d="M19 4v2" />
@@ -175,6 +205,9 @@
 export type IconName =
   | 'dashboard'
   | 'calendar'
+  | 'sun'
+  | 'calendar-check'
+  | 'clipboard-list'
   | 'sparkles'
   | 'folder'
   | 'settings'

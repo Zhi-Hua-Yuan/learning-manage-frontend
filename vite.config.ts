@@ -22,7 +22,7 @@ export default defineConfig({
     proxy: {
       // 意思是：只要前端请求的路径是以 /api 开头的，Vite 就帮你拦截下来，转发给后端的 8080 端口
       '/api': {
-        target: 'http://111.230.99.61:8081/',
+        target: 'http://111.230.99.61:8080/',
         changeOrigin: true, // 允许跨域
       },
     },

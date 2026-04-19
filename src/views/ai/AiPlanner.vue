@@ -177,7 +177,8 @@
               <label
                 v-for="(task, tIndex) in milestone.tasks"
                 :key="`task-${mIndex}-${tIndex}`"
-                class="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] p-3 text-sm text-[var(--color-text-body)]"
+                class="flex cursor-pointer items-start gap-3 rounded-lg border bg-[var(--color-bg-surface-muted)] p-3 text-sm text-[var(--color-text-body)]"
+                :style="{ borderColor: getDraftTaskItemBorderColor(task.priority) }"
               >
                 <input
                   type="checkbox"
@@ -185,8 +186,16 @@
                   :checked="isTaskChecked(mIndex, tIndex)"
                   @change="toggleTaskSelection(mIndex, tIndex, $event)"
                 />
-                <div>
-                  <div class="font-medium">{{ getTaskTitle(task) }}</div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1 break-words font-medium">{{ getTaskTitle(task) }}</div>
+                    <span
+                      v-if="formatDraftTaskDueDate(task.dueDate)"
+                      class="mono shrink-0 text-right text-xs text-[var(--color-text-secondary)]"
+                    >
+                      {{ formatDraftTaskDueDate(task.dueDate) }}
+                    </span>
+                  </div>
                   <div v-if="task.description" class="mt-1 text-xs text-[var(--color-text-secondary)]">
                     {{ task.description }}
                   </div>
@@ -327,6 +336,8 @@ interface DraftTask {
   title?: string
   name?: string
   description?: string
+  priority?: number
+  dueDate?: string
 }
 
 interface DraftMilestone {
@@ -396,6 +407,27 @@ const getTaskTitle = (task: DraftTask) => {
   return title || '未命名任务'
 }
 
+const taskItemPriorityBorderColorMap: Record<number, string> = {
+  3: 'var(--color-danger)',
+  2: 'var(--color-warning)',
+  1: 'var(--color-success)',
+  0: 'var(--color-input-border)',
+}
+
+const getDraftTaskItemBorderColor = (priority?: number) => {
+  const normalizedPriority =
+    typeof priority === 'number' && Number.isFinite(priority) ? Math.max(0, Math.min(3, priority)) : 0
+  return taskItemPriorityBorderColorMap[normalizedPriority] || taskItemPriorityBorderColorMap[0]
+}
+
+const normalizeDraftTaskDueDate = (dueDate?: string | null) => {
+  if (!dueDate) return ''
+  const normalized = dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
+}
+
+const formatDraftTaskDueDate = (dueDate?: string | null) => normalizeDraftTaskDueDate(dueDate)
+
 const getErrorMessage = (error: unknown) => {
   if (error && typeof error === 'object' && 'message' in error) {
     const message = String((error as { message?: unknown }).message || '请求失败')
@@ -429,11 +461,26 @@ const normalizePlan = (raw: unknown): DraftMilestone[] => {
     const name = typeof source.name === 'string' && source.name.trim() ? source.name.trim() : `阶段 ${index + 1}`
     const tasks = Array.isArray(source.tasks)
       ? source.tasks.map((task) => {
-          const sourceTask = task as { title?: unknown; name?: unknown; description?: unknown }
+          const sourceTask = task as {
+            title?: unknown
+            name?: unknown
+            description?: unknown
+            priority?: unknown
+            dueDate?: unknown
+          }
+          const dueDate =
+            typeof sourceTask.dueDate === 'string' && sourceTask.dueDate.trim()
+              ? sourceTask.dueDate.trim()
+              : undefined
           return {
             title: typeof sourceTask.title === 'string' ? sourceTask.title : undefined,
             name: typeof sourceTask.name === 'string' ? sourceTask.name : undefined,
             description: typeof sourceTask.description === 'string' ? sourceTask.description : undefined,
+            priority:
+              typeof sourceTask.priority === 'number' && Number.isFinite(sourceTask.priority)
+                ? sourceTask.priority
+                : undefined,
+            dueDate,
           } satisfies DraftTask
         })
       : []
@@ -485,6 +532,15 @@ const schedulePersistPlannerDraft = () => {
     persistPlannerDraft()
     persistDraftTimer = null
   }, 120)
+}
+
+const flushPersistPlannerDraft = () => {
+  if (typeof window === 'undefined') return
+  if (persistDraftTimer) {
+    window.clearTimeout(persistDraftTimer)
+    persistDraftTimer = null
+  }
+  persistPlannerDraft()
 }
 
 const hydrateDraftFromStorage = () => {
@@ -677,11 +733,15 @@ const openConfirmModal = () => {
 
 const createTask = async (projectId: string, milestoneId: string, task: DraftTask) => {
   const finalTitle = getTaskTitle(task).slice(0, TASK_TITLE_MAX_LENGTH)
+  const normalizedPriority =
+    typeof task.priority === 'number' && Number.isFinite(task.priority) ? task.priority : 0
+  const normalizedDueDate = typeof task.dueDate === 'string' && task.dueDate.trim() ? task.dueDate.trim() : undefined
   await addTaskApi({
     title: finalTitle,
     description: task.description || '',
     projectId,
-    priority: 0,
+    priority: normalizedPriority,
+    dueDate: normalizedDueDate,
     milestoneId: milestoneId || undefined,
   })
 }
@@ -897,14 +957,14 @@ watch(
 onMounted(() => {
   isViewMounted.value = true
   hydrateDraftFromStorage()
-  consumePendingGeneratedPlan()
+  if (generatedPlan.value.length === 0) {
+    consumePendingGeneratedPlan()
+  }
 })
 
 onBeforeUnmount(() => {
   isViewMounted.value = false
-  if (!persistDraftTimer || typeof window === 'undefined') return
-  window.clearTimeout(persistDraftTimer)
-  persistDraftTimer = null
+  flushPersistPlannerDraft()
 })
 
 const getFailureTitle = (item: FailedImportItem) => {

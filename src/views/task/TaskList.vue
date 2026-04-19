@@ -41,38 +41,40 @@
         v-if="!isAggregateView"
         class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5"
       >
-        <div class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center">
+        <div
+          ref="newTaskQuickCreateRef"
+          class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center"
+          @focusin="onNewTaskQuickCreateFocusIn"
+          @focusout="onNewTaskQuickCreateFocusOut"
+        >
           <div class="flex min-w-0 flex-1 items-center">
             <span class="mr-2 text-lg font-bold text-[var(--color-text-tertiary)]">+</span>
             <input
               ref="newTaskTitleInputRef"
               v-model="newTaskTitle"
-              @keyup.enter="addTask"
+              @keydown.enter.exact="onNewTaskInputEnter"
+              @keydown.tab.exact="onNewTaskInputTab"
               @focus="onNewTaskInputFocus"
-              @blur="onNewTaskInputBlur"
               type="text"
               maxlength="50"
-              placeholder="输入任务标题（最多 50 字），按回车保存"
+              placeholder="输入任务标题（最多 50 字），按回车保存，Tab 选择所属阶段"
               class="w-full min-w-0 bg-transparent text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
             />
             <button
-              v-if="isInputFocused"
+              v-if="isInputFocused || isNewTaskFlagMenuOpen"
+              ref="newTaskFlagTriggerRef"
               type="button"
               class="ml-1 shrink-0 rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-surface-secondary)]"
+              aria-label="选择阶段"
+              aria-haspopup="listbox"
+              :aria-controls="newTaskFlagMenuId"
+              :aria-expanded="isNewTaskFlagMenuOpen ? 'true' : 'false'"
               @mousedown.prevent="toggleNewTaskFlagMenu"
+              @focus="onNewTaskFlagTriggerFocus"
+              @keydown="onNewTaskFlagTriggerKeydown"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
-              </svg>
-            </button>
-            <button
-              v-if="isInputFocused"
-              type="button"
-              class="shrink-0 rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-surface-secondary)]"
-              @mousedown.prevent="toggleNewTaskMoreOptions"
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </button>
           </div>
@@ -80,20 +82,29 @@
           <!-- Flag Menu Popup - shows milestone/stage options -->
           <div
             v-if="isNewTaskFlagMenuOpen"
+            :id="newTaskFlagMenuId"
             ref="newTaskFlagMenuRef"
+            role="listbox"
+            tabindex="-1"
             @click.stop
+            @keydown="onNewTaskFlagMenuKeydown"
             @pointerdown.stop
             class="surface-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-48 overflow-hidden rounded-lg py-1"
           >
             <button
-              v-for="option in milestoneOptions"
+              v-for="(option, optionIndex) in milestoneOptions"
               :key="option.value ?? 'default'"
+              :id="getNewTaskFlagOptionId(optionIndex)"
+              role="option"
+              :aria-selected="isNewTaskMilestoneSelected(option.value) ? 'true' : 'false'"
               @click="selectNewTaskMilestone(option.value)"
+              @mousemove="setNewTaskActiveMilestoneIndex(optionIndex)"
               class="interactive-row flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+              :class="optionIndex === newTaskActiveMilestoneIndex ? 'bg-[var(--color-menu-hover)]' : ''"
             >
               <span class="truncate text-[var(--color-text-body)]">{{ option.label }}</span>
               <svg
-                v-if="(option.value === null && newTaskMilestoneId === '') || newTaskMilestoneId === option.value"
+                v-if="isNewTaskMilestoneSelected(option.value)"
                 class="ml-auto h-4 w-4 text-[var(--color-text-secondary)]"
                 fill="none"
                 stroke="currentColor"
@@ -104,43 +115,6 @@
             </button>
           </div>
 
-          <!-- More Options Panel -->
-          <div
-            v-if="isNewTaskMoreOptionsOpen"
-            ref="newTaskMoreOptionsRef"
-            @click.stop
-            @pointerdown.stop
-            class="surface-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-72 rounded-lg py-2"
-          >
-            <!-- Priority Dots Row -->
-            <div class="flex items-center gap-3 px-3 py-2">
-              <span class="text-sm text-[var(--color-text-secondary)]">优先级</span>
-              <div class="flex gap-2">
-                <button
-                  v-for="option in priorityOptions"
-                  :key="option.value"
-                  @click="setNewTaskPriority(option.value)"
-                  type="button"
-                  class="priority-dot"
-                  :class="[option.dotClass, newTaskPriority === option.value ? 'ring-2 ring-offset-1' : '']"
-                />
-              </div>
-            </div>
-
-            <!-- Due Date Row -->
-            <div class="flex items-center gap-3 px-3 py-2">
-              <span class="text-sm text-[var(--color-text-secondary)]">截止日期</span>
-              <button type="button" @click="openNewTaskDueDatePicker" class="text-sm text-[var(--color-text-body)]">
-                {{ newTaskDueDateLabel }}
-              </button>
-            </div>
-
-            <!-- Mode Toggle -->
-            <div class="flex items-center justify-between px-3 py-2 border-t">
-              <span class="text-sm text-[var(--color-text-secondary)]">详细模式</span>
-              <span class="text-xs text-[var(--color-text-tertiary)]">(暂不可用)</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -959,6 +933,45 @@ interface ContextLoadOptions {
   forceTaskRefresh?: boolean
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+const extractListPayload = <T>(payload: unknown): T[] | null => {
+  if (Array.isArray(payload)) return payload as T[]
+  if (!isRecord(payload)) return null
+
+  if (Array.isArray(payload.records)) return payload.records as T[]
+  if (!('data' in payload)) return null
+
+  const nested = payload.data
+  if (Array.isArray(nested)) return nested as T[]
+  if (isRecord(nested) && Array.isArray(nested.records)) return nested.records as T[]
+  return null
+}
+
+const extractTaskPagePayload = (payload: unknown): TaskPageResponse => {
+  const fallback: TaskPageResponse = { records: [] }
+
+  if (Array.isArray(payload)) {
+    return { records: payload as Task[] }
+  }
+
+  if (!isRecord(payload)) return fallback
+
+  if (Array.isArray(payload.data)) {
+    return { records: payload.data as Task[] }
+  }
+
+  const source = isRecord(payload.data) && Array.isArray(payload.data.records) ? payload.data : payload
+  const records = Array.isArray(source.records) ? (source.records as Task[]) : []
+
+  return {
+    records,
+    current: typeof source.current === 'number' ? source.current : undefined,
+    size: typeof source.size === 'number' ? source.size : undefined,
+    total: typeof source.total === 'number' ? source.total : undefined,
+  }
+}
+
 const PROJECT_LIST_EVENT_SOURCE = 'task-list'
 const AGGREGATE_PAGE_SIZE = 100
 const AGGREGATE_MAX_PAGES = 200
@@ -1032,10 +1045,10 @@ const isDueDatePickerOpen = ref(false)
 const isMilestoneMenuOpen = ref(false)
 const isNewTaskMilestoneMenuOpen = ref(false)
 const isNewTaskFlagMenuOpen = ref(false)
-const isNewTaskMoreOptionsOpen = ref(false)
-const newTaskPriority = ref(0)
-const newTaskDueDate = ref<string | null>(null)
 const isInputFocused = ref(false)
+const suppressNextInputEnter = ref(false)
+const shouldOpenNewTaskFlagMenuOnTriggerFocus = ref(false)
+const newTaskActiveMilestoneIndex = ref(0)
 const showDeleteTaskConfirm = ref(false)
 const showDeleteMilestoneConfirm = ref(false)
 const showCompletionQualityModal = ref(false)
@@ -1045,8 +1058,9 @@ const pendingCompletionTask = ref<Task | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
 const milestoneRowRef = ref<HTMLElement | null>(null)
+const newTaskQuickCreateRef = ref<HTMLElement | null>(null)
+const newTaskFlagTriggerRef = ref<HTMLButtonElement | null>(null)
 const newTaskFlagMenuRef = ref<HTMLElement | null>(null)
-const newTaskMoreOptionsRef = ref<HTMLElement | null>(null)
 const newTaskTitleInputRef = ref<HTMLInputElement | null>(null)
 const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
@@ -1060,6 +1074,7 @@ const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 
 const isMobile = computed(() => viewportWidth.value < 768)
 let boardSlowTimer: ReturnType<typeof setTimeout> | null = null
+const newTaskFlagMenuId = 'new-task-flag-menu'
 
 const PROJECT_ICON_FALLBACK: IconName = 'folder'
 const PROJECT_ICON_COMPAT_MAP: Record<string, IconName> = {
@@ -1465,7 +1480,7 @@ const loadProjects = async (options: LoadOptions = {}): Promise<LoadOutcome> => 
     projectList.value = cachedRecords
   }
 
-  if (cachedRecords && !forceRefresh) {
+  if (cachedRecords && cachedRecords.length > 0 && !forceRefresh) {
     await ensureSelectedProjectFromList()
     return okOutcome()
   }
@@ -1473,8 +1488,11 @@ const loadProjects = async (options: LoadOptions = {}): Promise<LoadOutcome> => 
   try {
     const res = await fetchProjectList({ status: 0 })
     if (requestVersion !== projectLoadVersion.value) return staleOutcome()
-    const records = (res as unknown as { records?: Project[] })?.records
-    projectList.value = records || []
+    const records = extractListPayload<Project>(res)
+    if (!records) {
+      throw new Error('project-list-shape-invalid')
+    }
+    projectList.value = records
     writeProjectListCache(0, projectList.value)
 
     await ensureSelectedProjectFromList()
@@ -1505,11 +1523,12 @@ const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean)
   for (let index = 0; index < AGGREGATE_MAX_PAGES; index += 1) {
     if (isStale()) return []
 
-    const res = (await fetchTaskList({
+    const raw = await fetchTaskList({
       projectId,
       current: page,
       size: AGGREGATE_PAGE_SIZE,
-    })) as unknown as TaskPageResponse
+    })
+    const res = extractTaskPagePayload(raw)
 
     if (isStale()) return []
 
@@ -1593,15 +1612,18 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
 
   const requestProjectId = selectedProjectId.value
   try {
-    const res = await fetchTaskList({
+    const raw = await fetchTaskList({
       projectId: requestProjectId,
       current: 1,
       size: 100,
     })
     if (requestVersion !== taskLoadVersion.value) return staleOutcome()
     if (requestProjectId !== selectedProjectId.value) return staleOutcome()
-    const records = (res as unknown as { records?: Task[] })?.records
-    taskList.value = records || []
+    const records = extractListPayload<Task>(raw)
+    if (!records) {
+      throw new Error('task-list-shape-invalid')
+    }
+    taskList.value = records
     writeTaskCache(requestProjectId, taskList.value)
     syncAggregateTaskCacheByProject(requestProjectId, taskList.value)
     syncSelectedTaskFromList()
@@ -1628,10 +1650,13 @@ const loadMilestones = async (options: LoadOptions = {}): Promise<LoadOutcome> =
   }
 
   try {
-    const res = await fetchMilestoneList({ projectId: requestProjectId })
+    const raw = await fetchMilestoneList({ projectId: requestProjectId })
     if (requestVersion !== milestoneLoadVersion.value) return staleOutcome()
     if (requestProjectId !== selectedProjectId.value || isAggregateView.value) return staleOutcome()
-    const milestones = Array.isArray(res) ? (res as Milestone[]) : []
+    const milestones = extractListPayload<Milestone>(raw)
+    if (!milestones) {
+      throw new Error('milestone-list-shape-invalid')
+    }
     const sortedMilestones = milestones.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
     milestoneList.value = sortedMilestones
     milestoneCacheByProject.value = {
@@ -1689,6 +1714,11 @@ const handleProjectListUpdated: EventListener = (event) => {
 }
 
 const addTask = async () => {
+  if (suppressNextInputEnter.value) {
+    suppressNextInputEnter.value = false
+    return
+  }
+  if (isNewTaskFlagMenuOpen.value) return
   if (!newTaskTitle.value.trim() || !selectedProjectId.value) return
 
   try {
@@ -1696,17 +1726,11 @@ const addTask = async () => {
     await addTaskApi({
       title: finalTitle,
       projectId: selectedProjectId.value,
-      priority: newTaskPriority.value,
-      dueDate: newTaskDueDate.value,
+      priority: 0,
+      dueDate: null,
       milestoneId: newTaskMilestoneId.value || undefined,
     })
-    newTaskTitle.value = ''
-    newTaskMilestoneId.value = ''
-    newTaskPriority.value = 0
-    newTaskDueDate.value = null
-    isInputFocused.value = false
-    isNewTaskFlagMenuOpen.value = false
-    isNewTaskMoreOptionsOpen.value = false
+    resetNewTaskDraft({ blurInput: true })
     isNewTaskMilestoneMenuOpen.value = false
     await loadTasks({ forceRefresh: true })
   } catch {
@@ -1795,59 +1819,45 @@ const milestoneOptions = computed(() => [
   })),
 ])
 
+const getNewTaskFlagOptionId = (index: number) => `new-task-flag-option-${index}`
+
+const isNewTaskMilestoneSelected = (value: string | null) => {
+  if (value === null) return newTaskMilestoneId.value === ''
+  return newTaskMilestoneId.value === value
+}
+
+const getSelectedNewTaskMilestoneIndex = () => {
+  const selectedIndex = milestoneOptions.value.findIndex((option) => isNewTaskMilestoneSelected(option.value))
+  return selectedIndex >= 0 ? selectedIndex : 0
+}
+
+const normalizeNewTaskActiveMilestoneIndex = () => {
+  const total = milestoneOptions.value.length
+  if (total <= 0) {
+    newTaskActiveMilestoneIndex.value = 0
+    return
+  }
+
+  newTaskActiveMilestoneIndex.value = Math.min(
+    Math.max(newTaskActiveMilestoneIndex.value, 0),
+    total - 1,
+  )
+}
+
+const syncNewTaskActiveMilestoneIndex = () => {
+  newTaskActiveMilestoneIndex.value = getSelectedNewTaskMilestoneIndex()
+  normalizeNewTaskActiveMilestoneIndex()
+}
+
+watch([milestoneOptions, newTaskMilestoneId], () => {
+  syncNewTaskActiveMilestoneIndex()
+}, { immediate: true })
+
 const selectedMilestoneValue = computed(() => {
   const milestoneId = selectedTask.value?.milestoneId
   if (!milestoneId || String(milestoneId) === '0') return null
   return String(milestoneId)
 })
-
-const newTaskDueDateLabel = computed(() => {
-  if (!newTaskDueDate.value) return '设置截止日期'
-  return formatTaskDueDate(newTaskDueDate.value)
-})
-
-const setNewTaskPriority = (priority: number) => {
-  newTaskPriority.value = priority
-}
-
-const openNewTaskDueDatePicker = () => {
-  isNewTaskFlagMenuOpen.value = false
-  isNewTaskMoreOptionsOpen.value = false
-
-  const input = document.createElement('input')
-  input.type = 'date'
-  input.value = newTaskDueDate.value || ''
-  input.style.cssText = 'position:absolute;opacity:0;pointer-events:none;'
-
-  const container = document.createElement('div')
-  container.style.position = 'relative'
-  container.appendChild(input)
-  document.body.appendChild(container)
-
-  if (typeof (input as HTMLInputElement).showPicker === 'function') {
-    try {
-      ;(input as HTMLInputElement).showPicker()
-    } catch {
-      input.click()
-    }
-  } else {
-    input.click()
-  }
-
-  input.addEventListener('change', (e) => {
-    const target = e.target as HTMLInputElement
-    newTaskDueDate.value = target.value || null
-    document.body.removeChild(container)
-  })
-
-  input.addEventListener('blur', () => {
-    setTimeout(() => {
-      if (document.body.contains(container)) {
-        document.body.removeChild(container)
-      }
-    }, 100)
-  })
-}
 
 const deleteTaskConfirmTitle = computed(() => {
   if (!pendingDeleteTask.value) return '确认删除任务？'
@@ -1859,29 +1869,197 @@ const deleteMilestoneConfirmTitle = computed(() => {
   return `确认删除阶段“${pendingDeleteMilestone.value.name}”？`
 })
 
+const closeNewTaskQuickCreateMenus = () => {
+  isNewTaskFlagMenuOpen.value = false
+  shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+}
+
+const collapseNewTaskQuickCreate = () => {
+  closeNewTaskQuickCreateMenus()
+  isInputFocused.value = false
+}
+
+const resetNewTaskDraft = (options: { blurInput?: boolean } = {}) => {
+  newTaskTitle.value = ''
+  newTaskMilestoneId.value = ''
+  newTaskActiveMilestoneIndex.value = 0
+  suppressNextInputEnter.value = false
+  shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+  collapseNewTaskQuickCreate()
+  if (options.blurInput) {
+    newTaskTitleInputRef.value?.blur()
+  }
+}
+
+const isWithinNewTaskQuickCreate = (node: Node | null) => {
+  if (!node || !newTaskQuickCreateRef.value) return false
+  return newTaskQuickCreateRef.value.contains(node)
+}
+
+const setNewTaskActiveMilestoneIndex = (index: number) => {
+  newTaskActiveMilestoneIndex.value = index
+  normalizeNewTaskActiveMilestoneIndex()
+}
+
+const armInputEnterSuppression = () => {
+  suppressNextInputEnter.value = true
+  setTimeout(() => {
+    suppressNextInputEnter.value = false
+  }, 0)
+}
+
+const moveNewTaskActiveMilestoneIndex = (direction: 1 | -1) => {
+  const total = milestoneOptions.value.length
+  if (total <= 0) return
+  const offset = ((newTaskActiveMilestoneIndex.value + direction) % total + total) % total
+  newTaskActiveMilestoneIndex.value = offset
+}
+
+const openNewTaskFlagMenu = () => {
+  isNewTaskFlagMenuOpen.value = true
+  syncNewTaskActiveMilestoneIndex()
+}
+
+const selectNewTaskMilestone = (
+  value: string | null,
+  options: {
+    focusInput?: boolean
+    suppressEnter?: boolean
+  } = {},
+) => {
+  newTaskMilestoneId.value = value ?? ''
+  syncNewTaskActiveMilestoneIndex()
+  isNewTaskFlagMenuOpen.value = false
+  shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+  if (options.suppressEnter) {
+    armInputEnterSuppression()
+  }
+  if (!options.focusInput) return
+
+  void nextTick(() => {
+    newTaskTitleInputRef.value?.focus()
+  })
+}
+
+const selectActiveNewTaskMilestone = (
+  options: {
+    focusInput?: boolean
+    suppressEnter?: boolean
+  } = {},
+) => {
+  const activeOption = milestoneOptions.value[newTaskActiveMilestoneIndex.value] ?? milestoneOptions.value[0]
+  selectNewTaskMilestone(activeOption?.value ?? null, options)
+}
+
+const onNewTaskQuickCreateFocusIn = () => {
+  isInputFocused.value = true
+}
+
+const onNewTaskQuickCreateFocusOut = (event: FocusEvent) => {
+  const nextTarget = event.relatedTarget as Node | null
+  if (isWithinNewTaskQuickCreate(nextTarget)) return
+  collapseNewTaskQuickCreate()
+}
+
 const onNewTaskInputFocus = () => {
   isInputFocused.value = true
 }
 
-const onNewTaskInputBlur = () => {
-  isInputFocused.value = false
-  isNewTaskFlagMenuOpen.value = false
-  isNewTaskMoreOptionsOpen.value = false
+const onNewTaskInputEnter = () => {
+  void addTask()
+}
+
+const onNewTaskInputTab = () => {
+  shouldOpenNewTaskFlagMenuOnTriggerFocus.value = true
+}
+
+const onNewTaskFlagTriggerFocus = () => {
+  isInputFocused.value = true
+  if (!shouldOpenNewTaskFlagMenuOnTriggerFocus.value) return
+
+  shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+  openNewTaskFlagMenu()
+}
+
+const onNewTaskFlagTriggerKeydown = (event: KeyboardEvent) => {
+  const { key } = event
+
+  if (key === 'ArrowDown') {
+    event.preventDefault()
+    if (!isNewTaskFlagMenuOpen.value) {
+      openNewTaskFlagMenu()
+    }
+    moveNewTaskActiveMilestoneIndex(1)
+    return
+  }
+
+  if (key === 'ArrowUp') {
+    event.preventDefault()
+    if (!isNewTaskFlagMenuOpen.value) {
+      openNewTaskFlagMenu()
+    }
+    moveNewTaskActiveMilestoneIndex(-1)
+    return
+  }
+
+  if (key === 'Enter' || key === ' ') {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!isNewTaskFlagMenuOpen.value) {
+      openNewTaskFlagMenu()
+      return
+    }
+    selectActiveNewTaskMilestone({ focusInput: true, suppressEnter: true })
+    return
+  }
+
+  if (key === 'Escape' && isNewTaskFlagMenuOpen.value) {
+    event.preventDefault()
+    isNewTaskFlagMenuOpen.value = false
+    void nextTick(() => {
+      newTaskTitleInputRef.value?.focus()
+    })
+  }
+}
+
+const onNewTaskFlagMenuKeydown = (event: KeyboardEvent) => {
+  const { key } = event
+
+  if (key === 'ArrowDown') {
+    event.preventDefault()
+    moveNewTaskActiveMilestoneIndex(1)
+    return
+  }
+
+  if (key === 'ArrowUp') {
+    event.preventDefault()
+    moveNewTaskActiveMilestoneIndex(-1)
+    return
+  }
+
+  if (key === 'Enter' || key === ' ') {
+    event.preventDefault()
+    event.stopPropagation()
+    selectActiveNewTaskMilestone({ focusInput: true, suppressEnter: true })
+    return
+  }
+
+  if (key === 'Escape') {
+    event.preventDefault()
+    isNewTaskFlagMenuOpen.value = false
+    void nextTick(() => {
+      newTaskFlagTriggerRef.value?.focus()
+    })
+  }
 }
 
 const toggleNewTaskFlagMenu = () => {
-  isNewTaskMoreOptionsOpen.value = false
-  isNewTaskFlagMenuOpen.value = !isNewTaskFlagMenuOpen.value
-}
-
-const selectNewTaskMilestone = (value: string | null) => {
-  newTaskMilestoneId.value = value ?? ''
-  isNewTaskFlagMenuOpen.value = false
-}
-
-const toggleNewTaskMoreOptions = () => {
-  isNewTaskFlagMenuOpen.value = false
-  isNewTaskMoreOptionsOpen.value = !isNewTaskMoreOptionsOpen.value
+  shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+  if (isNewTaskFlagMenuOpen.value) {
+    isNewTaskFlagMenuOpen.value = false
+    return
+  }
+  openNewTaskFlagMenu()
 }
 
 const togglePriorityMenu = () => {
@@ -1938,24 +2116,11 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
     isMilestoneMenuOpen.value = false
   }
 
-  // Close new task flag menu when clicking outside
   if (
-    isNewTaskFlagMenuOpen.value &&
-    newTaskFlagMenuRef.value &&
-    !newTaskFlagMenuRef.value.contains(targetNode) &&
-    !newTaskTitleInputRef.value?.contains(targetNode)
+    (isInputFocused.value || isNewTaskFlagMenuOpen.value) &&
+    !isWithinNewTaskQuickCreate(targetNode)
   ) {
-    isNewTaskFlagMenuOpen.value = false
-  }
-
-  // Close more options panel when clicking outside
-  if (
-    isNewTaskMoreOptionsOpen.value &&
-    newTaskMoreOptionsRef.value &&
-    !newTaskMoreOptionsRef.value.contains(targetNode) &&
-    !newTaskTitleInputRef.value?.contains(targetNode)
-  ) {
-    isNewTaskMoreOptionsOpen.value = false
+    collapseNewTaskQuickCreate()
   }
 }
 
@@ -2227,6 +2392,7 @@ watch(
   [() => route.query.projectId, () => route.query.view],
   async () => {
     closeCompletionQualityModal()
+    resetNewTaskDraft({ blurInput: true })
     syncSelectedProject()
     closeDueDatePicker()
     selectedTask.value = null

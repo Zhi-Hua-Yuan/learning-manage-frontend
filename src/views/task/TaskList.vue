@@ -64,7 +64,7 @@
               v-if="isInputFocused || isNewTaskFlagMenuOpen"
               ref="newTaskFlagTriggerRef"
               type="button"
-              class="ml-1 shrink-0 rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-surface-secondary)]"
+              class="ml-1 inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-xs text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-surface-secondary)]"
               aria-label="选择阶段"
               aria-haspopup="listbox"
               :aria-controls="newTaskFlagMenuId"
@@ -76,6 +76,7 @@
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
               </svg>
+              <span class="max-w-24 truncate">{{ newTaskMilestoneLabel }}</span>
             </button>
           </div>
 
@@ -135,7 +136,7 @@
                 @click="requestTodayAiOrder"
               >
                 <AppIcon name="sparkles" class="h-3.5 w-3.5" />
-                {{ isFetchingTodayAiOrder ? '获取中...' : '获取 AI 排序' }}
+                {{ isFetchingTodayAiOrder ? '获取中...' : 'AI 智能排序' }}
               </button>
             </div>
             <div class="space-y-2">
@@ -189,6 +190,14 @@
                 </span>
 
                 <div class="flex shrink-0 items-center gap-2">
+                  <button
+                    v-if="isTodayView && getTodayAiOrderMeta(task)"
+                    type="button"
+                    class="inline-flex items-center rounded-full border border-[var(--color-ai)]/40 bg-[var(--color-success-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--color-ai)] transition-colors hover:bg-[var(--color-success-soft)]/80"
+                    @click.stop="openTodayAiReasonDialog(task)"
+                  >
+                    AI
+                  </button>
                   <span
                     v-if="isAggregateView"
                     class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
@@ -761,6 +770,48 @@
       </template>
     </aside>
 
+    <transition name="completion-overlay">
+      <div
+        v-if="showTodayAiReasonDialog && selectedTodayAiReason"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI 排序依据"
+      >
+        <div class="completion-backdrop absolute inset-0" @click="closeTodayAiReasonDialog">
+          <div class="completion-backdrop-base absolute inset-0"></div>
+          <div class="completion-backdrop-blur absolute inset-0"></div>
+        </div>
+
+        <div
+          class="completion-panel surface-panel relative z-[var(--z-modal-panel)] w-full max-w-sm overflow-hidden rounded-2xl"
+          @click.stop
+        >
+          <div class="ai-reason-header h-1.5 w-full"></div>
+          <div class="space-y-4 p-6">
+            <div class="text-center">
+              <div class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-ai)]">
+                <AppIcon name="sparkles" class="h-6 w-6" />
+              </div>
+              <h3 class="text-lg font-bold text-[var(--color-text-primary)]">AI 智能排序依据</h3>
+              <p class="mt-1 text-xs text-[var(--color-text-secondary)]">{{ selectedTodayAiReason.taskTitle }}</p>
+            </div>
+            <div class="rounded-lg bg-[var(--color-bg-surface-muted)] px-3 py-2 text-sm text-[var(--color-text-body)]">
+              排序位次：<span class="mono font-semibold text-[var(--color-ai)]">#{{ selectedTodayAiReason.rank }}</span>
+            </div>
+            <div class="rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-3 py-3 text-sm leading-relaxed text-[var(--color-text-body)]">
+              {{ selectedTodayAiReason.reason || 'AI 未返回详细理由。' }}
+            </div>
+          </div>
+          <div class="flex justify-end p-4 pt-0">
+            <button type="button" class="btn-ai rounded-xl px-5 py-2 text-sm font-bold" @click="closeTodayAiReasonDialog">
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <AppConfirmDialog
       v-model="showDeleteTaskConfirm"
       variant="danger"
@@ -856,7 +907,9 @@ import {
   updateMilestoneApi,
 } from '@/api/milestone'
 import { useToast } from '@/composables/useToast'
+import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
 import {
   offProjectListUpdated,
@@ -873,8 +926,11 @@ import {
   writeTaskCache,
 } from '@/utils/taskCache'
 import {
+  clearTaskTodayAiOrderCache,
   readSelectedProjectIdCache,
+  readTaskTodayAiOrderCache,
   writeSelectedProjectIdCache,
+  writeTaskTodayAiOrderCache,
 } from '@/utils/appCache'
 import {
   isTaskCompleted,
@@ -893,6 +949,16 @@ interface Task {
   projectId: string
   dueDate?: string | null
   milestoneId?: string | null
+}
+
+interface TodayAiOrderMeta {
+  rank: number
+  reason: string
+}
+
+interface TodayAiOrderCachePayload {
+  dateKey: string
+  metaByTaskId: Record<string, TodayAiOrderMeta>
 }
 
 interface Milestone {
@@ -1005,18 +1071,19 @@ const normalizeAiRank = (rawRank: unknown, fallbackRank: number) => {
   return Math.floor(rank)
 }
 
-const createTodayAiOrderRankMap = (items: AiTodayOrderItem[]) => {
-  const rankMap: Record<string, number> = {}
+const createTodayAiOrderMetaMap = (items: AiTodayOrderItem[]) => {
+  const metaMap: Record<string, TodayAiOrderMeta> = {}
   items.forEach((item, index) => {
     const taskId = String(item.taskId ?? '').trim()
     if (!taskId) return
     const rank = normalizeAiRank(item.rank, index + 1)
-    const current = rankMap[taskId]
-    if (current === undefined || rank < current) {
-      rankMap[taskId] = rank
+    const reason = typeof item.reason === 'string' ? item.reason.trim() : ''
+    const current = metaMap[taskId]
+    if (!current || rank < current.rank) {
+      metaMap[taskId] = { rank, reason }
     }
   })
-  return rankMap
+  return metaMap
 }
 
 const resolveClientTimezone = () => {
@@ -1036,6 +1103,51 @@ const formatIsoLocalDateTimeSeconds = (date: Date) => {
   )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
+const getTodayDateKey = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`
+}
+
+const normalizeTodayAiOrderMetaMap = (raw: unknown): Record<string, TodayAiOrderMeta> => {
+  if (!raw || typeof raw !== 'object') return {}
+  const source = raw as Record<string, unknown>
+  const normalized: Record<string, TodayAiOrderMeta> = {}
+
+  Object.entries(source).forEach(([taskId, value]) => {
+    if (!taskId) return
+    if (!value || typeof value !== 'object') return
+
+    const rank = Number((value as { rank?: unknown }).rank)
+    if (!Number.isFinite(rank) || rank < 1) return
+
+    const reasonRaw = (value as { reason?: unknown }).reason
+    normalized[taskId] = {
+      rank: Math.floor(rank),
+      reason: typeof reasonRaw === 'string' ? reasonRaw.trim() : '',
+    }
+  })
+
+  return normalized
+}
+
+const hydrateTodayAiOrderMetaFromCache = () => {
+  const cached = readTaskTodayAiOrderCache<TodayAiOrderCachePayload>()
+  if (!cached || cached.dateKey !== getTodayDateKey()) {
+    clearTaskTodayAiOrderCache()
+    return
+  }
+  todayAiOrderMetaByTaskId.value = normalizeTodayAiOrderMetaMap(cached.metaByTaskId)
+}
+
+const persistTodayAiOrderMetaToCache = (metaMap: Record<string, TodayAiOrderMeta>) => {
+  writeTaskTodayAiOrderCache<TodayAiOrderCachePayload>({
+    dateKey: getTodayDateKey(),
+    metaByTaskId: metaMap,
+  })
+}
+
 const PROJECT_LIST_EVENT_SOURCE = 'task-list'
 const AGGREGATE_PAGE_SIZE = 100
 const AGGREGATE_MAX_PAGES = 200
@@ -1050,6 +1162,8 @@ const DEFAULT_BOARD_ERROR_MESSAGE = '加载失败，请稍后重试。'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const aiPendingRegistry = useAiPendingRegistryStore()
+const { runAiRequest } = useAiPendingRequest()
 const undoDelete = useUndoDelete()
 
 const projectList = ref<Project[]>([])
@@ -1076,16 +1190,18 @@ const selectedProjectColor = computed(() =>
   isAggregateView.value ? '' : normalizeProjectColorValue(selectedProject.value?.color),
 )
 const pageTitle = computed(() => {
-  if (isTodayView.value) return '今天'
-  if (isWeekView.value) return '本周'
+  if (isTodayView.value) return '今天截止'
+  if (isWeekView.value) return '本周截止'
   return selectedProject.value?.name || '请选择清单'
 })
 const mainTaskSectionTitle = computed(() => {
-  if (isTodayView.value) return '今天任务'
-  if (isWeekView.value) return '本周任务'
+  if (isTodayView.value) return '今天截止'
+  if (isWeekView.value) return '本周截止'
   return '默认列表'
 })
 const shouldShowTodayAiOrderButton = computed(() => isTodayView.value && taskList.value.length > 0)
+const todayAiOrderEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER])
+const isFetchingTodayAiOrder = computed(() => todayAiOrderEntry.value.status === 'pending')
 const currentContextKey = computed(() => {
   if (isTodayView.value) return 'aggregate:today'
   if (isWeekView.value) return 'aggregate:week'
@@ -1139,9 +1255,10 @@ const projectLoadVersion = ref(0)
 const taskLoadVersion = ref(0)
 const milestoneLoadVersion = ref(0)
 const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
-const todayAiOrderRankByTaskId = ref<Record<string, number>>({})
-const isFetchingTodayAiOrder = ref(false)
-const todayAiOrderRequestVersion = ref(0)
+const todayAiOrderMetaByTaskId = ref<Record<string, TodayAiOrderMeta>>({})
+const isTaskViewMounted = ref(false)
+const showTodayAiReasonDialog = ref(false)
+const selectedTodayAiReason = ref<{ taskTitle: string; rank: number; reason: string } | null>(null)
 
 const isMobile = computed(() => viewportWidth.value < 768)
 let boardSlowTimer: ReturnType<typeof setTimeout> | null = null
@@ -1248,18 +1365,56 @@ const getTaskCheckboxBorderColor = (status: number): string | undefined => {
 const TASK_TITLE_MAX_LENGTH = 50
 const TASK_DESCRIPTION_MAX_LENGTH = 500
 
+const applyTodayAiOrderPayload = (payload: unknown) => {
+  const metaMap = createTodayAiOrderMetaMap(extractAiTodayOrderItems(payload))
+  todayAiOrderMetaByTaskId.value = metaMap
+  persistTodayAiOrderMetaToCache(metaMap)
+  return true
+}
+
+const consumePendingTodayAiOrder = () => {
+  const entry = todayAiOrderEntry.value
+  if (entry.status !== 'success') return
+  if (!isTodayView.value || !isTaskViewMounted.value || taskList.value.length === 0) return
+
+  const applied = applyTodayAiOrderPayload(entry.responsePayload)
+  if (applied) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER, entry.requestId)
+  }
+}
+
+const getTodayAiOrderMeta = (task: Task): TodayAiOrderMeta | null => {
+  if (!isTodayView.value || isTaskCompleted(task.status)) return null
+  const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
+  if (!meta || !Number.isFinite(meta.rank)) return null
+  return meta
+}
+
+const openTodayAiReasonDialog = (task: Task) => {
+  const meta = getTodayAiOrderMeta(task)
+  if (!meta) return
+  selectedTodayAiReason.value = {
+    taskTitle: task.title,
+    rank: meta.rank,
+    reason: meta.reason,
+  }
+  showTodayAiReasonDialog.value = true
+}
+
+const closeTodayAiReasonDialog = () => {
+  showTodayAiReasonDialog.value = false
+  selectedTodayAiReason.value = null
+}
+
 const requestTodayAiOrder = async () => {
   if (!isTodayView.value) return
   const todayTasks = taskList.value
   if (todayTasks.length === 0) return
 
-  const requestVersion = ++todayAiOrderRequestVersion.value
-  isFetchingTodayAiOrder.value = true
-
   const candidateTasks = todayTasks.filter((task) => !isTaskCompleted(task.status))
   if (candidateTasks.length === 0) {
-    todayAiOrderRankByTaskId.value = {}
-    isFetchingTodayAiOrder.value = false
+    todayAiOrderMetaByTaskId.value = {}
+    clearTaskTodayAiOrderCache()
     toast.warning('没有可排序的未完成任务。')
     return
   }
@@ -1277,33 +1432,43 @@ const requestTodayAiOrder = async () => {
     requestPayload.taskIds = numericTaskIds.slice(0, AI_TODAY_ORDER_MAX_LIMIT)
   }
 
-  try {
-    const response = await aiTodayOrderRecommendApi(requestPayload)
-    if (requestVersion !== todayAiOrderRequestVersion.value || !isTodayView.value) return
+  const result = await runAiRequest({
+    board: AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER,
+    requestMeta: {
+      taskCount: candidateTasks.length,
+      taskIds: requestPayload.taskIds || null,
+      strategy: requestPayload.strategy,
+      timezone: requestPayload.timezone,
+      now: requestPayload.now,
+    },
+    request: () => aiTodayOrderRecommendApi(requestPayload),
+    successMessage: 'AI 智能排序响应完成。',
+    errorMessage: 'AI 智能排序失败，请稍后重试。',
+  })
 
-    const rankMap = createTodayAiOrderRankMap(extractAiTodayOrderItems(response))
-    todayAiOrderRankByTaskId.value = rankMap
-    if (Object.keys(rankMap).length === 0) {
-      toast.warning('AI 未返回可用排序，已保持当前顺序。')
-      return
-    }
-    toast.success('已应用 AI 排序。')
-  } catch (error) {
-    if (requestVersion !== todayAiOrderRequestVersion.value) return
-    todayAiOrderRankByTaskId.value = {}
-    console.warn('加载 AI 今日排序失败，已降级为默认排序', error)
-    toast.error('获取 AI 排序失败，请稍后重试。')
-  } finally {
-    if (requestVersion === todayAiOrderRequestVersion.value) {
-      isFetchingTodayAiOrder.value = false
-    }
+  if (result.status === 'blocked') {
+    toast.warning('AI 智能排序正在处理中，请稍候。')
+    return
+  }
+
+  if (result.status === 'error') {
+    todayAiOrderMetaByTaskId.value = {}
+    clearTaskTodayAiOrderCache()
+    return
+  }
+
+  if (result.status !== 'success' || !result.ticket || !isTaskViewMounted.value || !isTodayView.value) return
+
+  const applied = applyTodayAiOrderPayload(result.payload)
+  if (applied) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER, result.ticket.requestId)
   }
 }
 
 const getTodayAiRank = (task: Task) => {
   if (!isTodayView.value || isTaskCompleted(task.status)) return Number.POSITIVE_INFINITY
-  const rank = todayAiOrderRankByTaskId.value[String(task.id)]
-  return typeof rank === 'number' && Number.isFinite(rank) ? rank : Number.POSITIVE_INFINITY
+  const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
+  return meta && Number.isFinite(meta.rank) ? meta.rank : Number.POSITIVE_INFINITY
 }
 
 const getTaskDueDateTimestamp = (dueDate?: string | null) => {
@@ -1716,15 +1881,15 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
   const isStaleRequest = () => requestVersion !== taskLoadVersion.value
-  if (!isTodayView.value) {
-    todayAiOrderRankByTaskId.value = {}
-  }
 
   if (isAggregateView.value) {
     if (projectList.value.length === 0) {
       taskList.value = []
       selectedTask.value = null
-      if (isTodayView.value) todayAiOrderRankByTaskId.value = {}
+      if (isTodayView.value) {
+        todayAiOrderMetaByTaskId.value = {}
+        clearTaskTodayAiOrderCache()
+      }
       return okOutcome()
     }
 
@@ -1736,7 +1901,8 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
         )
         const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(allRecords))
         if (isTodayView.value && filteredRecords.length === 0) {
-          todayAiOrderRankByTaskId.value = {}
+          todayAiOrderMetaByTaskId.value = {}
+          clearTaskTodayAiOrderCache()
         }
         taskList.value = sortTaskListForCurrentBoard(filteredRecords)
         syncSelectedTaskFromList()
@@ -1754,7 +1920,8 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
       const records = responses.flat()
       const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(records))
       if (isTodayView.value && filteredRecords.length === 0) {
-        todayAiOrderRankByTaskId.value = {}
+        todayAiOrderMetaByTaskId.value = {}
+        clearTaskTodayAiOrderCache()
       }
       taskList.value = sortTaskListForCurrentBoard(filteredRecords)
       writeAggregateTaskCacheFromRecords(records)
@@ -1994,6 +2161,12 @@ const milestoneOptions = computed(() => [
     label: milestone.name,
   })),
 ])
+
+const newTaskMilestoneLabel = computed(() => {
+  if (!newTaskMilestoneId.value) return '默认列表'
+  const matched = milestoneList.value.find((milestone) => milestone.id === newTaskMilestoneId.value)
+  return matched?.name || '默认列表'
+})
 
 const getNewTaskFlagOptionId = (index: number) => `new-task-flag-option-${index}`
 
@@ -2568,6 +2741,7 @@ watch(
   [() => route.query.projectId, () => route.query.view],
   async () => {
     closeCompletionQualityModal()
+    closeTodayAiReasonDialog()
     resetNewTaskDraft({ blurInput: true })
     syncSelectedProject()
     closeDueDatePicker()
@@ -2575,6 +2749,9 @@ watch(
     isPriorityMenuOpen.value = false
     isMilestoneMenuOpen.value = false
     isNewTaskMilestoneMenuOpen.value = false
+    if (isTodayView.value) {
+      hydrateTodayAiOrderMetaFromCache()
+    }
     await loadContextData(currentContextKey.value)
   },
 )
@@ -2584,6 +2761,13 @@ watch(
   async () => {
     await nextTick()
     syncDetailEditorHeights()
+  },
+)
+
+watch(
+  [() => todayAiOrderEntry.value.status, isTodayView, () => taskList.value.length],
+  () => {
+    consumePendingTodayAiOrder()
   },
 )
 
@@ -2600,15 +2784,22 @@ watch(showDeleteMilestoneConfirm, (next) => {
 })
 
 onMounted(async () => {
+  isTaskViewMounted.value = true
+  if (isTodayView.value) {
+    hydrateTodayAiOrderMetaFromCache()
+  }
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
   onProjectListUpdated(handleProjectListUpdated)
   syncSelectedProject()
   await loadContextData(currentContextKey.value)
+  consumePendingTodayAiOrder()
 })
 
 onBeforeUnmount(() => {
+  isTaskViewMounted.value = false
+  closeTodayAiReasonDialog()
   closeCompletionQualityModal()
   clearBoardSlowTimer()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
@@ -2641,6 +2832,10 @@ onBeforeUnmount(() => {
 
 .completion-header {
   background: var(--color-primary);
+}
+
+.ai-reason-header {
+  background: var(--color-ai);
 }
 
 .completion-option {

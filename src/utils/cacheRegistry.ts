@@ -9,6 +9,7 @@ export const TASK_LIST_CACHE_PREFIX = 'tick:cache:task-list:v1'
 export const TASK_LIST_ALL_CACHE_KEY = 'tick:cache:task-list:all:v1'
 export const PROJECT_LIST_CACHE_PREFIX = 'tick:cache:project-list'
 export const PROJECT_PROGRESS_CACHE_KEY = 'tick:cache:project-progress:v2'
+export const TASK_TODAY_AI_ORDER_CACHE_KEY = 'tick:cache:task-today-ai-order:v1'
 
 export const CACHE_REGISTRY = {
   selectedProjectId: {
@@ -34,6 +35,12 @@ export const CACHE_REGISTRY = {
     ttlMs: 30 * 60 * 1000,
     version: 1,
     owner: 'project-progress',
+  },
+  taskTodayAiOrder: {
+    key: TASK_TODAY_AI_ORDER_CACHE_KEY,
+    ttlMs: null,
+    version: 1,
+    owner: 'task-today-ai-order',
   },
 } as const satisfies Record<string, CacheEntry>
 

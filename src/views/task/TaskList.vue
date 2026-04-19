@@ -122,9 +122,22 @@
         <div :key="boardTransitionKey" class="flex-1 overflow-y-auto p-3 sm:p-4">
           <div v-if="shouldRenderBoardData" class="space-y-4">
             <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
-            <h3 class="px-1 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
-              {{ mainTaskSectionTitle }}
-            </h3>
+            <div class="flex items-center justify-between gap-3 px-1">
+              <h3 class="text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
+                {{ mainTaskSectionTitle }}
+              </h3>
+              <button
+                v-if="shouldShowTodayAiOrderButton"
+                type="button"
+                class="btn-ai inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
+                :disabled="isFetchingTodayAiOrder"
+                :class="isFetchingTodayAiOrder ? 'cursor-not-allowed opacity-70' : ''"
+                @click="requestTodayAiOrder"
+              >
+                <AppIcon name="sparkles" class="h-3.5 w-3.5" />
+                {{ isFetchingTodayAiOrder ? '获取中...' : '获取 AI 排序' }}
+              </button>
+            </div>
             <div class="space-y-2">
               <div
                 v-for="task in groupedTasks.unassigned"
@@ -829,6 +842,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import {
+  aiTodayOrderRecommendApi,
+  type AiTodayOrderItem,
+  type AiTodayOrderRecommendRequest,
+} from '@/api/ai'
 import { fetchProjectList } from '@/api/project'
 import { addTaskApi, deleteTaskApi, fetchTaskList, updateTaskApi } from '@/api/task'
 import {
@@ -972,9 +990,58 @@ const extractTaskPagePayload = (payload: unknown): TaskPageResponse => {
   }
 }
 
+const extractAiTodayOrderItems = (payload: unknown): AiTodayOrderItem[] => {
+  if (!isRecord(payload)) return []
+  if (Array.isArray(payload.items)) return payload.items as AiTodayOrderItem[]
+  if (isRecord(payload.data) && Array.isArray(payload.data.items)) {
+    return payload.data.items as AiTodayOrderItem[]
+  }
+  return []
+}
+
+const normalizeAiRank = (rawRank: unknown, fallbackRank: number) => {
+  const rank = Number(rawRank)
+  if (!Number.isFinite(rank) || rank < 1) return fallbackRank
+  return Math.floor(rank)
+}
+
+const createTodayAiOrderRankMap = (items: AiTodayOrderItem[]) => {
+  const rankMap: Record<string, number> = {}
+  items.forEach((item, index) => {
+    const taskId = String(item.taskId ?? '').trim()
+    if (!taskId) return
+    const rank = normalizeAiRank(item.rank, index + 1)
+    const current = rankMap[taskId]
+    if (current === undefined || rank < current) {
+      rankMap[taskId] = rank
+    }
+  })
+  return rankMap
+}
+
+const resolveClientTimezone = () => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (typeof timezone === 'string' && timezone.trim()) return timezone
+  } catch {
+    // ignore and use fallback timezone
+  }
+  return AI_TODAY_ORDER_DEFAULT_TIMEZONE
+}
+
+const formatIsoLocalDateTimeSeconds = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 const PROJECT_LIST_EVENT_SOURCE = 'task-list'
 const AGGREGATE_PAGE_SIZE = 100
 const AGGREGATE_MAX_PAGES = 200
+const AI_TODAY_ORDER_MAX_LIMIT = 50
+const AI_TODAY_ORDER_DEFAULT_STRATEGY = 'balanced'
+const AI_TODAY_ORDER_DEFAULT_TIMEZONE = 'Asia/Shanghai'
 const BOARD_SLOW_THRESHOLD_MS = 1200
 const PROJECT_CONTEXT_PREFIX = 'project:'
 const AGGREGATE_CONTEXT_PREFIX = 'aggregate:'
@@ -1018,6 +1085,7 @@ const mainTaskSectionTitle = computed(() => {
   if (isWeekView.value) return '本周任务'
   return '默认列表'
 })
+const shouldShowTodayAiOrderButton = computed(() => isTodayView.value && taskList.value.length > 0)
 const currentContextKey = computed(() => {
   if (isTodayView.value) return 'aggregate:today'
   if (isWeekView.value) return 'aggregate:week'
@@ -1071,6 +1139,9 @@ const projectLoadVersion = ref(0)
 const taskLoadVersion = ref(0)
 const milestoneLoadVersion = ref(0)
 const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
+const todayAiOrderRankByTaskId = ref<Record<string, number>>({})
+const isFetchingTodayAiOrder = ref(false)
+const todayAiOrderRequestVersion = ref(0)
 
 const isMobile = computed(() => viewportWidth.value < 768)
 let boardSlowTimer: ReturnType<typeof setTimeout> | null = null
@@ -1177,6 +1248,64 @@ const getTaskCheckboxBorderColor = (status: number): string | undefined => {
 const TASK_TITLE_MAX_LENGTH = 50
 const TASK_DESCRIPTION_MAX_LENGTH = 500
 
+const requestTodayAiOrder = async () => {
+  if (!isTodayView.value) return
+  const todayTasks = taskList.value
+  if (todayTasks.length === 0) return
+
+  const requestVersion = ++todayAiOrderRequestVersion.value
+  isFetchingTodayAiOrder.value = true
+
+  const candidateTasks = todayTasks.filter((task) => !isTaskCompleted(task.status))
+  if (candidateTasks.length === 0) {
+    todayAiOrderRankByTaskId.value = {}
+    isFetchingTodayAiOrder.value = false
+    toast.warning('没有可排序的未完成任务。')
+    return
+  }
+
+  const numericTaskIds = candidateTasks
+    .map((task) => Number(task.id))
+    .filter((id) => Number.isSafeInteger(id) && id > 0)
+  const requestPayload: AiTodayOrderRecommendRequest = {
+    timezone: resolveClientTimezone(),
+    now: formatIsoLocalDateTimeSeconds(new Date()),
+    strategy: AI_TODAY_ORDER_DEFAULT_STRATEGY,
+    limit: Math.min(AI_TODAY_ORDER_MAX_LIMIT, candidateTasks.length),
+  }
+  if (numericTaskIds.length > 0) {
+    requestPayload.taskIds = numericTaskIds.slice(0, AI_TODAY_ORDER_MAX_LIMIT)
+  }
+
+  try {
+    const response = await aiTodayOrderRecommendApi(requestPayload)
+    if (requestVersion !== todayAiOrderRequestVersion.value || !isTodayView.value) return
+
+    const rankMap = createTodayAiOrderRankMap(extractAiTodayOrderItems(response))
+    todayAiOrderRankByTaskId.value = rankMap
+    if (Object.keys(rankMap).length === 0) {
+      toast.warning('AI 未返回可用排序，已保持当前顺序。')
+      return
+    }
+    toast.success('已应用 AI 排序。')
+  } catch (error) {
+    if (requestVersion !== todayAiOrderRequestVersion.value) return
+    todayAiOrderRankByTaskId.value = {}
+    console.warn('加载 AI 今日排序失败，已降级为默认排序', error)
+    toast.error('获取 AI 排序失败，请稍后重试。')
+  } finally {
+    if (requestVersion === todayAiOrderRequestVersion.value) {
+      isFetchingTodayAiOrder.value = false
+    }
+  }
+}
+
+const getTodayAiRank = (task: Task) => {
+  if (!isTodayView.value || isTaskCompleted(task.status)) return Number.POSITIVE_INFINITY
+  const rank = todayAiOrderRankByTaskId.value[String(task.id)]
+  return typeof rank === 'number' && Number.isFinite(rank) ? rank : Number.POSITIVE_INFINITY
+}
+
 const getTaskDueDateTimestamp = (dueDate?: string | null) => {
   if (!dueDate) return Number.POSITIVE_INFINITY
   const timestamp = new Date(dueDate).getTime()
@@ -1195,6 +1324,31 @@ const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
 
   if (a.priority !== b.priority) return b.priority - a.priority
   return 0
+}
+
+const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: Task, b: Task) => {
+  const isACompleted = isTaskCompleted(a.status)
+  const isBCompleted = isTaskCompleted(b.status)
+  if (isACompleted !== isBCompleted) {
+    return isACompleted ? 1 : -1
+  }
+
+  const aiRankA = getTodayAiRank(a)
+  const aiRankB = getTodayAiRank(b)
+  if (aiRankA !== aiRankB) return aiRankA - aiRankB
+
+  const dueDateDiff = getTaskDueDateTimestamp(a.dueDate) - getTaskDueDateTimestamp(b.dueDate)
+  if (dueDateDiff !== 0) return dueDateDiff
+
+  if (a.priority !== b.priority) return b.priority - a.priority
+  return 0
+}
+
+const sortTaskListForCurrentBoard = (tasks: Task[]) => {
+  if (isTodayView.value) {
+    return [...tasks].sort(compareTodayTaskByCompletionThenAiThenDueDateThenPriority)
+  }
+  return [...tasks].sort(compareTaskByDueDateThenPriority)
 }
 
 const calendarWeekdayLabels = ['日', '一', '二', '三', '四', '五', '六'] as const
@@ -1237,6 +1391,11 @@ const getCurrentWeekRange = () => {
     startDateKey: toDateKey(weekStart),
     endDateKey: toDateKey(weekEnd),
   }
+}
+
+const filterTasksByExistingProjects = (records: Task[]) => {
+  const existingProjectIds = new Set(projectList.value.map((project) => String(project.id)))
+  return records.filter((task) => existingProjectIds.has(String(task.projectId)))
 }
 
 const filterAggregateTasks = (records: Task[]) => {
@@ -1556,11 +1715,16 @@ const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean)
 const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
+  const isStaleRequest = () => requestVersion !== taskLoadVersion.value
+  if (!isTodayView.value) {
+    todayAiOrderRankByTaskId.value = {}
+  }
 
   if (isAggregateView.value) {
     if (projectList.value.length === 0) {
       taskList.value = []
       selectedTask.value = null
+      if (isTodayView.value) todayAiOrderRankByTaskId.value = {}
       return okOutcome()
     }
 
@@ -1570,7 +1734,11 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
         const allRecords = Object.values(cachedAllProjectsTasks).flatMap((items) =>
           Array.isArray(items) ? items : [],
         )
-        taskList.value = filterAggregateTasks(allRecords).sort(compareTaskByDueDateThenPriority)
+        const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(allRecords))
+        if (isTodayView.value && filteredRecords.length === 0) {
+          todayAiOrderRankByTaskId.value = {}
+        }
+        taskList.value = sortTaskListForCurrentBoard(filteredRecords)
         syncSelectedTaskFromList()
         return okOutcome()
       }
@@ -1579,17 +1747,21 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     try {
       const responses = await Promise.all(
         projectList.value.map((project) =>
-          fetchAllTasksByProject(project.id, () => requestVersion !== taskLoadVersion.value),
+          fetchAllTasksByProject(project.id, isStaleRequest),
         ),
       )
-      if (requestVersion !== taskLoadVersion.value) return staleOutcome()
+      if (isStaleRequest()) return staleOutcome()
       const records = responses.flat()
-      taskList.value = filterAggregateTasks(records).sort(compareTaskByDueDateThenPriority)
+      const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(records))
+      if (isTodayView.value && filteredRecords.length === 0) {
+        todayAiOrderRankByTaskId.value = {}
+      }
+      taskList.value = sortTaskListForCurrentBoard(filteredRecords)
       writeAggregateTaskCacheFromRecords(records)
       syncSelectedTaskFromList()
       return okOutcome()
     } catch (error) {
-      if (requestVersion !== taskLoadVersion.value) return staleOutcome()
+      if (isStaleRequest()) return staleOutcome()
       console.error('加载今日任务失败', error)
       return errorOutcome(error)
     }
@@ -1710,7 +1882,11 @@ const retryCurrentContextLoad = async () => {
 const handleProjectListUpdated: EventListener = (event) => {
   const customEvent = event as CustomEvent<ProjectListUpdatedDetail>
   if (customEvent.detail?.source === PROJECT_LIST_EVENT_SOURCE) return
-  void loadProjects({ forceRefresh: true })
+  void loadContextData(currentContextKey.value, {
+    forceProjectRefresh: true,
+    forceMilestoneRefresh: !isAggregateView.value,
+    forceTaskRefresh: true,
+  })
 }
 
 const addTask = async () => {
@@ -2345,7 +2521,7 @@ const projectProgress = computed(() => {
 const groupedTasks = computed(() => {
   if (isAggregateView.value) {
     return {
-      unassigned: [...taskList.value].sort(compareTaskByDueDateThenPriority),
+      unassigned: sortTaskListForCurrentBoard(taskList.value),
       milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
     }
   }

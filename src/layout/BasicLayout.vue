@@ -551,13 +551,18 @@ import {
   writeSelectedProjectIdCache,
 } from '@/utils/appCache'
 import { clearAuthToken } from '@/utils/authToken'
-import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
+import {
+  clearProjectProgressCache,
+  readProjectListCache,
+  writeProjectListCache,
+} from '@/utils/projectCache'
 import {
   emitProjectListUpdated,
   offProjectListUpdated,
   onProjectListUpdated,
   type ProjectListUpdatedDetail,
 } from '@/utils/projectEvents'
+import { removeProjectTaskCaches } from '@/utils/taskCache'
 
 interface Project {
   id: string
@@ -659,6 +664,7 @@ const activeProjectActionId = ref('')
 const showProjectSettingsModal = ref(false)
 const projectSettingsMode = ref<'create' | 'update'>('create')
 const projectSettingsProjectId = ref('')
+const pendingProjectDeleteIds = new Set<string>()
 const projectSettingsForm = ref({
   name: '',
   icon: '',
@@ -731,6 +737,13 @@ const projectActionButtonClass = (projectId: string) => {
 const closeProjectActionMenu = () => {
   activeProjectActionId.value = ''
 }
+
+const syncProjectListCache = () => {
+  writeProjectListCache(0, projectList.value)
+}
+
+const filterPendingDeletedProjects = (records: Project[]) =>
+  records.filter((item) => !pendingProjectDeleteIds.has(item.id))
 
 const toggleProjectActionMenu = (projectId: string) => {
   activeProjectActionId.value = activeProjectActionId.value === projectId ? '' : projectId
@@ -1092,7 +1105,7 @@ const ensureDefaultProject = async () => {
 const loadProjects = async () => {
   const cachedRecords = readProjectListCache<Project>(0)
   if (cachedRecords && cachedRecords.length > 0) {
-    projectList.value = cachedRecords
+    projectList.value = filterPendingDeletedProjects(cachedRecords)
     await ensureDefaultProject()
   }
 
@@ -1103,8 +1116,8 @@ const loadProjects = async () => {
       console.error('加载项目失败：响应结构异常', res)
       return
     }
-    projectList.value = records
-    writeProjectListCache(0, projectList.value)
+    projectList.value = filterPendingDeletedProjects(records)
+    syncProjectListCache()
 
     if (activeProjectActionId.value && !projectList.value.some((item) => item.id === activeProjectActionId.value)) {
       closeProjectActionMenu()
@@ -1149,8 +1162,10 @@ const deleteProject = async (id: string, name: string) => {
   const removedProject = snapshot.find((item) => item.id === id)
   if (!removedProject) return
 
+  pendingProjectDeleteIds.add(id)
   const wasSelected = selectedProjectId.value === id
   projectList.value = snapshot.filter((item) => item.id !== id)
+  syncProjectListCache()
 
   if (wasSelected) {
     clearSelectedProjectIdCache()
@@ -1164,16 +1179,21 @@ const deleteProject = async (id: string, name: string) => {
       await deleteProjectApi(id)
     },
     onCommitSuccess: async () => {
-      await loadProjects()
+      pendingProjectDeleteIds.delete(id)
+      removeProjectTaskCaches(id)
+      clearProjectProgressCache(id)
+      syncProjectListCache()
       emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
     },
     onRollback: async () => {
+      pendingProjectDeleteIds.delete(id)
       if (!projectList.value.some((item) => item.id === id)) {
         const next = [...projectList.value]
         const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
         next.splice(insertIndex, 0, removedProject)
         projectList.value = next
       }
+      syncProjectListCache()
 
       if (wasSelected) {
         writeSelectedProjectIdCache(id)

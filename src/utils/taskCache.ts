@@ -116,3 +116,16 @@ export const syncAggregateTaskCacheByProject = (projectId: string, tasks: Task[]
     [projectId]: tasks,
   })
 }
+
+export const removeProjectTaskCaches = (projectId: string) => {
+  if (!projectId) return
+
+  clearTaskCache(projectId)
+
+  const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY)
+  if (!cachedAllProjectsTasks || !(projectId in cachedAllProjectsTasks)) return
+
+  const nextCache = { ...cachedAllProjectsTasks }
+  delete nextCache[projectId]
+  writeAllProjectsTaskCache(nextCache)
+}

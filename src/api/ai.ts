@@ -17,3 +17,34 @@ export const aiPolishApi = (data: {
 }) => {
   return request.post('/ai/polish', data)
 }
+
+export interface AiTodayOrderRecommendRequest {
+  taskIds?: Array<string | number>
+  timezone?: string
+  now?: string
+  strategy?: 'balanced' | 'benefit_first' | 'quick_win'
+  limit?: number
+}
+
+export interface AiTodayOrderItem {
+  taskId: string | number
+  rank?: number
+  score?: number
+  difficulty?: number
+  cost?: number
+  benefit?: number
+  estimatedMinutes?: number
+  reason?: string
+}
+
+export interface AiTodayOrderRecommendResponse {
+  strategy?: 'balanced' | 'benefit_first' | 'quick_win'
+  generatedAt?: string
+  fallbackUsed?: boolean
+  items?: AiTodayOrderItem[]
+}
+
+// AI 今日任务推荐顺序
+export const aiTodayOrderRecommendApi = (data: AiTodayOrderRecommendRequest) => {
+  return request.post('/ai/today-order/recommend', data)
+}

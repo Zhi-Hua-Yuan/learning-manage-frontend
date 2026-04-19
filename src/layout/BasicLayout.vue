@@ -70,7 +70,7 @@
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <AppIcon name="calendar" class="h-4 w-4" />
+            <AppIcon name="sun" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">今天</span>
           </div>
 
@@ -96,7 +96,7 @@
                 : 'text-[var(--color-text-secondary)]'
             "
           >
-            <AppIcon name="calendar" class="h-4 w-4" />
+            <AppIcon name="clipboard-list" class="h-4 w-4" />
             <span class="flex-1 text-[13px] leading-5">周报回顾</span>
           </div>
 
@@ -194,7 +194,7 @@
                 to="body"
               >
                 <div
-                  class="surface-panel absolute right-0 top-9 z-[var(--z-overlay)] w-36 overflow-hidden rounded-lg py-1"
+                  class="surface-panel z-[var(--z-overlay)] w-36 overflow-hidden rounded-lg py-1"
                   :style="getActionMenuStyle(project.id)"
                   data-project-action-menu
                   :data-project-id="project.id"
@@ -551,13 +551,18 @@ import {
   writeSelectedProjectIdCache,
 } from '@/utils/appCache'
 import { clearAuthToken } from '@/utils/authToken'
-import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
+import {
+  clearProjectProgressCache,
+  readProjectListCache,
+  writeProjectListCache,
+} from '@/utils/projectCache'
 import {
   emitProjectListUpdated,
   offProjectListUpdated,
   onProjectListUpdated,
   type ProjectListUpdatedDetail,
 } from '@/utils/projectEvents'
+import { removeProjectTaskCaches } from '@/utils/taskCache'
 
 interface Project {
   id: string
@@ -569,6 +574,31 @@ interface Project {
 interface CurrentUserInfo {
   username?: string
   account?: string
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+const extractListPayload = <T>(payload: unknown): T[] | null => {
+  if (Array.isArray(payload)) return payload as T[]
+  if (!isRecord(payload)) return null
+
+  if (Array.isArray(payload.records)) return payload.records as T[]
+  if (!('data' in payload)) return null
+
+  const nested = payload.data
+  if (Array.isArray(nested)) return nested as T[]
+  if (isRecord(nested) && Array.isArray(nested.records)) return nested.records as T[]
+  return null
+}
+
+const extractObjectPayload = <T>(payload: unknown): T | null => {
+  if (!isRecord(payload)) return null
+
+  if ('data' in payload && isRecord(payload.data)) {
+    return payload.data as T
+  }
+
+  return payload as T
 }
 
 const USER_INFO_UPDATED_EVENT = 'tick:user-updated'
@@ -634,6 +664,7 @@ const activeProjectActionId = ref('')
 const showProjectSettingsModal = ref(false)
 const projectSettingsMode = ref<'create' | 'update'>('create')
 const projectSettingsProjectId = ref('')
+const pendingProjectDeleteIds = new Set<string>()
 const projectSettingsForm = ref({
   name: '',
   icon: '',
@@ -707,18 +738,65 @@ const closeProjectActionMenu = () => {
   activeProjectActionId.value = ''
 }
 
+const syncProjectListCache = () => {
+  writeProjectListCache(0, projectList.value)
+}
+
+const filterPendingDeletedProjects = (records: Project[]) =>
+  records.filter((item) => !pendingProjectDeleteIds.has(item.id))
+
 const toggleProjectActionMenu = (projectId: string) => {
   activeProjectActionId.value = activeProjectActionId.value === projectId ? '' : projectId
 }
 
+const ACTION_MENU_GAP_PX = 4
+const ACTION_MENU_VIEWPORT_PADDING_PX = 8
+const ACTION_MENU_MIN_VISIBLE_HEIGHT_PX = 120
+const ACTION_MENU_PREFER_DOWN_MIN_SPACE_PX = 180
+
 const getActionMenuStyle = (projectId: string): Record<string, string> => {
   const el = document.querySelector(`[data-project-action-root][data-project-id="${projectId}"]`)
   if (!el) return { display: 'none' }
+
   const rect = el.getBoundingClientRect()
+  const right = Math.max(ACTION_MENU_VIEWPORT_PADDING_PX, window.innerWidth - rect.right)
+  const availableBelow = window.innerHeight - rect.bottom - ACTION_MENU_VIEWPORT_PADDING_PX
+  const availableAbove = rect.top - ACTION_MENU_VIEWPORT_PADDING_PX
+
+  const openUpward =
+    availableBelow < ACTION_MENU_PREFER_DOWN_MIN_SPACE_PX && availableAbove > availableBelow
+
+  const availableHeight = Math.max(
+    ACTION_MENU_MIN_VISIBLE_HEIGHT_PX,
+    (openUpward ? availableAbove : availableBelow) - ACTION_MENU_GAP_PX,
+  )
+
+  if (openUpward) {
+    const bottom = Math.max(
+      ACTION_MENU_VIEWPORT_PADDING_PX,
+      window.innerHeight - rect.top + ACTION_MENU_GAP_PX,
+    )
+    return {
+      position: 'fixed',
+      right: `${right}px`,
+      bottom: `${bottom}px`,
+      maxHeight: `${availableHeight}px`,
+      overflowY: 'auto',
+    }
+  }
+
+  const maxTop = window.innerHeight - ACTION_MENU_VIEWPORT_PADDING_PX - ACTION_MENU_MIN_VISIBLE_HEIGHT_PX
+  const top = Math.max(
+    ACTION_MENU_VIEWPORT_PADDING_PX,
+    Math.min(rect.bottom + ACTION_MENU_GAP_PX, maxTop),
+  )
+
   return {
     position: 'fixed',
-    right: `${window.innerWidth - rect.right}px`,
-    top: `${rect.bottom + 4}px`,
+    right: `${right}px`,
+    top: `${top}px`,
+    maxHeight: `${availableHeight}px`,
+    overflowY: 'auto',
   }
 }
 
@@ -805,6 +883,41 @@ const selectProjectColor = (color: string) => {
   projectSettingsForm.value.color = color
 }
 
+const resolveProjectId = (value: unknown): string => {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const normalized = String(value).trim()
+    return normalized && normalized !== 'true' ? normalized : ''
+  }
+
+  if (!isRecord(value)) return ''
+  const idCandidates = [value.id, value.projectId]
+  for (const candidate of idCandidates) {
+    if (typeof candidate === 'string' || typeof candidate === 'number') {
+      const normalized = String(candidate).trim()
+      if (normalized && normalized !== 'true') return normalized
+    }
+  }
+
+  return ''
+}
+
+const pinProjectToTop = async (projectId: string) => {
+  await loadProjects()
+
+  const ids = projectList.value.map((item) => item.id)
+  if (!ids.includes(projectId)) return
+
+  const reorderedIds = [projectId, ...ids.filter((id) => id !== projectId)]
+  await reorderProjectApi(
+    reorderedIds.map((id, index) => ({
+      id,
+      orderNo: index,
+    })),
+  )
+
+  await loadProjects()
+}
+
 const submitProjectSettings = async () => {
   const name = projectSettingsForm.value.name.trim()
   if (!name) {
@@ -818,11 +931,24 @@ const submitProjectSettings = async () => {
   isProjectSettingsSubmitting.value = true
   try {
     if (projectSettingsMode.value === 'create') {
-      await addProjectApi({
+      const created = await addProjectApi({
         name,
         icon: normalizedIcon,
         color: normalizedColor,
       })
+      const newProjectId = resolveProjectId(created)
+
+      if (newProjectId) {
+        try {
+          await pinProjectToTop(newProjectId)
+        } catch (error) {
+          console.error('新建清单置顶失败', error)
+          await loadProjects()
+          toast.warning('清单已创建，但置顶失败。')
+        }
+      } else {
+        await loadProjects()
+      }
     } else {
       const id = projectSettingsProjectId.value
       if (!id) return
@@ -832,12 +958,12 @@ const submitProjectSettings = async () => {
         icon: normalizedIcon,
         color: normalizedColor,
       })
+      await loadProjects()
     }
 
     showProjectSettingsModal.value = false
     projectSettingsProjectId.value = ''
     resetProjectSettingsForm()
-    await loadProjects()
     emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
   } catch {
     toast.error(projectSettingsMode.value === 'create' ? '创建清单失败，请检查网络后重试。' : '保存清单设置失败，请检查网络后重试。')
@@ -942,7 +1068,8 @@ const deleteProjectConfirmTitle = computed(() => {
 const loadUserInfo = async () => {
   try {
     const res = await getUserMeApi()
-    currentUserInfo.value = res && typeof res === 'object' ? (res as CurrentUserInfo) : {}
+    const parsed = extractObjectPayload<CurrentUserInfo>(res)
+    currentUserInfo.value = parsed || {}
   } catch (error) {
     console.error('获取用户信息失败', error)
   }
@@ -978,15 +1105,19 @@ const ensureDefaultProject = async () => {
 const loadProjects = async () => {
   const cachedRecords = readProjectListCache<Project>(0)
   if (cachedRecords && cachedRecords.length > 0) {
-    projectList.value = cachedRecords
+    projectList.value = filterPendingDeletedProjects(cachedRecords)
     await ensureDefaultProject()
   }
 
   try {
     const res = await fetchProjectList({ status: 0 })
-    const records = (res as unknown as { records?: Project[] })?.records
-    projectList.value = records || []
-    writeProjectListCache(0, projectList.value)
+    const records = extractListPayload<Project>(res)
+    if (!records) {
+      console.error('加载项目失败：响应结构异常', res)
+      return
+    }
+    projectList.value = filterPendingDeletedProjects(records)
+    syncProjectListCache()
 
     if (activeProjectActionId.value && !projectList.value.some((item) => item.id === activeProjectActionId.value)) {
       closeProjectActionMenu()
@@ -1031,8 +1162,10 @@ const deleteProject = async (id: string, name: string) => {
   const removedProject = snapshot.find((item) => item.id === id)
   if (!removedProject) return
 
+  pendingProjectDeleteIds.add(id)
   const wasSelected = selectedProjectId.value === id
   projectList.value = snapshot.filter((item) => item.id !== id)
+  syncProjectListCache()
 
   if (wasSelected) {
     clearSelectedProjectIdCache()
@@ -1046,16 +1179,21 @@ const deleteProject = async (id: string, name: string) => {
       await deleteProjectApi(id)
     },
     onCommitSuccess: async () => {
-      await loadProjects()
+      pendingProjectDeleteIds.delete(id)
+      removeProjectTaskCaches(id)
+      clearProjectProgressCache(id)
+      syncProjectListCache()
       emitProjectListUpdated(PROJECT_LIST_EVENT_SOURCE)
     },
     onRollback: async () => {
+      pendingProjectDeleteIds.delete(id)
       if (!projectList.value.some((item) => item.id === id)) {
         const next = [...projectList.value]
         const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
         next.splice(insertIndex, 0, removedProject)
         projectList.value = next
       }
+      syncProjectListCache()
 
       if (wasSelected) {
         writeSelectedProjectIdCache(id)

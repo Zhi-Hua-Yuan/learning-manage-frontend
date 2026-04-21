@@ -71,7 +71,7 @@
             "
           >
             <AppIcon name="sun" class="h-4 w-4" />
-            <span class="flex-1 text-[13px] leading-5">今天</span>
+            <span class="flex-1 text-[13px] leading-5">今天截止</span>
           </div>
 
           <div
@@ -84,7 +84,7 @@
             "
           >
             <AppIcon name="calendar" class="h-4 w-4" />
-            <span class="flex-1 text-[13px] leading-5">本周</span>
+            <span class="flex-1 text-[13px] leading-5">本周截止</span>
           </div>
 
           <div

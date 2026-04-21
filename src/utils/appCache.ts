@@ -76,3 +76,28 @@ export const writeAiPlannerDraftCache = <T>(payload: T) => {
 export const clearAiPlannerDraftCache = () => {
   removeCache(CACHE_REGISTRY.aiPlannerDraft)
 }
+
+export const readTaskTodayAiOrderCache = <T>(): T | null => {
+  const entry = CACHE_REGISTRY.taskTodayAiOrder
+  const cached = readCache<T>(entry)
+  if (cached) return cached
+
+  const raw = readRawStorage(entry.key)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as T
+    writeCache(entry, parsed)
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export const writeTaskTodayAiOrderCache = <T>(payload: T) => {
+  writeCache(CACHE_REGISTRY.taskTodayAiOrder, payload)
+}
+
+export const clearTaskTodayAiOrderCache = () => {
+  removeCache(CACHE_REGISTRY.taskTodayAiOrder)
+}

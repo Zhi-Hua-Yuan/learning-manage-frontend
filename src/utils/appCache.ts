@@ -101,3 +101,28 @@ export const writeTaskTodayAiOrderCache = <T>(payload: T) => {
 export const clearTaskTodayAiOrderCache = () => {
   removeCache(CACHE_REGISTRY.taskTodayAiOrder)
 }
+
+export const readTaskListReplanStateCache = <T>(): T | null => {
+  const entry = CACHE_REGISTRY.taskListReplanState
+  const cached = readCache<T>(entry)
+  if (cached) return cached
+
+  const raw = readRawStorage(entry.key)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as T
+    writeCache(entry, parsed)
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export const writeTaskListReplanStateCache = <T>(payload: T) => {
+  writeCache(CACHE_REGISTRY.taskListReplanState, payload)
+}
+
+export const clearTaskListReplanStateCache = () => {
+  removeCache(CACHE_REGISTRY.taskListReplanState)
+}

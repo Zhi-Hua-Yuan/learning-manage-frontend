@@ -329,7 +329,7 @@
         <component
           :is="Component"
           :key="pageTransitionKey"
-          class="flex-1 overflow-y-auto bg-[var(--color-bg-page)]"
+          class="flex-1 min-h-0 overflow-y-auto bg-[var(--color-bg-page)]"
           :class="isCompactViewport ? 'pt-14' : ''"
           @refresh-projects="loadProjects"
         />

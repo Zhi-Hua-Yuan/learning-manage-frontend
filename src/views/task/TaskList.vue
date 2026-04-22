@@ -1,8 +1,8 @@
 ﻿<template>
   <div class="relative flex min-h-full flex-1 bg-[var(--color-bg-page)]">
-    <main class="flex min-w-0 flex-1 flex-col bg-[var(--color-bg-page)]">
+    <main class="flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--color-bg-page)]">
       <div
-        class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-3 sm:px-5"
+        class="flex h-14 items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-0 sm:px-5"
       >
         <div class="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
           <AppIcon
@@ -23,16 +23,51 @@
           ></span>
         </div>
 
+        <button
+          v-if="shouldShowUnifiedAiButton && isTodayView"
+          type="button"
+          class="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
+          :disabled="isUnifiedAiActionBusy"
+          :class="isUnifiedAiActionBusy ? 'cursor-not-allowed opacity-70' : ''"
+          :title="unifiedAiButtonHint"
+          :aria-label="unifiedAiButtonHint"
+          @click="handleUnifiedAiAction"
+        >
+          <svg v-if="isUnifiedAiActionBusy" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" class="opacity-25" />
+            <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <AppIcon v-else name="sparkles" class="h-5 w-5" />
+        </button>
+
         <div
           v-if="shouldRenderBoardData && !isAggregateView && selectedProjectId && taskList.length > 0"
-          class="flex w-full items-center gap-3 sm:w-56"
+          class="ml-auto flex items-center gap-2"
         >
-          <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
-          <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]">
-            <div
-              class="h-full bg-[var(--color-success)] transition-all duration-500"
-              :style="{ width: projectProgress + '%' }"
-            ></div>
+          <button
+            v-if="shouldShowUnifiedAiButton && !isAggregateView"
+            type="button"
+            class="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
+            :disabled="isUnifiedAiActionBusy"
+            :class="isUnifiedAiActionBusy ? 'cursor-not-allowed opacity-70' : ''"
+            :title="unifiedAiButtonHint"
+            :aria-label="unifiedAiButtonHint"
+            @click="handleUnifiedAiAction"
+          >
+            <svg v-if="isUnifiedAiActionBusy" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" class="opacity-25" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            <AppIcon v-else name="sparkles" class="h-5 w-5" />
+          </button>
+          <div class="flex w-40 items-center gap-3 sm:w-56">
+            <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
+            <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]">
+              <div
+                class="h-full bg-[var(--color-success)] transition-all duration-500"
+                :style="{ width: projectProgress + '%' }"
+              ></div>
+            </div>
           </div>
         </div>
       </div>
@@ -120,24 +155,13 @@
       </div>
 
       <Transition name="content-fade" mode="out-in">
-        <div :key="boardTransitionKey" class="flex-1 overflow-y-auto p-3 sm:p-4">
+        <div :key="boardTransitionKey" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
           <div v-if="shouldRenderBoardData" class="space-y-4">
             <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
-            <div class="flex items-center justify-between gap-3 px-1">
+            <div class="flex items-center gap-3 px-1">
               <h3 class="text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
                 {{ mainTaskSectionTitle }}
               </h3>
-              <button
-                v-if="shouldShowTodayAiOrderButton"
-                type="button"
-                class="btn-ai inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                :disabled="isFetchingTodayAiOrder"
-                :class="isFetchingTodayAiOrder ? 'cursor-not-allowed opacity-70' : ''"
-                @click="requestTodayAiOrder"
-              >
-                <AppIcon name="sparkles" class="h-3.5 w-3.5" />
-                {{ isFetchingTodayAiOrder ? '获取中...' : 'AI 智能排序' }}
-              </button>
             </div>
             <div class="space-y-2">
               <div
@@ -447,7 +471,7 @@
 
     <aside
       v-if="selectedTask || !isMobile"
-      class="z-[var(--z-content-sticky)] flex flex-col bg-[var(--color-bg-surface)]"
+      class="z-[var(--z-popover)] flex min-h-0 flex-col bg-[var(--color-bg-surface)]"
       :class="
         isMobile
           ? 'fixed inset-0 w-full border-l-0'
@@ -499,7 +523,7 @@
           </div>
         </div>
 
-        <div class="flex-1 space-y-4 overflow-y-auto p-4">
+        <div class="flex-1 min-h-0 space-y-4 overflow-y-auto p-4">
           <div class="space-y-1">
             <textarea
               ref="detailTitleInputRef"
@@ -616,45 +640,45 @@
               <div
                 v-if="isDueDatePickerOpen"
                 @click.stop
-                class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 w-[280px] max-w-full rounded-lg p-3"
+                class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 flex w-full max-w-[320px] aspect-[5/6] flex-col overflow-hidden rounded-lg p-2"
               >
-                <div class="mb-3 flex items-center justify-between">
+                <div class="mb-2 flex shrink-0 items-center justify-between">
                   <button
                     type="button"
                     @click="shiftCalendarMonth(-1)"
-                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
+                    class="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
                     aria-label="上个月"
                   >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                   </button>
-                  <span class="mono text-sm font-medium text-[var(--color-text-primary)]">
+                  <span class="mono text-xs font-medium text-[var(--color-text-primary)]">
                     {{ currentCalendarMonthLabel }}
                   </span>
                   <button
                     type="button"
                     @click="shiftCalendarMonth(1)"
-                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
+                    class="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
                     aria-label="下个月"
                   >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
                   </button>
                 </div>
 
-                <div class="mb-1 grid grid-cols-7 gap-1 text-center text-xs text-[var(--color-text-tertiary)]">
+                <div class="mb-1 grid shrink-0 grid-cols-7 gap-1 text-center text-[11px] text-[var(--color-text-tertiary)]">
                   <span v-for="weekday in calendarWeekdayLabels" :key="weekday" class="py-1">{{ weekday }}</span>
                 </div>
 
-                <div class="grid grid-cols-7 gap-1">
+                <div class="grid min-h-0 flex-1 grid-cols-7 auto-rows-fr gap-1">
                   <button
                     v-for="cell in calendarCells"
                     :key="cell.key"
                     type="button"
                     @click="selectDueDate(cell.iso)"
-                    class="h-8 rounded-md text-sm transition-colors"
+                    class="h-full min-h-0 rounded-md text-xs leading-none transition-colors"
                     :class="
                       cell.isSelected
                         ? 'bg-[var(--color-primary)] text-[var(--color-text-on-accent)]'
@@ -669,18 +693,18 @@
                   </button>
                 </div>
 
-                <div class="mt-3 flex items-center justify-between gap-2">
+                <div class="mt-2 flex shrink-0 items-center justify-between gap-2">
                   <button
                     type="button"
                     @click="clearDueDate"
-                    class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
+                    class="inline-flex h-7 items-center rounded-md px-1.5 text-[11px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
                   >
                     清空
                   </button>
                   <button
                     type="button"
                     @click="selectTodayDueDate"
-                    class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
+                    class="inline-flex h-7 items-center rounded-md px-1.5 text-[11px] font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
                   >
                     今天
                   </button>
@@ -812,6 +836,136 @@
       </div>
     </transition>
 
+    <transition name="completion-overlay">
+      <div
+        v-if="showListReplanPreviewModal && listReplanPreviewPayload"
+        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI 清单重排预览"
+      >
+        <div class="completion-backdrop absolute inset-0" @click="closeListReplanPreviewDialog">
+          <div class="completion-backdrop-base absolute inset-0"></div>
+          <div class="completion-backdrop-blur absolute inset-0"></div>
+        </div>
+
+        <div
+          class="completion-panel surface-panel relative z-[var(--z-modal-panel)] w-full max-w-3xl overflow-hidden rounded-2xl"
+          @click.stop
+        >
+          <div class="ai-reason-header h-1.5 w-full"></div>
+          <div class="space-y-4 p-6">
+            <div class="text-center">
+              <div class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-ai)]">
+                <AppIcon name="sparkles" class="h-6 w-6" />
+              </div>
+              <h3 class="text-lg font-bold text-[var(--color-text-primary)]">AI 清单重排预览</h3>
+              <p class="mt-1 text-xs text-[var(--color-text-secondary)]">清单：{{ pageTitle }}</p>
+            </div>
+            <div class="rounded-lg bg-[var(--color-bg-surface-muted)] px-3 py-2 text-sm text-[var(--color-text-body)]">
+              变更任务数：<span class="mono font-semibold text-[var(--color-ai)]">{{ listReplanChangedCount }}</span>
+            </div>
+            <div
+              v-if="listReplanPreviewItems.length === 0"
+              class="rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-3 py-4 text-center text-sm text-[var(--color-text-secondary)]"
+            >
+              当前预览未检测到可应用的任务变更。
+            </div>
+            <div v-else class="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+              <div
+                v-for="item in listReplanPreviewItems"
+                :key="String(item.taskId)"
+                class="rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] p-3"
+              >
+                <div class="text-sm font-semibold text-[var(--color-text-primary)]">
+                  {{ item.newTitle || item.oldTitle || `任务 #${item.taskId}` }}
+                </div>
+                <div class="mt-2 space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">标题</span>
+                    <div class="list-replan-field-change">
+                      <span class="list-replan-chip">{{ item.oldTitle || '（空）' }}</span>
+                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span class="list-replan-chip">{{ item.newTitle || '（空）' }}</span>
+                    </div>
+                  </div>
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">优先级</span>
+                    <div class="list-replan-field-change">
+                      <span
+                        class="list-replan-priority-chip"
+                        :class="[
+                          getPriorityOption(item.oldPriority ?? 0).textClass,
+                          getListReplanPriorityChipClass(item.oldPriority ?? 0),
+                        ]"
+                      >
+                        <span class="priority-dot" :class="getPriorityOption(item.oldPriority ?? 0).dotClass"></span>
+                        {{ getPriorityOption(item.oldPriority ?? 0).text }}
+                      </span>
+                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span
+                        class="list-replan-priority-chip"
+                        :class="[
+                          getPriorityOption(item.newPriority ?? 0).textClass,
+                          getListReplanPriorityChipClass(item.newPriority ?? 0),
+                        ]"
+                      >
+                        <span class="priority-dot" :class="getPriorityOption(item.newPriority ?? 0).dotClass"></span>
+                        {{ getPriorityOption(item.newPriority ?? 0).text }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">截止日期</span>
+                    <div class="list-replan-field-change">
+                      <span class="list-replan-chip">{{ formatTaskDueDate(item.oldDueDate) || '未设置' }}</span>
+                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span class="list-replan-chip">{{ formatTaskDueDate(item.newDueDate) || '未设置' }}</span>
+                    </div>
+                  </div>
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">置信度</span>
+                    <span class="mono text-[var(--color-text-body)]">
+                      {{ normalizeListReplanConfidence(item.confidence) }}%
+                    </span>
+                  </div>
+                </div>
+                <div class="mt-2 rounded-lg bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-body)]">
+                  {{ item.reason || 'AI 未返回调整原因。' }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 p-4 pt-0">
+            <button
+              type="button"
+              class="btn-secondary rounded-xl px-4 py-2.5 text-sm font-semibold"
+              :disabled="isListReplanActionBusy"
+              :class="isListReplanActionBusy ? 'cursor-not-allowed opacity-70' : ''"
+              @click="cancelListReplanPreview"
+            >
+              {{ isListReplanCancelling ? '取消中...' : '取消预览' }}
+            </button>
+            <button
+              type="button"
+              class="btn-ai rounded-xl px-5 py-2 text-sm font-bold"
+              :disabled="isListReplanActionBusy || !canConfirmListReplan"
+              :class="isListReplanActionBusy || !canConfirmListReplan ? 'cursor-not-allowed opacity-70' : ''"
+              @click="confirmListReplanPreview"
+            >
+              {{ isListReplanConfirming ? '确认中...' : '确认生效' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <AppConfirmDialog
       v-model="showDeleteTaskConfirm"
       variant="danger"
@@ -872,9 +1026,13 @@
                 @click="confirmCompletionQuality(option.status)"
               >
                 <span class="block text-3xl leading-none">{{ option.emoji }}</span>
-                <span class="mt-2 block text-base font-semibold">{{ option.label }}</span>
+                <span class="mt-2 block text-base font-semibold">
+                  {{ option.label }}
+                  <span class="mono ml-1 text-xs font-medium opacity-70">{{ option.shortcutKey }}</span>
+                </span>
               </button>
             </div>
+            <p class="mt-3 text-xs text-[var(--color-text-tertiary)]">快捷键：差 1 · 中 2 · 好 3</p>
           </div>
 
           <div class="flex justify-end p-4 pt-0">
@@ -894,6 +1052,11 @@ import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import {
+  aiListReplanCancelApi,
+  aiListReplanConfirmApi,
+  aiListReplanPreviewApi,
+  type AiListReplanPreviewItem,
+  type AiListReplanPreviewResponse,
   aiTodayOrderRecommendApi,
   type AiTodayOrderItem,
   type AiTodayOrderRecommendRequest,
@@ -910,6 +1073,7 @@ import { useToast } from '@/composables/useToast'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
+import { useToastStore } from '@/stores/toast'
 import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
 import {
   offProjectListUpdated,
@@ -926,10 +1090,13 @@ import {
   writeTaskCache,
 } from '@/utils/taskCache'
 import {
+  clearTaskListReplanStateCache,
   clearTaskTodayAiOrderCache,
   readSelectedProjectIdCache,
+  readTaskListReplanStateCache,
   readTaskTodayAiOrderCache,
   writeSelectedProjectIdCache,
+  writeTaskListReplanStateCache,
   writeTaskTodayAiOrderCache,
 } from '@/utils/appCache'
 import {
@@ -961,6 +1128,21 @@ interface TodayAiOrderCachePayload {
   metaByTaskId: Record<string, TodayAiOrderMeta>
 }
 
+interface ListReplanPendingOperation {
+  listId: string
+  operationId: string
+  createdAt: string
+}
+
+interface ListReplanStateEntry {
+  dirty: boolean
+  pendingOperation: ListReplanPendingOperation | null
+  previewPayload: AiListReplanPreviewResponse | null
+  updatedAt: number
+}
+
+type ListReplanStateMap = Record<string, ListReplanStateEntry>
+
 interface Milestone {
   id: string
   name: string
@@ -988,6 +1170,7 @@ interface CompletionQualityOption {
   label: string
   emoji: string
   toneClass: string
+  shortcutKey: '1' | '2' | '3'
 }
 
 interface CalendarCell {
@@ -1148,6 +1331,108 @@ const persistTodayAiOrderMetaToCache = (metaMap: Record<string, TodayAiOrderMeta
   })
 }
 
+const LIST_REPLAN_OPERATION_TTL_MS = 30 * 60 * 1000
+
+const normalizeListId = (value: unknown) => String(value ?? '').trim()
+
+const normalizeListReplanPreviewItems = (value: unknown): AiListReplanPreviewItem[] => {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const record = item as Record<string, unknown>
+      return {
+        taskId: String(record.taskId ?? '').trim(),
+        oldTitle: typeof record.oldTitle === 'string' ? record.oldTitle.trim() : '',
+        newTitle: typeof record.newTitle === 'string' ? record.newTitle.trim() : '',
+        oldPriority: Number(record.oldPriority),
+        newPriority: Number(record.newPriority),
+        oldDueDate: typeof record.oldDueDate === 'string' ? record.oldDueDate.trim() : null,
+        newDueDate: typeof record.newDueDate === 'string' ? record.newDueDate.trim() : null,
+        confidence: Number(record.confidence),
+        reason: typeof record.reason === 'string' ? record.reason.trim() : '',
+      }
+    })
+    .filter((item) => item.taskId)
+}
+
+const normalizeListReplanPreviewPayload = (value: unknown): AiListReplanPreviewResponse | null => {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const operationId = String(record.operationId ?? '').trim()
+  if (!operationId) return null
+
+  const changedCountRaw = Number(record.changedCount)
+  const changedCount = Number.isFinite(changedCountRaw) && changedCountRaw >= 0 ? Math.floor(changedCountRaw) : 0
+
+  return {
+    operationId,
+    changedCount,
+    previewTasks: normalizeListReplanPreviewItems(record.previewTasks),
+  }
+}
+
+const isListReplanOperationExpired = (operation: ListReplanPendingOperation | null) => {
+  if (!operation) return false
+  const createdAt = Date.parse(operation.createdAt)
+  if (!Number.isFinite(createdAt)) return true
+  return Date.now() - createdAt > LIST_REPLAN_OPERATION_TTL_MS
+}
+
+const normalizeListReplanPendingOperation = (
+  value: unknown,
+  listId: string,
+): ListReplanPendingOperation | null => {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const operationId = String(record.operationId ?? '').trim()
+  const operationListId = normalizeListId(record.listId)
+  const createdAt = String(record.createdAt ?? '').trim()
+  if (!operationId || !operationListId || !createdAt) return null
+  if (operationListId !== listId) return null
+  const operation = { listId: operationListId, operationId, createdAt }
+  return isListReplanOperationExpired(operation) ? null : operation
+}
+
+const normalizeListReplanStateMap = (value: unknown): ListReplanStateMap => {
+  if (!value || typeof value !== 'object') return {}
+  const source = value as Record<string, unknown>
+  const next: ListReplanStateMap = {}
+
+  Object.entries(source).forEach(([listIdRaw, entryRaw]) => {
+    const listId = normalizeListId(listIdRaw)
+    if (!listId || !entryRaw || typeof entryRaw !== 'object') return
+
+    const entry = entryRaw as Record<string, unknown>
+    const dirty = Boolean(entry.dirty)
+    const pendingOperation = normalizeListReplanPendingOperation(entry.pendingOperation, listId)
+    const previewPayload = pendingOperation ? normalizeListReplanPreviewPayload(entry.previewPayload) : null
+    const updatedAt = Number(entry.updatedAt)
+
+    next[listId] = {
+      dirty,
+      pendingOperation,
+      previewPayload,
+      updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+    }
+  })
+
+  return next
+}
+
+const readListReplanStateMap = (): ListReplanStateMap => {
+  return normalizeListReplanStateMap(readTaskListReplanStateCache<unknown>())
+}
+
+const writeListReplanStateMap = (stateMap: ListReplanStateMap) => {
+  const nextKeys = Object.keys(stateMap)
+  if (nextKeys.length === 0) {
+    clearTaskListReplanStateCache()
+    return
+  }
+  writeTaskListReplanStateCache<ListReplanStateMap>(stateMap)
+}
+
 const PROJECT_LIST_EVENT_SOURCE = 'task-list'
 const AGGREGATE_PAGE_SIZE = 100
 const AGGREGATE_MAX_PAGES = 200
@@ -1162,6 +1447,7 @@ const DEFAULT_BOARD_ERROR_MESSAGE = '加载失败，请稍后重试。'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const toastStore = useToastStore()
 const aiPendingRegistry = useAiPendingRegistryStore()
 const { runAiRequest } = useAiPendingRequest()
 const undoDelete = useUndoDelete()
@@ -1199,9 +1485,31 @@ const mainTaskSectionTitle = computed(() => {
   if (isWeekView.value) return '本周截止'
   return '默认列表'
 })
-const shouldShowTodayAiOrderButton = computed(() => isTodayView.value && taskList.value.length > 0)
+const shouldShowUnifiedAiButton = computed(
+  () =>
+    taskList.value.length > 0 && (isTodayView.value || (!isAggregateView.value && Boolean(selectedProjectId.value))),
+)
 const todayAiOrderEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER])
+const listReplanPreviewEntry = computed(
+  () => aiPendingRegistry.boards[AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW],
+)
 const isFetchingTodayAiOrder = computed(() => todayAiOrderEntry.value.status === 'pending')
+const isFetchingListReplanPreview = computed(() => listReplanPreviewEntry.value.status === 'pending')
+const isUnifiedAiActionBusy = computed(() =>
+  isTodayView.value ? isFetchingTodayAiOrder.value : isListReplanActionBusy.value,
+)
+const unifiedAiButtonHint = computed(() => {
+  if (isTodayView.value) {
+    return isFetchingTodayAiOrder.value ? 'AI 智能排序处理中...' : 'AI 智能排序'
+  }
+  if (isFetchingListReplanPreview.value) {
+    return 'AI 清单重排处理中...'
+  }
+  if (pendingListReplanOperation.value) {
+    return '查看 AI 清单重排预览'
+  }
+  return 'AI 清单重排'
+})
 const currentContextKey = computed(() => {
   if (isTodayView.value) return 'aggregate:today'
   if (isWeekView.value) return 'aggregate:week'
@@ -1248,7 +1556,17 @@ const newTaskFlagMenuRef = ref<HTMLElement | null>(null)
 const newTaskTitleInputRef = ref<HTMLInputElement | null>(null)
 const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
-const detailWidth = ref(Number(localStorage.getItem('tick_detailWidth')) || 340)
+const MIN_DETAIL_WIDTH = 320
+const DEFAULT_DETAIL_WIDTH = 380
+const MAX_DETAIL_WIDTH = 640
+
+const sanitizeDetailWidth = (value: unknown) => {
+  const width = Number(value)
+  if (!Number.isFinite(width)) return DEFAULT_DETAIL_WIDTH
+  return Math.min(MAX_DETAIL_WIDTH, Math.max(MIN_DETAIL_WIDTH, Math.round(width)))
+}
+
+const detailWidth = ref(sanitizeDetailWidth(localStorage.getItem('tick_detailWidth')))
 const isResizingRight = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
 const projectLoadVersion = ref(0)
@@ -1259,6 +1577,14 @@ const todayAiOrderMetaByTaskId = ref<Record<string, TodayAiOrderMeta>>({})
 const isTaskViewMounted = ref(false)
 const showTodayAiReasonDialog = ref(false)
 const selectedTodayAiReason = ref<{ taskTitle: string; rank: number; reason: string } | null>(null)
+const isListReplanDirty = ref(false)
+const pendingListReplanOperation = ref<ListReplanPendingOperation | null>(null)
+const listReplanPreviewPayload = ref<AiListReplanPreviewResponse | null>(null)
+const showListReplanPreviewModal = ref(false)
+const isListReplanConfirming = ref(false)
+const isListReplanCancelling = ref(false)
+const lastListReplanReminderRequestId = ref(0)
+const selectedTaskTitleBaseline = ref('')
 
 const isMobile = computed(() => viewportWidth.value < 768)
 let boardSlowTimer: ReturnType<typeof setTimeout> | null = null
@@ -1320,26 +1646,43 @@ const priorityOptions: PriorityOption[] = [
 const getPriorityOption = (priority: number) =>
   priorityOptions.find((option) => option.value === priority) || priorityOptions[priorityOptions.length - 1]!
 
+const getListReplanPriorityChipClass = (priority: number) => {
+  const option = getPriorityOption(priority)
+  if (option.value === 3) return 'list-replan-priority-chip--urgent'
+  if (option.value === 2) return 'list-replan-priority-chip--high'
+  if (option.value === 1) return 'list-replan-priority-chip--low'
+  return 'list-replan-priority-chip--none'
+}
+
 const completionQualityOptions: CompletionQualityOption[] = [
   {
     status: TASK_STATUS_DONE_BASIC,
     label: '差',
     emoji: '😢',
     toneClass: 'completion-option--danger',
+    shortcutKey: '1',
   },
   {
     status: TASK_STATUS_DONE_STANDARD,
     label: '中',
     emoji: '😐',
     toneClass: 'completion-option--warning',
+    shortcutKey: '2',
   },
   {
     status: TASK_STATUS_DONE_EXCELLENT,
     label: '好',
     emoji: '😄',
     toneClass: 'completion-option--success',
+    shortcutKey: '3',
   },
 ]
+
+const completionQualityShortcutStatusMap: Record<string, number> = {
+  '1': TASK_STATUS_DONE_BASIC,
+  '2': TASK_STATUS_DONE_STANDARD,
+  '3': TASK_STATUS_DONE_EXCELLENT,
+}
 
 const taskItemPriorityBorderColorMap: Record<number, string> = {
   3: 'var(--color-danger)',
@@ -1383,6 +1726,62 @@ const consumePendingTodayAiOrder = () => {
   }
 }
 
+const remindListReplanPreviewReady = (entryRequestId: number, listId: string) => {
+  if (entryRequestId <= lastListReplanReminderRequestId.value) return
+  lastListReplanReminderRequestId.value = entryRequestId
+
+  const listName = projectById.value.get(listId)?.name || '对应清单'
+  toastStore.push({
+    type: 'info',
+    message: `AI 清单重排已完成，可返回「${listName}」查看预览。`,
+    duration: 6000,
+    action: {
+      label: '前往查看',
+      onClick: async () => {
+        await router.push({ path: '/tasks', query: { projectId: listId } })
+      },
+    },
+  })
+}
+
+const consumePendingListReplanPreview = () => {
+  const entry = listReplanPreviewEntry.value
+  if (entry.status !== 'success') return
+  if (!isTaskViewMounted.value) return
+
+  const requestMeta = (entry.requestMeta || null) as { listId?: unknown; dirty?: unknown } | null
+  const listId = normalizeListId(requestMeta?.listId)
+  if (!listId) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
+    return
+  }
+
+  const payload = normalizeListReplanPreviewPayload(entry.responsePayload)
+  if (!payload) {
+    toast.error('AI 返回格式异常，请稍后重试。')
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
+    return
+  }
+
+  if (isAggregateView.value || selectedProjectId.value !== listId) {
+    remindListReplanPreviewReady(entry.requestId, listId)
+    return
+  }
+
+  pendingListReplanOperation.value = {
+    listId,
+    operationId: payload.operationId,
+    createdAt: new Date().toISOString(),
+  }
+  listReplanPreviewPayload.value = payload
+  showListReplanPreviewModal.value = true
+  if (requestMeta?.dirty) {
+    isListReplanDirty.value = true
+  }
+  persistCurrentListReplanState()
+  aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
+}
+
 const getTodayAiOrderMeta = (task: Task): TodayAiOrderMeta | null => {
   if (!isTodayView.value || isTaskCompleted(task.status)) return null
   const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
@@ -1404,6 +1803,270 @@ const openTodayAiReasonDialog = (task: Task) => {
 const closeTodayAiReasonDialog = () => {
   showTodayAiReasonDialog.value = false
   selectedTodayAiReason.value = null
+}
+
+const listReplanPreviewItems = computed(
+  () => listReplanPreviewPayload.value?.previewTasks || ([] as AiListReplanPreviewItem[]),
+)
+const listReplanChangedCount = computed(() => {
+  const changedCountRaw = Number(listReplanPreviewPayload.value?.changedCount)
+  if (Number.isFinite(changedCountRaw) && changedCountRaw >= 0) return Math.floor(changedCountRaw)
+  return listReplanPreviewItems.value.length
+})
+const isListReplanActionBusy = computed(
+  () => isFetchingListReplanPreview.value || isListReplanConfirming.value || isListReplanCancelling.value,
+)
+const canConfirmListReplan = computed(() => Boolean(pendingListReplanOperation.value?.operationId))
+
+const normalizeListReplanConfidence = (value: unknown) => {
+  const confidence = Number(value)
+  if (!Number.isFinite(confidence)) return 0
+  return Math.max(0, Math.min(100, Math.round(confidence)))
+}
+
+const getDefaultListReplanStateEntry = (): ListReplanStateEntry => ({
+  dirty: false,
+  pendingOperation: null,
+  previewPayload: null,
+  updatedAt: Date.now(),
+})
+
+const upsertListReplanStateEntry = (listId: string, patch: Partial<ListReplanStateEntry>) => {
+  const normalizedListId = normalizeListId(listId)
+  if (!normalizedListId) return
+  const stateMap = readListReplanStateMap()
+  const current = stateMap[normalizedListId] || getDefaultListReplanStateEntry()
+  stateMap[normalizedListId] = {
+    ...current,
+    ...patch,
+    updatedAt: Date.now(),
+  }
+  writeListReplanStateMap(stateMap)
+}
+
+const resetListReplanRuntimeState = () => {
+  pendingListReplanOperation.value = null
+  listReplanPreviewPayload.value = null
+  showListReplanPreviewModal.value = false
+  isListReplanConfirming.value = false
+  isListReplanCancelling.value = false
+}
+
+const persistCurrentListReplanState = () => {
+  if (isAggregateView.value || !selectedProjectId.value) return
+  const listId = selectedProjectId.value
+  const pendingOperation =
+    pendingListReplanOperation.value &&
+    pendingListReplanOperation.value.listId === listId &&
+    !isListReplanOperationExpired(pendingListReplanOperation.value)
+      ? pendingListReplanOperation.value
+      : null
+  const previewPayload = pendingOperation ? listReplanPreviewPayload.value : null
+
+  upsertListReplanStateEntry(listId, {
+    dirty: isListReplanDirty.value,
+    pendingOperation,
+    previewPayload,
+  })
+}
+
+const hydrateListReplanStateForList = (listId: string) => {
+  const normalizedListId = normalizeListId(listId)
+  if (!normalizedListId) {
+    isListReplanDirty.value = false
+    resetListReplanRuntimeState()
+    return
+  }
+
+  const stateMap = readListReplanStateMap()
+  const cached = stateMap[normalizedListId]
+  if (!cached) {
+    isListReplanDirty.value = false
+    resetListReplanRuntimeState()
+    return
+  }
+
+  isListReplanDirty.value = Boolean(cached.dirty)
+  pendingListReplanOperation.value = cached.pendingOperation
+  listReplanPreviewPayload.value = cached.pendingOperation ? cached.previewPayload : null
+  showListReplanPreviewModal.value = false
+  isListReplanConfirming.value = false
+  isListReplanCancelling.value = false
+
+  upsertListReplanStateEntry(normalizedListId, {
+    dirty: isListReplanDirty.value,
+    pendingOperation: pendingListReplanOperation.value,
+    previewPayload: listReplanPreviewPayload.value,
+  })
+}
+
+const hydrateListReplanDirtyForList = (listId: string) => {
+  const normalizedListId = normalizeListId(listId)
+  if (!normalizedListId) return false
+  const stateMap = readListReplanStateMap()
+  return Boolean(stateMap[normalizedListId]?.dirty)
+}
+
+const closeListReplanPreviewDialog = () => {
+  showListReplanPreviewModal.value = false
+}
+
+const clearListReplanPreviewState = (options: { persistListId?: string; keepDirty?: boolean } = {}) => {
+  const keepDirty = options.keepDirty !== false
+  const listId =
+    normalizeListId(options.persistListId) ||
+    normalizeListId(pendingListReplanOperation.value?.listId) ||
+    normalizeListId(selectedProjectId.value)
+  const stateMap = readListReplanStateMap()
+  const isCurrentList = listId && listId === selectedProjectId.value && !isAggregateView.value
+  const cachedDirty = listId ? Boolean(stateMap[listId]?.dirty) : false
+  const nextDirty = keepDirty ? (isCurrentList ? isListReplanDirty.value : cachedDirty) : false
+
+  resetListReplanRuntimeState()
+  if (!keepDirty && isCurrentList) {
+    isListReplanDirty.value = false
+  }
+
+  if (listId) {
+    upsertListReplanStateEntry(listId, {
+      dirty: nextDirty,
+      pendingOperation: null,
+      previewPayload: null,
+    })
+  }
+}
+
+const ensureFreshPendingListReplanOperation = (options: { notify?: boolean } = {}) => {
+  const notify = options.notify !== false
+  const pending = pendingListReplanOperation.value
+  if (!pending) return true
+
+  if (
+    pending.listId !== selectedProjectId.value ||
+    isListReplanOperationExpired(pending)
+  ) {
+    clearListReplanPreviewState({ persistListId: pending.listId, keepDirty: true })
+    if (notify) {
+      toast.warning('当前预览已过期，请重新生成。')
+    }
+    return false
+  }
+
+  return true
+}
+
+const markListReplanDirty = () => {
+  if (isAggregateView.value || !selectedProjectId.value) return
+  isListReplanDirty.value = true
+  persistCurrentListReplanState()
+}
+
+const requestListReplanPreview = async () => {
+  if (isAggregateView.value || !selectedProjectId.value) {
+    toast.warning('仅支持在单个清单视图中使用 AI 重排。')
+    return
+  }
+
+  if (!ensureFreshPendingListReplanOperation({ notify: true })) return
+
+  if (pendingListReplanOperation.value) {
+    if (listReplanPreviewPayload.value) {
+      showListReplanPreviewModal.value = true
+      return
+    }
+    toast.warning('当前有待处理的重排预览，请先确认或取消。')
+    return
+  }
+
+  if (!isListReplanDirty.value) {
+    toast.warning('当前清单没有新的变化，暂不需要重排。')
+    return
+  }
+
+  const listId = selectedProjectId.value
+  const result = await runAiRequest<AiListReplanPreviewResponse>({
+    board: AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW,
+    requestMeta: { listId, dirty: isListReplanDirty.value },
+    request: () => aiListReplanPreviewApi({ listId }),
+    successMessage: 'AI 重排预览响应完成。',
+    errorMessage: 'AI 重排预览失败，请稍后重试。',
+  })
+
+  if (result.status === 'blocked') {
+    toast.warning('AI 重排预览正在处理中，请稍候。')
+    return
+  }
+
+  if (result.status !== 'success' || !result.ticket) return
+  consumePendingListReplanPreview()
+}
+
+const confirmListReplanPreview = async () => {
+  if (isListReplanConfirming.value) return
+  if (!ensureFreshPendingListReplanOperation({ notify: true })) return
+  const pending = pendingListReplanOperation.value
+  if (!pending) return
+
+  const confirmContextKey = currentContextKey.value
+  const confirmListId = pending.listId
+  isListReplanConfirming.value = true
+  try {
+    const confirmed = await aiListReplanConfirmApi({
+      listId: pending.listId,
+      operationId: pending.operationId,
+    })
+
+    if (confirmed === true) {
+      clearListReplanPreviewState({ persistListId: pending.listId, keepDirty: false })
+      if (
+        isTaskViewMounted.value &&
+        !isAggregateView.value &&
+        selectedProjectId.value === confirmListId &&
+        currentContextKey.value === confirmContextKey
+      ) {
+        await loadContextData(currentContextKey.value, {
+          forceProjectRefresh: true,
+          forceMilestoneRefresh: true,
+          forceTaskRefresh: true,
+        })
+      }
+      toast.success('AI 重排已确认并生效。')
+      return
+    }
+
+    clearListReplanPreviewState({ persistListId: pending.listId, keepDirty: true })
+    toast.warning('当前预览已失效，请重新生成。')
+  } catch (error) {
+    console.error('确认 AI 重排失败', error)
+    toast.error('确认 AI 重排失败，请稍后重试。')
+  } finally {
+    isListReplanConfirming.value = false
+  }
+}
+
+const cancelListReplanPreview = async () => {
+  if (isListReplanCancelling.value) return
+  if (!ensureFreshPendingListReplanOperation({ notify: true })) return
+  const pending = pendingListReplanOperation.value
+  if (!pending) return
+
+  isListReplanCancelling.value = true
+  try {
+    const canceled = await aiListReplanCancelApi({ operationId: pending.operationId })
+    if (canceled === true) {
+      clearListReplanPreviewState({ persistListId: pending.listId, keepDirty: true })
+      toast.success('已取消当前 AI 重排预览。')
+      return
+    }
+
+    clearListReplanPreviewState({ persistListId: pending.listId, keepDirty: true })
+    toast.warning('当前预览已不可用，已清理本地状态。')
+  } catch (error) {
+    console.error('取消 AI 重排预览失败', error)
+    toast.error('取消 AI 重排预览失败，请稍后重试。')
+  } finally {
+    isListReplanCancelling.value = false
+  }
 }
 
 const requestTodayAiOrder = async () => {
@@ -1465,6 +2128,14 @@ const requestTodayAiOrder = async () => {
   }
 }
 
+const handleUnifiedAiAction = () => {
+  if (isTodayView.value) {
+    void requestTodayAiOrder()
+    return
+  }
+  void requestListReplanPreview()
+}
+
 const getTodayAiRank = (task: Task) => {
   if (!isTodayView.value || isTaskCompleted(task.status)) return Number.POSITIVE_INFINITY
   const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
@@ -1508,6 +2179,9 @@ const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: Task, b: T
   if (a.priority !== b.priority) return b.priority - a.priority
   return 0
 }
+
+const isMilestoneGroupAllCompleted = (group: { milestone: Milestone; tasks: Task[]; progress: number }) =>
+  group.tasks.length > 0 && group.tasks.every((task) => isTaskCompleted(task.status))
 
 const sortTaskListForCurrentBoard = (tasks: Task[]) => {
   if (isTodayView.value) {
@@ -1692,7 +2366,7 @@ const startResizeRight = () => {
 const handleMouseMoveRight = (e: MouseEvent) => {
   if (!isResizingRight.value || isMobile.value) return
   const newWidth = document.body.clientWidth - e.clientX
-  if (newWidth > 260 && newWidth < 640) {
+  if (newWidth >= MIN_DETAIL_WIDTH && newWidth <= MAX_DETAIL_WIDTH) {
     detailWidth.value = newWidth
   }
 }
@@ -1702,7 +2376,7 @@ const stopResizeRight = () => {
   document.removeEventListener('mousemove', handleMouseMoveRight)
   document.removeEventListener('mouseup', stopResizeRight)
   document.body.style.userSelect = ''
-  localStorage.setItem('tick_detailWidth', detailWidth.value.toString())
+  localStorage.setItem('tick_detailWidth', sanitizeDetailWidth(detailWidth.value).toString())
 }
 
 const vFocus = {
@@ -2073,6 +2747,7 @@ const addTask = async () => {
       dueDate: null,
       milestoneId: newTaskMilestoneId.value || undefined,
     })
+    markListReplanDirty()
     resetNewTaskDraft({ blurInput: true })
     isNewTaskMilestoneMenuOpen.value = false
     await loadTasks({ forceRefresh: true })
@@ -2087,6 +2762,7 @@ const setTaskStatus = async (task: Task, nextStatus: number) => {
   try {
     await updateTaskApi({ ...task, status: nextStatus })
     upsertTaskInCaches(task)
+    markListReplanDirty()
   } catch {
     task.status = oldStatus
     toast.error('更新状态失败，请检查网络后重试。')
@@ -2123,8 +2799,22 @@ const toggleTaskStatus = async (task: Task) => {
   showCompletionQualityModal.value = true
 }
 
+const handleCompletionQualityShortcutKeydown = (event: KeyboardEvent) => {
+  if (!showCompletionQualityModal.value || !pendingCompletionTask.value) return
+  if (event.defaultPrevented || event.isComposing) return
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+
+  const nextStatus = completionQualityShortcutStatusMap[event.key]
+  if (nextStatus === undefined) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  void confirmCompletionQuality(nextStatus)
+}
+
 const selectTask = (task: Task) => {
   selectedTask.value = task
+  selectedTaskTitleBaseline.value = task.title
   isPriorityMenuOpen.value = false
   isDueDatePickerOpen.value = false
   isMilestoneMenuOpen.value = false
@@ -2483,6 +3173,7 @@ const selectPriority = async (val: number) => {
   try {
     await updateTaskApi({ ...selectedTask.value, priority: val })
     upsertTaskInCaches(selectedTask.value)
+    markListReplanDirty()
   } catch {
     selectedTask.value.priority = oldPriority
     toast.error('更新优先级失败，请检查网络后重试。')
@@ -2505,6 +3196,7 @@ const updateDueDate = async (nextDate: string | null) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, dueDate: finalDate })
+    markListReplanDirty()
     await loadTasks({ forceRefresh: true })
   } catch {
     selectedTask.value.dueDate = oldDate
@@ -2548,8 +3240,13 @@ const selectMilestone = async (milestoneId: string | null) => {
 const onTextBlur = async () => {
   if (!selectedTask.value) return
 
+  const previousTitle = selectedTaskTitleBaseline.value
   try {
     await updateTaskApi({ ...selectedTask.value })
+    if (selectedTask.value.title !== previousTitle) {
+      markListReplanDirty()
+    }
+    selectedTaskTitleBaseline.value = selectedTask.value.title
     await loadTasks({ forceRefresh: true })
   } catch (error) {
     console.error('保存任务失败', error)
@@ -2581,6 +3278,7 @@ const confirmDeleteTask = async () => {
       await deleteTaskApi(taskToDelete.id)
     },
     onCommitSuccess: async () => {
+      markListReplanDirty()
       await loadTasks({ forceRefresh: true })
     },
     onRollback: async () => {
@@ -2734,31 +3432,74 @@ const groupedTasks = computed(() => {
     }
   })
 
+  result.milestones.sort((a, b) => {
+    const aAllCompleted = isMilestoneGroupAllCompleted(a)
+    const bAllCompleted = isMilestoneGroupAllCompleted(b)
+    if (aAllCompleted !== bAllCompleted) {
+      return aAllCompleted ? 1 : -1
+    }
+    return (a.milestone.orderNo || 0) - (b.milestone.orderNo || 0)
+  })
+
   return result
 })
 
 watch(
   [() => route.query.projectId, () => route.query.view],
-  async () => {
+  async ([nextProjectIdRaw, nextViewRaw], [prevProjectIdRaw, prevViewRaw]) => {
+    const prevProjectId = typeof prevProjectIdRaw === 'string' ? prevProjectIdRaw : ''
+    const nextProjectId = typeof nextProjectIdRaw === 'string' ? nextProjectIdRaw : ''
+    const prevView = typeof prevViewRaw === 'string' ? prevViewRaw : 'project'
+    const nextView = typeof nextViewRaw === 'string' ? nextViewRaw : 'project'
+    const preserveDirty =
+      prevView === 'project' &&
+      nextView === 'project' &&
+      prevProjectId === nextProjectId &&
+      prevProjectId !== ''
+    const previousListId = prevProjectId || selectedProjectId.value
+
     closeCompletionQualityModal()
     closeTodayAiReasonDialog()
+    closeListReplanPreviewDialog()
     resetNewTaskDraft({ blurInput: true })
+
+    if (previousListId) {
+      clearListReplanPreviewState({
+        persistListId: previousListId,
+        keepDirty: true,
+      })
+    } else {
+      resetListReplanRuntimeState()
+    }
+
     syncSelectedProject()
     closeDueDatePicker()
     selectedTask.value = null
     isPriorityMenuOpen.value = false
     isMilestoneMenuOpen.value = false
     isNewTaskMilestoneMenuOpen.value = false
+
+    if (preserveDirty && !isAggregateView.value && selectedProjectId.value) {
+      persistCurrentListReplanState()
+    } else if (isAggregateView.value || !selectedProjectId.value) {
+      isListReplanDirty.value = false
+    } else {
+      isListReplanDirty.value = hydrateListReplanDirtyForList(selectedProjectId.value)
+      persistCurrentListReplanState()
+    }
+
     if (isTodayView.value) {
       hydrateTodayAiOrderMetaFromCache()
     }
     await loadContextData(currentContextKey.value)
+    consumePendingListReplanPreview()
   },
 )
 
 watch(
   () => selectedTask.value?.id,
   async () => {
+    selectedTaskTitleBaseline.value = selectedTask.value?.title || ''
     await nextTick()
     syncDetailEditorHeights()
   },
@@ -2768,6 +3509,13 @@ watch(
   [() => todayAiOrderEntry.value.status, isTodayView, () => taskList.value.length],
   () => {
     consumePendingTodayAiOrder()
+  },
+)
+
+watch(
+  [() => listReplanPreviewEntry.value.status, isAggregateView, () => selectedProjectId.value],
+  () => {
+    consumePendingListReplanPreview()
   },
 )
 
@@ -2789,19 +3537,40 @@ onMounted(async () => {
     hydrateTodayAiOrderMetaFromCache()
   }
   updateViewport()
+  document.addEventListener('keydown', handleCompletionQualityShortcutKeydown)
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
   onProjectListUpdated(handleProjectListUpdated)
   syncSelectedProject()
+  if (!isAggregateView.value && selectedProjectId.value) {
+    hydrateListReplanStateForList(selectedProjectId.value)
+  } else {
+    isListReplanDirty.value = false
+    resetListReplanRuntimeState()
+  }
   await loadContextData(currentContextKey.value)
   consumePendingTodayAiOrder()
+  consumePendingListReplanPreview()
 })
 
 onBeforeUnmount(() => {
   isTaskViewMounted.value = false
   closeTodayAiReasonDialog()
+  closeListReplanPreviewDialog()
   closeCompletionQualityModal()
+  if (!isAggregateView.value && selectedProjectId.value) {
+    if (isListReplanOperationExpired(pendingListReplanOperation.value)) {
+      clearListReplanPreviewState({
+        persistListId: selectedProjectId.value,
+        keepDirty: true,
+      })
+    } else {
+      persistCurrentListReplanState()
+    }
+  }
+  resetListReplanRuntimeState()
   clearBoardSlowTimer()
+  document.removeEventListener('keydown', handleCompletionQualityShortcutKeydown)
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   stopResizeRight()
   window.removeEventListener('resize', updateViewport)
@@ -2836,6 +3605,67 @@ onBeforeUnmount(() => {
 
 .ai-reason-header {
   background: var(--color-ai);
+}
+
+.list-replan-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-replan-field-label {
+  flex-shrink: 0;
+  width: 52px;
+  color: var(--color-text-tertiary);
+}
+
+.list-replan-field-change {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.list-replan-chip,
+.list-replan-priority-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-input-border);
+  background: var(--color-bg-surface-muted);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  line-height: 1.25;
+}
+
+.list-replan-chip {
+  color: var(--color-text-body);
+}
+
+.list-replan-priority-chip--urgent {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+}
+
+.list-replan-priority-chip--high {
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning);
+}
+
+.list-replan-priority-chip--low {
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+}
+
+.list-replan-priority-chip--none {
+  background: var(--color-primary-soft-2);
+  border-color: var(--color-primary);
+}
+
+.list-replan-arrow {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
 }
 
 .completion-option {

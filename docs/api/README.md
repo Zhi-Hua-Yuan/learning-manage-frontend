@@ -19,6 +19,7 @@
 
 除 `/user/login` 和 `/user/register` 外，所有接口需要登录态。
 登录成功后从响应 `data.token` 字段获取 token，后续请求携带 header：
+
 ```
 Authorization: Bearer <token>
 ```
@@ -158,6 +159,9 @@ Project (1) ──────< (many) Milestone
 | POST | /ai/breakdown | AI 任务拆解（目标 → 里程碑 → 任务） |
 | POST | /ai/today-order/recommend | AI 今日任务推荐顺序 |
 | POST | /ai/daily-review/suggest-rename | AI 日报回顾任务改名建议 |
+| POST | /ai/list/replan/preview | AI 清单任务智能重排预览 |
+| POST | /ai/list/replan/confirm | AI 清单任务智能重排确认 |
+| POST | /ai/list/replan/cancel | AI 清单任务智能重排取消 |
 | POST | /ai/polish | AI 周总结润色 |
 
 ---

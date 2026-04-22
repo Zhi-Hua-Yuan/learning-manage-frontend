@@ -48,3 +48,51 @@ export interface AiTodayOrderRecommendResponse {
 export const aiTodayOrderRecommendApi = (data: AiTodayOrderRecommendRequest) => {
   return request.post('/ai/today-order/recommend', data)
 }
+
+export interface AiListReplanPreviewRequest {
+  listId: string | number
+}
+
+export interface AiListReplanPreviewItem {
+  taskId: string | number
+  oldTitle?: string
+  newTitle?: string
+  oldPriority?: number
+  newPriority?: number
+  oldDueDate?: string | null
+  newDueDate?: string | null
+  confidence?: number
+  reason?: string
+}
+
+export interface AiListReplanPreviewResponse {
+  operationId: string
+  changedCount?: number
+  previewTasks?: AiListReplanPreviewItem[]
+}
+
+export interface AiListReplanConfirmRequest {
+  listId: string | number
+  operationId: string
+}
+
+export interface AiListReplanCancelRequest {
+  operationId: string
+}
+
+// AI 清单任务智能重排预览（不落库）
+export const aiListReplanPreviewApi = (
+  data: AiListReplanPreviewRequest,
+): Promise<AiListReplanPreviewResponse> => {
+  return request.post('/ai/list/replan/preview', data) as Promise<AiListReplanPreviewResponse>
+}
+
+// AI 清单任务智能重排确认（落库）
+export const aiListReplanConfirmApi = (data: AiListReplanConfirmRequest): Promise<boolean> => {
+  return request.post('/ai/list/replan/confirm', data) as Promise<boolean>
+}
+
+// AI 清单任务智能重排取消（不落库）
+export const aiListReplanCancelApi = (data: AiListReplanCancelRequest): Promise<boolean> => {
+  return request.post('/ai/list/replan/cancel', data) as Promise<boolean>
+}

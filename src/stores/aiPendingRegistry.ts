@@ -5,6 +5,7 @@ export const AI_PENDING_BOARDS = {
   WEEKLY_REVIEW_POLISH: 'weekly-review-polish',
   AI_PLANNER_BREAKDOWN: 'ai-planner-breakdown',
   TASK_TODAY_AI_ORDER: 'task-today-ai-order',
+  TASK_LIST_REPLAN_PREVIEW: 'task-list-replan-preview',
 } as const
 
 export type AiPendingBoard = (typeof AI_PENDING_BOARDS)[keyof typeof AI_PENDING_BOARDS]
@@ -44,6 +45,7 @@ export const useAiPendingRegistryStore = defineStore('aiPendingRegistry', () => 
     [AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH]: createBoardEntry(),
     [AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN]: createBoardEntry(),
     [AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER]: createBoardEntry(),
+    [AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW]: createBoardEntry(),
   })
 
   const startRequest = (

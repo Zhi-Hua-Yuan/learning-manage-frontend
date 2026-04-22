@@ -405,6 +405,137 @@
 
 ---
 
+### POST /ai/list/replan/preview — 清单任务智能重排预览
+
+生成重排结果供前端确认，不直接落库。前端展示预览后用户可选择确认或取消。
+
+**请求体（AiListReplanPreviewRequest）:**
+
+```json
+{
+  "listId": 1001
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| listId | Long | 是 | 清单ID（对应 project.id） |
+
+**成功响应:** `BaseResponse<AiListReplanPreviewVO>`
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "operationId": "20260422_replan_9ab27d5f",
+    "changedCount": 5,
+    "previewTasks": [
+      {
+        "taskId": 101,
+        "oldTitle": "背单词",
+        "newTitle": "完成核心词汇第1-12单元记忆",
+        "oldPriority": 1,
+        "newPriority": 3,
+        "oldDueDate": "2026-04-22",
+        "newDueDate": "2026-04-20",
+        "confidence": 86,
+        "reason": "根据执行节奏和收益优先级调整"
+      }
+    ]
+  }
+}
+```
+
+**AiListReplanPreviewVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| operationId | String | 重排操作ID（后续确认/取消时需传入） |
+| changedCount | Integer | 发生变化的任务数量 |
+| previewTasks | List\<AiListReplanPreviewItemVO\> | 重排预览任务列表 |
+
+**AiListReplanPreviewItemVO 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| taskId | Long | 任务 ID |
+| oldTitle | String | 原任务标题 |
+| newTitle | String | 建议任务标题 |
+| oldPriority | Integer | 原优先级 |
+| newPriority | Integer | 建议优先级 |
+| oldDueDate | String | 原截止日期（yyyy-MM-dd） |
+| newDueDate | String | 建议截止日期（yyyy-MM-dd） |
+| confidence | Integer | 建议置信度（0-100） |
+| reason | String | 建议原因 |
+
+---
+
+### POST /ai/list/replan/confirm — 清单任务智能重排确认
+
+确认预览结果并入库。执行后将按预览结果更新任务的标题、优先级、截止日期，并同步更新项目结束日期。
+
+**请求体（AiListReplanConfirmRequest）:**
+
+```json
+{
+  "listId": 1001,
+  "operationId": "20260422_replan_9ab27d5f"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| listId | Long | 是 | 清单ID（对应 project.id） |
+| operationId | String | 是 | 重排操作ID（来自 preview 返回） |
+
+**成功响应:** `BaseResponse<Boolean>`
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": true
+}
+```
+
+**返回值说明：**
+
+| 值 | 说明 |
+|----|------|
+| true | 确认成功，已更新任务数据 |
+| false | 确认失败（可能操作已过期或已被取消） |
+
+---
+
+### POST /ai/list/replan/cancel — 清单任务智能重排取消
+
+取消本次预览结果，不入库。
+
+**请求体（AiListReplanCancelRequest）:**
+
+```json
+{
+  "operationId": "20260422_replan_9ab27d5f"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| operationId | String | 是 | 重排操作ID（来自 preview 返回） |
+
+**成功响应:** `BaseResponse<Boolean>`
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": true
+}
+```
+
+---
+
 ### POST /ai/polish — 周总结润色
 
 根据用户填写的任务 ID 列表和反思内容，AI 生成结构化、表达流畅的周总结润色文本。**注意：此接口不再返回下周计划（plan），仅返回复盘内容（review）。**

@@ -1026,9 +1026,13 @@
                 @click="confirmCompletionQuality(option.status)"
               >
                 <span class="block text-3xl leading-none">{{ option.emoji }}</span>
-                <span class="mt-2 block text-base font-semibold">{{ option.label }}</span>
+                <span class="mt-2 block text-base font-semibold">
+                  {{ option.label }}
+                  <span class="mono ml-1 text-xs font-medium opacity-70">{{ option.shortcutKey }}</span>
+                </span>
               </button>
             </div>
+            <p class="mt-3 text-xs text-[var(--color-text-tertiary)]">快捷键：差 1 · 中 2 · 好 3</p>
           </div>
 
           <div class="flex justify-end p-4 pt-0">
@@ -1166,6 +1170,7 @@ interface CompletionQualityOption {
   label: string
   emoji: string
   toneClass: string
+  shortcutKey: '1' | '2' | '3'
 }
 
 interface CalendarCell {
@@ -1655,20 +1660,29 @@ const completionQualityOptions: CompletionQualityOption[] = [
     label: '差',
     emoji: '😢',
     toneClass: 'completion-option--danger',
+    shortcutKey: '1',
   },
   {
     status: TASK_STATUS_DONE_STANDARD,
     label: '中',
     emoji: '😐',
     toneClass: 'completion-option--warning',
+    shortcutKey: '2',
   },
   {
     status: TASK_STATUS_DONE_EXCELLENT,
     label: '好',
     emoji: '😄',
     toneClass: 'completion-option--success',
+    shortcutKey: '3',
   },
 ]
+
+const completionQualityShortcutStatusMap: Record<string, number> = {
+  '1': TASK_STATUS_DONE_BASIC,
+  '2': TASK_STATUS_DONE_STANDARD,
+  '3': TASK_STATUS_DONE_EXCELLENT,
+}
 
 const taskItemPriorityBorderColorMap: Record<number, string> = {
   3: 'var(--color-danger)',
@@ -2165,6 +2179,9 @@ const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: Task, b: T
   if (a.priority !== b.priority) return b.priority - a.priority
   return 0
 }
+
+const isMilestoneGroupAllCompleted = (group: { milestone: Milestone; tasks: Task[]; progress: number }) =>
+  group.tasks.length > 0 && group.tasks.every((task) => isTaskCompleted(task.status))
 
 const sortTaskListForCurrentBoard = (tasks: Task[]) => {
   if (isTodayView.value) {
@@ -2780,6 +2797,19 @@ const toggleTaskStatus = async (task: Task) => {
   }
   pendingCompletionTask.value = task
   showCompletionQualityModal.value = true
+}
+
+const handleCompletionQualityShortcutKeydown = (event: KeyboardEvent) => {
+  if (!showCompletionQualityModal.value || !pendingCompletionTask.value) return
+  if (event.defaultPrevented || event.isComposing) return
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+
+  const nextStatus = completionQualityShortcutStatusMap[event.key]
+  if (nextStatus === undefined) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  void confirmCompletionQuality(nextStatus)
 }
 
 const selectTask = (task: Task) => {
@@ -3402,6 +3432,15 @@ const groupedTasks = computed(() => {
     }
   })
 
+  result.milestones.sort((a, b) => {
+    const aAllCompleted = isMilestoneGroupAllCompleted(a)
+    const bAllCompleted = isMilestoneGroupAllCompleted(b)
+    if (aAllCompleted !== bAllCompleted) {
+      return aAllCompleted ? 1 : -1
+    }
+    return (a.milestone.orderNo || 0) - (b.milestone.orderNo || 0)
+  })
+
   return result
 })
 
@@ -3498,6 +3537,7 @@ onMounted(async () => {
     hydrateTodayAiOrderMetaFromCache()
   }
   updateViewport()
+  document.addEventListener('keydown', handleCompletionQualityShortcutKeydown)
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', updateViewport)
   onProjectListUpdated(handleProjectListUpdated)
@@ -3530,6 +3570,7 @@ onBeforeUnmount(() => {
   }
   resetListReplanRuntimeState()
   clearBoardSlowTimer()
+  document.removeEventListener('keydown', handleCompletionQualityShortcutKeydown)
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   stopResizeRight()
   window.removeEventListener('resize', updateViewport)

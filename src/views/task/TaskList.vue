@@ -880,17 +880,61 @@
                 <div class="text-sm font-semibold text-[var(--color-text-primary)]">
                   {{ item.newTitle || item.oldTitle || `任务 #${item.taskId}` }}
                 </div>
-                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">
-                  标题：{{ item.oldTitle || '（空）' }} -> {{ item.newTitle || '（空）' }}
-                </div>
-                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">
-                  优先级：{{ getPriorityOption(item.oldPriority ?? 0).text }} -> {{ getPriorityOption(item.newPriority ?? 0).text }}
-                </div>
-                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">
-                  截止日期：{{ formatTaskDueDate(item.oldDueDate) || '未设置' }} -> {{ formatTaskDueDate(item.newDueDate) || '未设置' }}
-                </div>
-                <div class="mt-1 text-xs text-[var(--color-text-secondary)]">
-                  置信度：{{ normalizeListReplanConfidence(item.confidence) }}%
+                <div class="mt-2 space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">标题</span>
+                    <div class="list-replan-field-change">
+                      <span class="list-replan-chip">{{ item.oldTitle || '（空）' }}</span>
+                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span class="list-replan-chip">{{ item.newTitle || '（空）' }}</span>
+                    </div>
+                  </div>
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">优先级</span>
+                    <div class="list-replan-field-change">
+                      <span
+                        class="list-replan-priority-chip"
+                        :class="[
+                          getPriorityOption(item.oldPriority ?? 0).textClass,
+                          getListReplanPriorityChipClass(item.oldPriority ?? 0),
+                        ]"
+                      >
+                        <span class="priority-dot" :class="getPriorityOption(item.oldPriority ?? 0).dotClass"></span>
+                        {{ getPriorityOption(item.oldPriority ?? 0).text }}
+                      </span>
+                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span
+                        class="list-replan-priority-chip"
+                        :class="[
+                          getPriorityOption(item.newPriority ?? 0).textClass,
+                          getListReplanPriorityChipClass(item.newPriority ?? 0),
+                        ]"
+                      >
+                        <span class="priority-dot" :class="getPriorityOption(item.newPriority ?? 0).dotClass"></span>
+                        {{ getPriorityOption(item.newPriority ?? 0).text }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">截止日期</span>
+                    <div class="list-replan-field-change">
+                      <span class="list-replan-chip">{{ formatTaskDueDate(item.oldDueDate) || '未设置' }}</span>
+                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span class="list-replan-chip">{{ formatTaskDueDate(item.newDueDate) || '未设置' }}</span>
+                    </div>
+                  </div>
+                  <div class="list-replan-field-row">
+                    <span class="list-replan-field-label">置信度</span>
+                    <span class="mono text-[var(--color-text-body)]">
+                      {{ normalizeListReplanConfidence(item.confidence) }}%
+                    </span>
+                  </div>
                 </div>
                 <div class="mt-2 rounded-lg bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-body)]">
                   {{ item.reason || 'AI 未返回调整原因。' }}
@@ -1025,6 +1069,7 @@ import { useToast } from '@/composables/useToast'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
+import { useToastStore } from '@/stores/toast'
 import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
 import {
   offProjectListUpdated,
@@ -1397,6 +1442,7 @@ const DEFAULT_BOARD_ERROR_MESSAGE = '加载失败，请稍后重试。'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const toastStore = useToastStore()
 const aiPendingRegistry = useAiPendingRegistryStore()
 const { runAiRequest } = useAiPendingRequest()
 const undoDelete = useUndoDelete()
@@ -1532,6 +1578,7 @@ const listReplanPreviewPayload = ref<AiListReplanPreviewResponse | null>(null)
 const showListReplanPreviewModal = ref(false)
 const isListReplanConfirming = ref(false)
 const isListReplanCancelling = ref(false)
+const lastListReplanReminderRequestId = ref(0)
 const selectedTaskTitleBaseline = ref('')
 
 const isMobile = computed(() => viewportWidth.value < 768)
@@ -1594,6 +1641,14 @@ const priorityOptions: PriorityOption[] = [
 const getPriorityOption = (priority: number) =>
   priorityOptions.find((option) => option.value === priority) || priorityOptions[priorityOptions.length - 1]!
 
+const getListReplanPriorityChipClass = (priority: number) => {
+  const option = getPriorityOption(priority)
+  if (option.value === 3) return 'list-replan-priority-chip--urgent'
+  if (option.value === 2) return 'list-replan-priority-chip--high'
+  if (option.value === 1) return 'list-replan-priority-chip--low'
+  return 'list-replan-priority-chip--none'
+}
+
 const completionQualityOptions: CompletionQualityOption[] = [
   {
     status: TASK_STATUS_DONE_BASIC,
@@ -1655,6 +1710,62 @@ const consumePendingTodayAiOrder = () => {
   if (applied) {
     aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER, entry.requestId)
   }
+}
+
+const remindListReplanPreviewReady = (entryRequestId: number, listId: string) => {
+  if (entryRequestId <= lastListReplanReminderRequestId.value) return
+  lastListReplanReminderRequestId.value = entryRequestId
+
+  const listName = projectById.value.get(listId)?.name || '对应清单'
+  toastStore.push({
+    type: 'info',
+    message: `AI 清单重排已完成，可返回「${listName}」查看预览。`,
+    duration: 6000,
+    action: {
+      label: '前往查看',
+      onClick: async () => {
+        await router.push({ path: '/tasks', query: { projectId: listId } })
+      },
+    },
+  })
+}
+
+const consumePendingListReplanPreview = () => {
+  const entry = listReplanPreviewEntry.value
+  if (entry.status !== 'success') return
+  if (!isTaskViewMounted.value) return
+
+  const requestMeta = (entry.requestMeta || null) as { listId?: unknown; dirty?: unknown } | null
+  const listId = normalizeListId(requestMeta?.listId)
+  if (!listId) {
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
+    return
+  }
+
+  const payload = normalizeListReplanPreviewPayload(entry.responsePayload)
+  if (!payload) {
+    toast.error('AI 返回格式异常，请稍后重试。')
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
+    return
+  }
+
+  if (isAggregateView.value || selectedProjectId.value !== listId) {
+    remindListReplanPreviewReady(entry.requestId, listId)
+    return
+  }
+
+  pendingListReplanOperation.value = {
+    listId,
+    operationId: payload.operationId,
+    createdAt: new Date().toISOString(),
+  }
+  listReplanPreviewPayload.value = payload
+  showListReplanPreviewModal.value = true
+  if (requestMeta?.dirty) {
+    isListReplanDirty.value = true
+  }
+  persistCurrentListReplanState()
+  aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
 }
 
 const getTodayAiOrderMeta = (task: Task): TodayAiOrderMeta | null => {
@@ -1859,7 +1970,6 @@ const requestListReplanPreview = async () => {
   }
 
   const listId = selectedProjectId.value
-  const requestContextKey = currentContextKey.value
   const result = await runAiRequest<AiListReplanPreviewResponse>({
     board: AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW,
     requestMeta: { listId, dirty: isListReplanDirty.value },
@@ -1874,32 +1984,7 @@ const requestListReplanPreview = async () => {
   }
 
   if (result.status !== 'success' || !result.ticket) return
-
-  const payload = normalizeListReplanPreviewPayload(result.payload)
-  if (!payload) {
-    toast.error('AI 返回格式异常，请稍后重试。')
-    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, result.ticket.requestId)
-    return
-  }
-  if (
-    !isTaskViewMounted.value ||
-    isAggregateView.value ||
-    selectedProjectId.value !== listId ||
-    currentContextKey.value !== requestContextKey
-  ) {
-    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, result.ticket.requestId)
-    return
-  }
-
-  pendingListReplanOperation.value = {
-    listId,
-    operationId: payload.operationId,
-    createdAt: new Date().toISOString(),
-  }
-  listReplanPreviewPayload.value = payload
-  showListReplanPreviewModal.value = true
-  persistCurrentListReplanState()
-  aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, result.ticket.requestId)
+  consumePendingListReplanPreview()
 }
 
 const confirmListReplanPreview = async () => {
@@ -3368,6 +3453,7 @@ watch(
       hydrateTodayAiOrderMetaFromCache()
     }
     await loadContextData(currentContextKey.value)
+    consumePendingListReplanPreview()
   },
 )
 
@@ -3384,6 +3470,13 @@ watch(
   [() => todayAiOrderEntry.value.status, isTodayView, () => taskList.value.length],
   () => {
     consumePendingTodayAiOrder()
+  },
+)
+
+watch(
+  [() => listReplanPreviewEntry.value.status, isAggregateView, () => selectedProjectId.value],
+  () => {
+    consumePendingListReplanPreview()
   },
 )
 
@@ -3417,6 +3510,7 @@ onMounted(async () => {
   }
   await loadContextData(currentContextKey.value)
   consumePendingTodayAiOrder()
+  consumePendingListReplanPreview()
 })
 
 onBeforeUnmount(() => {
@@ -3470,6 +3564,67 @@ onBeforeUnmount(() => {
 
 .ai-reason-header {
   background: var(--color-ai);
+}
+
+.list-replan-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-replan-field-label {
+  flex-shrink: 0;
+  width: 52px;
+  color: var(--color-text-tertiary);
+}
+
+.list-replan-field-change {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.list-replan-chip,
+.list-replan-priority-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-input-border);
+  background: var(--color-bg-surface-muted);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  line-height: 1.25;
+}
+
+.list-replan-chip {
+  color: var(--color-text-body);
+}
+
+.list-replan-priority-chip--urgent {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+}
+
+.list-replan-priority-chip--high {
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning);
+}
+
+.list-replan-priority-chip--low {
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+}
+
+.list-replan-priority-chip--none {
+  background: var(--color-primary-soft-2);
+  border-color: var(--color-primary);
+}
+
+.list-replan-arrow {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
 }
 
 .completion-option {

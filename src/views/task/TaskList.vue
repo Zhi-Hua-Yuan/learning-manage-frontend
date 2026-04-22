@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="relative flex min-h-full flex-1 bg-[var(--color-bg-page)]">
-    <main class="flex min-w-0 flex-1 flex-col bg-[var(--color-bg-page)]">
+    <main class="flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--color-bg-page)]">
       <div
         class="flex h-14 items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-0 sm:px-5"
       >
@@ -155,7 +155,7 @@
       </div>
 
       <Transition name="content-fade" mode="out-in">
-        <div :key="boardTransitionKey" class="flex-1 overflow-y-auto p-3 sm:p-4">
+        <div :key="boardTransitionKey" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
           <div v-if="shouldRenderBoardData" class="space-y-4">
             <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
             <div class="flex items-center gap-3 px-1">
@@ -471,7 +471,7 @@
 
     <aside
       v-if="selectedTask || !isMobile"
-      class="z-[var(--z-popover)] flex flex-col bg-[var(--color-bg-surface)]"
+      class="z-[var(--z-popover)] flex min-h-0 flex-col bg-[var(--color-bg-surface)]"
       :class="
         isMobile
           ? 'fixed inset-0 w-full border-l-0'
@@ -523,7 +523,7 @@
           </div>
         </div>
 
-        <div class="flex-1 space-y-4 overflow-y-auto p-4">
+        <div class="flex-1 min-h-0 space-y-4 overflow-y-auto p-4">
           <div class="space-y-1">
             <textarea
               ref="detailTitleInputRef"

@@ -31,6 +31,15 @@ export const writeProjectListCache = <T>(status: CacheStatus, records: T[]) => {
   writeCache(getProjectListCacheEntry(status), records)
 }
 
+export const clearProjectListCache = (status?: CacheStatus) => {
+  if (status === undefined) {
+    removeCache(getProjectListCacheEntry(0))
+    removeCache(getProjectListCacheEntry(1))
+    return
+  }
+  removeCache(getProjectListCacheEntry(status))
+}
+
 export const readProjectProgressCache = (projectId: string, maxAgeMs = PROJECT_PROGRESS_CACHE_TTL_MS): number | null => {
   const progressMap = readProjectProgressMap()
   if (!progressMap) return null

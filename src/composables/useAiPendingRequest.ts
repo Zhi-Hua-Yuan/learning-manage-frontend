@@ -12,7 +12,7 @@ interface RunAiRequestOptions<T> {
   requestMeta?: Record<string, unknown> | null
   request: () => Promise<T>
   successMessage: string
-  errorMessage: string
+  errorMessage: string | ((error: unknown) => string)
   onStart?: () => void
 }
 
@@ -62,7 +62,11 @@ export const useAiPendingRequest = () => {
       const accepted = registry.resolveError(ticket, message)
 
       if (accepted && registry.consumeToastTicket(options.board, ticket.requestId)) {
-        toast.error(options.errorMessage)
+        const toastMessage =
+          typeof options.errorMessage === 'function'
+            ? options.errorMessage(error)
+            : options.errorMessage
+        toast.error(toastMessage)
       }
 
       return {

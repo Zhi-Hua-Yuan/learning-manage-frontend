@@ -3,16 +3,12 @@
     <div class="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8">
       <div class="mb-6 space-y-2 text-center sm:mb-8">
         <h2 class="text-2xl font-black tracking-tight text-[var(--color-text-primary)] sm:text-3xl">
-          让
-          <span class="text-[var(--color-ai)]">AI</span>
-          帮你拆解目标
+          让 <span class="text-[var(--color-ai)]">AI</span> 帮你拆解目标
         </h2>
-        <p class="text-[var(--color-text-secondary)]">只需一句话，自动生成包含阶段与任务的落地执行计划</p>
+        <p class="text-[var(--color-text-secondary)]">只需一句话，生成可确认的阶段与任务计划草稿</p>
       </div>
 
-      <div
-        class="card-base relative space-y-6 overflow-hidden rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-8"
-      >
+      <div class="card-base relative space-y-6 overflow-hidden rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-8">
         <div class="absolute top-0 left-0 h-1 w-full bg-[var(--color-ai)]"></div>
 
         <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
@@ -29,6 +25,7 @@
               class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
           </div>
+
           <div>
             <label class="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-text-body)]">
               <AppIcon name="history" class="h-4 w-4" />
@@ -42,59 +39,70 @@
               class="focus-ring w-full rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-body)]"
             />
           </div>
+
+          <div class="flex items-end">
+            <label
+              class="flex w-full cursor-pointer items-center justify-between rounded-xl border border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] px-4 py-3"
+              :class="isGeneratingPlan ? 'cursor-not-allowed opacity-70' : ''"
+            >
+              <span>
+                <span class="block text-sm font-bold text-[var(--color-text-body)]">详细拆解模式</span>
+                <span class="mt-0.5 block text-xs text-[var(--color-text-secondary)]">生成更细致的执行步骤</span>
+              </span>
+              <input
+                v-model="aiForm.detailed"
+                :disabled="isGeneratingPlan"
+                type="checkbox"
+                class="h-4 w-4 rounded border-[var(--color-input-border)] text-[var(--color-ai)] focus:ring-[var(--color-input-ring)]"
+              />
+            </label>
+          </div>
+
           <div class="md:col-span-2">
             <label class="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-text-body)]">
               <AppIcon name="document" class="h-4 w-4" />
-              补充描述 (可选)
+              补充描述（可选）
             </label>
             <textarea
               v-model="aiForm.description"
               :disabled="isGeneratingPlan"
-              placeholder="例如：我目前的基础比较薄弱，希望前两周以背单词和基础语法为主..."
-              class="focus-ring min-h-[80px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
+              placeholder="例如：我目前听力较弱，希望前两周先巩固词汇和基础听力..."
+              class="focus-ring min-h-[96px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
             ></textarea>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center justify-center gap-3 pt-4">
-          <button
-            @click="generatePlan"
-            :disabled="isGeneratingPlan"
-            class="btn-ai flex items-center gap-2 rounded-full px-8 py-3 font-bold"
-            :class="isGeneratingPlan ? 'cursor-not-allowed opacity-70' : ''"
-          >
-            <svg
-              v-if="isGeneratingPlan"
-              class="h-5 w-5 animate-spin text-[var(--color-text-on-accent)]"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
+        <div
+          v-if="isGeneratingPlan"
+          class="rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary-soft)] px-4 py-3 text-sm text-[var(--color-text-secondary)]"
+          aria-live="polite"
+        >
+          <div class="flex items-center gap-2">
+            <svg class="h-4 w-4 animate-spin text-[var(--color-ai)]" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" />
+              <path class="opacity-75" fill="currentColor" d="M21 12a9 9 0 0 0-9-9v3a6 6 0 0 1 6 6h3z" />
             </svg>
-            <AppIcon v-else name="sparkles" class="h-5 w-5" />
+            <span>{{ isSlowGeneration ? 'AI 正在生成较复杂的计划，请耐心等待。' : 'AI 正在生成计划草稿，请稍候。' }}</span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <button
+            type="button"
+            class="btn-ai flex items-center gap-2 rounded-full px-8 py-3 font-bold"
+            :disabled="isGeneratingPlan"
+            :class="isGeneratingPlan ? 'cursor-not-allowed opacity-70' : ''"
+            @click="generatePlan"
+          >
+            <AppIcon name="sparkles" class="h-5 w-5" />
             {{ isGeneratingPlan ? 'AI 正在生成计划...' : '开始智能拆解' }}
           </button>
 
           <button
             type="button"
             class="btn-secondary rounded-full px-5 py-3 text-sm font-bold"
-            :disabled="isGeneratingPlan || isApplying || isRetryingFailed"
-            :class="
-              isGeneratingPlan || isApplying || isRetryingFailed ? 'cursor-not-allowed opacity-70' : ''
-            "
+            :disabled="isGeneratingPlan"
+            :class="isGeneratingPlan ? 'cursor-not-allowed opacity-70' : ''"
             @click="clearPlannerContent"
           >
             一键清空内容
@@ -103,217 +111,27 @@
       </div>
 
       <div
-        v-if="generatedPlan.length > 0"
-        class="card-base animate-fade-in-up space-y-6 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-8"
+        v-if="plannerBreakdownEntry.status === 'error'"
+        class="card-base space-y-4 rounded-2xl border-[var(--color-danger)]/35 bg-[var(--color-danger-soft)]/45 p-5 sm:p-6"
+        role="alert"
       >
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h3 class="flex items-center gap-2 text-xl font-bold text-[var(--color-text-primary)]">
-            <AppIcon name="clipboard" class="h-5 w-5" />
-            生成的专属计划草稿
-          </h3>
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              class="btn-secondary rounded-lg px-3 py-2 text-xs font-bold"
-              @click="selectAllDraftTasks"
-            >
-              全选
-            </button>
-            <button
-              type="button"
-              class="btn-secondary rounded-lg px-3 py-2 text-xs font-bold"
-              @click="clearDraftTasks"
-            >
-              清空
-            </button>
-            <button
-              @click="openConfirmModal"
-              :disabled="isApplying || selectedTaskCount === 0"
-              class="btn-ai flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-bold"
-              :class="isApplying || selectedTaskCount === 0 ? 'cursor-not-allowed opacity-70' : ''"
-            >
-              <span v-if="isApplying">导入中...</span>
-              <span v-else class="flex items-center gap-1.5">
-                <AppIcon name="success" class="h-4 w-4" />
-                勾选项导入系统
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <div class="rounded-xl border border-[var(--color-input-border)] bg-[var(--color-bg-elevated)] p-3 text-sm text-[var(--color-text-secondary)]">
-          已选 {{ selectedMilestoneCount }} 个阶段，{{ selectedTaskCount }} / {{ totalTaskCount }} 个任务
-        </div>
-
-        <div class="space-y-6">
-          <div
-            v-for="(milestone, mIndex) in generatedPlan"
-            :key="`milestone-${mIndex}`"
-            class="rounded-xl border border-[var(--color-success)]/35 bg-[var(--color-success-soft)]/35 p-5"
-          >
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <label class="flex cursor-pointer items-center gap-3 text-[var(--color-ai)]">
-                <input
-                  type="checkbox"
-                  class="h-4 w-4 rounded border-[var(--color-input-border)] text-[var(--color-ai)] focus:ring-[var(--color-input-ring)]"
-                  :checked="isMilestoneChecked(mIndex)"
-                  :indeterminate.prop="isMilestoneIndeterminate(mIndex)"
-                  @change="toggleMilestoneSelection(mIndex, $event)"
-                />
-                <span class="flex items-center gap-2 font-bold">
-                  <span
-                    class="inline-flex h-6 min-w-[56px] items-center justify-center whitespace-nowrap rounded bg-[var(--color-success)]/20 px-2 text-xs text-[var(--color-ai)]"
-                    >阶段 {{ mIndex + 1 }}</span
-                  >
-                  {{ milestone.name }}
-                </span>
-              </label>
-              <span class="text-xs text-[var(--color-ai)]">
-                已选 {{ getSelectedTaskCountByMilestone(mIndex) }} / {{ milestone.tasks.length }} 任务
-              </span>
-            </div>
-
-            <div class="space-y-2 pl-2 sm:pl-8">
-              <label
-                v-for="(task, tIndex) in milestone.tasks"
-                :key="`task-${mIndex}-${tIndex}`"
-                class="flex cursor-pointer items-start gap-3 rounded-lg border bg-[var(--color-bg-surface-muted)] p-3 text-sm text-[var(--color-text-body)]"
-                :style="{ borderColor: getDraftTaskItemBorderColor(task.priority) }"
-              >
-                <input
-                  type="checkbox"
-                  class="mt-0.5 h-4 w-4 rounded border-[var(--color-input-border)] text-[var(--color-ai)] focus:ring-[var(--color-input-ring)]"
-                  :checked="isTaskChecked(mIndex, tIndex)"
-                  @change="toggleTaskSelection(mIndex, tIndex, $event)"
-                />
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1 break-words font-medium">{{ getTaskTitle(task) }}</div>
-                    <span
-                      v-if="formatDraftTaskDueDate(task.dueDate)"
-                      class="mono shrink-0 text-right text-xs text-[var(--color-text-secondary)]"
-                    >
-                      {{ formatDraftTaskDueDate(task.dueDate) }}
-                    </span>
-                  </div>
-                  <div v-if="task.description" class="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    {{ task.description }}
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-if="failedImportItems.length > 0"
-        class="card-base space-y-4 rounded-2xl border-[var(--color-warning)]/45 bg-[var(--color-warning-soft)]/45 p-5 sm:p-6"
-      >
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="flex items-center gap-2 text-lg font-bold text-[var(--color-warning)]">
+        <div class="flex items-start gap-3">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-danger-soft)] text-[var(--color-danger)]">
             <AppIcon name="warning" class="h-5 w-5" />
-            导入存在失败项（{{ failedImportItems.length }}）
-          </h3>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="btn-secondary rounded-lg px-3 py-2 text-xs font-bold"
-              @click="goToImportedProject"
-            >
-              查看已导入任务
-            </button>
-            <button
-              type="button"
-              class="btn-primary rounded-lg px-3 py-2 text-xs font-bold"
-              :disabled="isRetryingFailed"
-              :class="isRetryingFailed ? 'cursor-not-allowed opacity-70' : ''"
-              @click="retryFailedItems"
-            >
-              {{ isRetryingFailed ? '重试中...' : '重试失败项' }}
-            </button>
+          </div>
+          <div class="min-w-0 flex-1">
+            <h3 class="font-bold text-[var(--color-text-primary)]">计划草稿生成失败</h3>
+            <p class="mt-1 text-sm text-[var(--color-text-secondary)]">{{ plannerErrorMessage }}</p>
+            <p class="mt-1 text-xs text-[var(--color-text-tertiary)]">系统不会自动重试，你可以检查输入后手动重试。</p>
           </div>
         </div>
-
-        <div class="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-[var(--color-warning)]/45 bg-[var(--color-bg-elevated)] p-3">
-          <div
-            v-for="(item, index) in failedImportItems"
-            :key="`failed-${index}`"
-            class="rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning-soft)]/35 p-3"
-          >
-            <div class="text-sm font-semibold text-[var(--color-warning)]">{{ getFailureTitle(item) }}</div>
-            <div class="mt-1 text-xs text-[var(--color-text-secondary)]">{{ item.reason }}</div>
-          </div>
+        <div class="flex justify-end">
+          <button type="button" class="btn-secondary rounded-lg px-4 py-2 text-sm font-bold" @click="generatePlan">
+            重新尝试
+          </button>
         </div>
       </div>
     </div>
-
-    <transition
-      enter-active-class="ease-out duration-300"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="ease-in duration-200"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="showConfirmModal"
-        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
-      >
-        <div
-          class="fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm transition-opacity"
-          @click="showConfirmModal = false"
-        ></div>
-
-        <div class="relative z-[var(--z-modal-panel)] mx-auto my-6 w-[calc(100%-2rem)] max-w-md transform transition-all">
-          <div
-            class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl outline-none focus:outline-none"
-          >
-            <div class="h-1 w-full bg-[var(--color-ai)]"></div>
-            <div class="flex flex-col items-center p-6 pb-0 text-center">
-              <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-success-soft)]">
-                <AppIcon name="sparkles" class="h-7 w-7 text-[var(--color-ai)]" />
-              </div>
-              <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">确认导入计划？</h3>
-              <div class="space-y-2 px-4 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                <p>
-                  将创建项目
-                  <span class="font-bold text-[var(--color-ai)]">“{{ projectDisplayName }}”</span>
-                </p>
-                <p>已选阶段：{{ selectedMilestoneCount }} 个</p>
-                <p>已选任务：{{ selectedTaskCount }} 个</p>
-              </div>
-            </div>
-            <div class="flex items-center justify-center gap-3 rounded-b p-6">
-              <button
-                class="btn-secondary px-6 py-2.5 text-sm font-bold outline-none focus:outline-none"
-                type="button"
-                @click="showConfirmModal = false"
-              >
-                取消
-              </button>
-              <button
-                class="btn-ai flex items-center gap-2 px-6 py-2.5 text-sm font-bold outline-none focus:outline-none"
-                type="button"
-                :disabled="isApplying"
-                :class="isApplying ? 'cursor-not-allowed opacity-70' : ''"
-                @click="executeImport"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 13l4 4L19 7"
-                  ></path>
-                </svg>
-                {{ isApplying ? '导入中...' : '立即导入' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
   </main>
 </template>
 
@@ -321,635 +139,210 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
-import { aiBreakdownApi } from '@/api/ai'
-import { addMilestoneApi } from '@/api/milestone'
-import { addProjectApi, fetchProjectList } from '@/api/project'
-import { addTaskApi } from '@/api/task'
+import { aiBreakdownPreviewApi, type AiBreakdownPreviewResponse } from '@/api/ai'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useToast } from '@/composables/useToast'
+import { isApiRequestError } from '@/utils/request'
 import { clearAiPlannerDraftCache, readAiPlannerDraftCache, writeAiPlannerDraftCache } from '@/utils/appCache'
 
-const emit = defineEmits(['refresh-projects'])
-
-interface DraftTask {
-  title?: string
-  name?: string
-  description?: string
-  priority?: number
-  dueDate?: string
+interface PlannerForm {
+  target: string
+  description: string
+  duration: string
+  detailed: boolean
 }
-
-interface DraftMilestone {
-  name: string
-  tasks: DraftTask[]
-}
-
-interface SelectedMilestone extends DraftMilestone {
-  orderNo: number
-}
-
-interface FailedMilestoneImport {
-  kind: 'milestone'
-  milestoneName: string
-  orderNo: number
-  tasks: DraftTask[]
-  reason: string
-}
-
-interface FailedTaskImport {
-  kind: 'task'
-  milestoneName: string
-  milestoneId: string
-  task: DraftTask
-  reason: string
-}
-
-type FailedImportItem = FailedMilestoneImport | FailedTaskImport
 
 interface PersistedPlannerDraft {
-  aiForm: {
-    target: string
-    description: string
-    duration: string
-  }
-  generatedPlan: DraftMilestone[]
-  selectedTaskMap: Record<string, boolean>
+  aiForm?: Partial<PlannerForm>
 }
+
+const AI_SLOW_HINT_DELAY_MS = 15_000
 
 const router = useRouter()
 const toast = useToast()
 const aiPendingRegistry = useAiPendingRegistryStore()
 const { runAiRequest } = useAiPendingRequest()
-const TASK_TITLE_MAX_LENGTH = 50
 
-const aiForm = ref({ target: '', description: '', duration: '' })
+const aiForm = ref<PlannerForm>({
+  target: '',
+  description: '',
+  duration: '',
+  detailed: false,
+})
 const isViewMounted = ref(false)
-const generatedPlan = ref<DraftMilestone[]>([])
-const selectedTaskMap = ref<Record<string, boolean>>({})
-const isApplying = ref(false)
-const isRetryingFailed = ref(false)
-const showConfirmModal = ref(false)
-const failedImportItems = ref<FailedImportItem[]>([])
-const importProjectId = ref('')
-const isDraftPersistencePaused = ref(false)
+const isSlowGeneration = ref(false)
 let persistDraftTimer: ReturnType<typeof setTimeout> | null = null
+let slowGenerationTimer: ReturnType<typeof setTimeout> | null = null
 
 const plannerBreakdownEntry = computed(
   () => aiPendingRegistry.boards[AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN],
 )
 const isGeneratingPlan = computed(() => plannerBreakdownEntry.value.status === 'pending')
+const plannerErrorMessage = computed(
+  () => plannerBreakdownEntry.value.errorMessage || 'AI 计划草稿生成失败，请稍后手动重试。',
+)
 
-const getTaskKey = (mIndex: number, tIndex: number) => `${mIndex}-${tIndex}`
-
-const getTaskTitle = (task: DraftTask) => {
-  const title = (task.title || task.name || '').trim()
-  return title || '未命名任务'
-}
-
-const taskItemPriorityBorderColorMap: Record<number, string> = {
-  3: 'var(--color-danger)',
-  2: 'var(--color-warning)',
-  1: 'var(--color-success)',
-  0: 'var(--color-input-border)',
-}
-
-const getDraftTaskItemBorderColor = (priority?: number) => {
-  const normalizedPriority =
-    typeof priority === 'number' && Number.isFinite(priority) ? Math.max(0, Math.min(3, priority)) : 0
-  return taskItemPriorityBorderColorMap[normalizedPriority] || taskItemPriorityBorderColorMap[0]
-}
-
-const normalizeDraftTaskDueDate = (dueDate?: string | null) => {
-  if (!dueDate) return ''
-  const normalized = dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate
-  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
-}
-
-const formatDraftTaskDueDate = (dueDate?: string | null) => normalizeDraftTaskDueDate(dueDate)
-
-const getErrorMessage = (error: unknown) => {
-  if (error && typeof error === 'object' && 'message' in error) {
-    const message = String((error as { message?: unknown }).message || '请求失败')
-    return message.replace(/不能超过\s*60\s*字符/g, '不能超过 50 字符')
-  }
-  return '请求失败'
-}
-
-const resolveEntityId = (entity: unknown) => {
-  if (entity && typeof entity === 'object' && 'id' in (entity as { id?: unknown })) {
-    const id = (entity as { id?: unknown }).id
-    if (id !== undefined && id !== null) {
-      const parsed = String(id)
-      if (parsed && parsed !== 'true') return parsed
+const resolveAiErrorMessage = (error: unknown) => {
+  if (isApiRequestError(error)) {
+    const codeMessages: Record<number, string> = {
+      40400: '请求的数据不存在，请刷新后重试。',
+      42900: 'AI 调用过于频繁，请稍后手动重试。',
+      30001: 'AI 服务暂时不可用，请稍后手动重试。',
+      30002: 'AI 服务响应超时，请稍后手动重试。',
+      30003: 'AI 返回结果格式异常，请调整输入后重试。',
+      30004: 'AI 服务配置异常，请联系管理员。',
     }
+    const backendMessage = error.message.trim()
+    if (backendMessage && backendMessage !== '请求失败') return backendMessage
+    return (error.code !== null && codeMessages[error.code]) || 'AI 计划草稿生成失败，请稍后手动重试。'
   }
+  return error instanceof Error && error.message
+    ? error.message
+    : 'AI 计划草稿生成失败，请稍后手动重试。'
+}
 
-  if (typeof entity === 'string' || typeof entity === 'number') {
-    const parsed = String(entity)
-    if (parsed && parsed !== 'true') return parsed
+const clearSlowGenerationTimer = () => {
+  if (slowGenerationTimer) {
+    clearTimeout(slowGenerationTimer)
+    slowGenerationTimer = null
   }
-
-  return ''
+  isSlowGeneration.value = false
 }
 
-const normalizePlan = (raw: unknown): DraftMilestone[] => {
-  if (!Array.isArray(raw)) return []
+const scheduleSlowGenerationHint = () => {
+  clearSlowGenerationTimer()
+  if (!isGeneratingPlan.value) return
 
-  return raw.map((item, index) => {
-    const source = item as { name?: unknown; tasks?: unknown }
-    const name = typeof source.name === 'string' && source.name.trim() ? source.name.trim() : `阶段 ${index + 1}`
-    const tasks = Array.isArray(source.tasks)
-      ? source.tasks.map((task) => {
-          const sourceTask = task as {
-            title?: unknown
-            name?: unknown
-            description?: unknown
-            priority?: unknown
-            dueDate?: unknown
-          }
-          const dueDate =
-            typeof sourceTask.dueDate === 'string' && sourceTask.dueDate.trim()
-              ? sourceTask.dueDate.trim()
-              : undefined
-          return {
-            title: typeof sourceTask.title === 'string' ? sourceTask.title : undefined,
-            name: typeof sourceTask.name === 'string' ? sourceTask.name : undefined,
-            description: typeof sourceTask.description === 'string' ? sourceTask.description : undefined,
-            priority:
-              typeof sourceTask.priority === 'number' && Number.isFinite(sourceTask.priority)
-                ? sourceTask.priority
-                : undefined,
-            dueDate,
-          } satisfies DraftTask
-        })
-      : []
-
-    return { name, tasks } satisfies DraftMilestone
-  })
-}
-
-const pauseDraftPersistenceOnce = () => {
-  if (typeof window === 'undefined') return
-  isDraftPersistencePaused.value = true
-  window.setTimeout(() => {
-    isDraftPersistencePaused.value = false
-  }, 0)
-}
-
-const clearPersistedDraft = () => {
-  if (typeof window === 'undefined') return
-  clearAiPlannerDraftCache()
-}
-
-const persistPlannerDraft = () => {
-  if (typeof window === 'undefined') return
-
-  const hasFormContent =
-    aiForm.value.target.trim() !== '' || aiForm.value.duration.trim() !== '' || aiForm.value.description.trim() !== ''
-  if (!hasFormContent && generatedPlan.value.length === 0) {
-    clearPersistedDraft()
+  const elapsed = Date.now() - plannerBreakdownEntry.value.updatedAt
+  const remaining = Math.max(0, AI_SLOW_HINT_DELAY_MS - elapsed)
+  if (remaining === 0) {
+    isSlowGeneration.value = true
     return
   }
 
-  const payload: PersistedPlannerDraft = {
-    aiForm: { ...aiForm.value },
-    generatedPlan: generatedPlan.value,
-    selectedTaskMap: selectedTaskMap.value,
-  }
+  slowGenerationTimer = setTimeout(() => {
+    if (isGeneratingPlan.value) isSlowGeneration.value = true
+  }, remaining)
+}
 
-  writeAiPlannerDraftCache(payload)
+const persistPlannerDraft = () => {
+  writeAiPlannerDraftCache<PersistedPlannerDraft>({ aiForm: { ...aiForm.value } })
 }
 
 const schedulePersistPlannerDraft = () => {
-  if (typeof window === 'undefined') return
-
-  if (persistDraftTimer) {
-    window.clearTimeout(persistDraftTimer)
-  }
-
-  persistDraftTimer = window.setTimeout(() => {
-    persistPlannerDraft()
+  if (persistDraftTimer) clearTimeout(persistDraftTimer)
+  persistDraftTimer = setTimeout(() => {
     persistDraftTimer = null
-  }, 120)
+    persistPlannerDraft()
+  }, 250)
 }
 
 const flushPersistPlannerDraft = () => {
-  if (typeof window === 'undefined') return
   if (persistDraftTimer) {
-    window.clearTimeout(persistDraftTimer)
+    clearTimeout(persistDraftTimer)
     persistDraftTimer = null
   }
   persistPlannerDraft()
 }
 
 const hydrateDraftFromStorage = () => {
-  if (typeof window === 'undefined') return
+  const cached = readAiPlannerDraftCache<PersistedPlannerDraft>()
+  const form = cached?.aiForm
+  if (!form || typeof form !== 'object') return
 
-  const parsed = readAiPlannerDraftCache<Partial<PersistedPlannerDraft>>()
-  if (!parsed) return
-
-  try {
-    const nextForm = {
-      target: typeof parsed.aiForm?.target === 'string' ? parsed.aiForm.target : '',
-      description: typeof parsed.aiForm?.description === 'string' ? parsed.aiForm.description : '',
-      duration: typeof parsed.aiForm?.duration === 'string' ? parsed.aiForm.duration : '',
-    }
-
-    const nextPlan = normalizePlan(parsed.generatedPlan)
-    const rawMap =
-      parsed.selectedTaskMap && typeof parsed.selectedTaskMap === 'object' ? parsed.selectedTaskMap : {}
-
-    const nextMap: Record<string, boolean> = {}
-    nextPlan.forEach((milestone, mIndex) => {
-      milestone.tasks.forEach((_task, tIndex) => {
-        const taskKey = getTaskKey(mIndex, tIndex)
-        const rawValue = (rawMap as Record<string, unknown>)[taskKey]
-        nextMap[taskKey] = typeof rawValue === 'boolean' ? rawValue : true
-      })
-    })
-
-    pauseDraftPersistenceOnce()
-    aiForm.value = nextForm
-    generatedPlan.value = nextPlan
-    selectedTaskMap.value = nextMap
-  } catch {
-    clearPersistedDraft()
+  aiForm.value = {
+    target: typeof form.target === 'string' ? form.target : '',
+    description: typeof form.description === 'string' ? form.description : '',
+    duration: typeof form.duration === 'string' ? form.duration : '',
+    detailed: form.detailed === true,
   }
 }
 
-const initializeSelection = (plan: DraftMilestone[]) => {
-  const nextMap: Record<string, boolean> = {}
-  plan.forEach((milestone, mIndex) => {
-    milestone.tasks.forEach((_task, tIndex) => {
-      nextMap[getTaskKey(mIndex, tIndex)] = true
-    })
-  })
-  selectedTaskMap.value = nextMap
+const isBreakdownPreviewResponse = (value: unknown): value is AiBreakdownPreviewResponse => {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.draftId === 'string' &&
+    Boolean(record.draftId.trim()) &&
+    typeof record.expireAt === 'string' &&
+    Array.isArray(record.milestones)
+  )
 }
 
-const selectedMilestones = computed<SelectedMilestone[]>(() =>
-  generatedPlan.value
-    .map((milestone, mIndex) => ({
-      ...milestone,
-      orderNo: mIndex,
-      tasks: milestone.tasks.filter((_task, tIndex) => selectedTaskMap.value[getTaskKey(mIndex, tIndex)]),
-    }))
-    .filter((item) => item.tasks.length > 0),
-)
-
-const selectedTaskCount = computed(() =>
-  selectedMilestones.value.reduce((sum, milestone) => sum + milestone.tasks.length, 0),
-)
-const totalTaskCount = computed(() =>
-  generatedPlan.value.reduce((sum, milestone) => sum + milestone.tasks.length, 0),
-)
-const selectedMilestoneCount = computed(() => selectedMilestones.value.length)
-
-const projectDisplayName = computed(() => {
-  const target = aiForm.value.target.trim() || '未命名目标'
-  return `[AI] ${target}`
-})
-
-const isTaskChecked = (mIndex: number, tIndex: number) =>
-  Boolean(selectedTaskMap.value[getTaskKey(mIndex, tIndex)])
-
-const getSelectedTaskCountByMilestone = (mIndex: number) =>
-  generatedPlan.value[mIndex]?.tasks.filter((_task, tIndex) => isTaskChecked(mIndex, tIndex)).length || 0
-
-const isMilestoneChecked = (mIndex: number) => {
-  const milestone = generatedPlan.value[mIndex]
-  if (!milestone || milestone.tasks.length === 0) return false
-  return milestone.tasks.every((_task, tIndex) => isTaskChecked(mIndex, tIndex))
-}
-
-const isMilestoneIndeterminate = (mIndex: number) => {
-  const milestone = generatedPlan.value[mIndex]
-  if (!milestone || milestone.tasks.length === 0) return false
-  const selectedCount = getSelectedTaskCountByMilestone(mIndex)
-  return selectedCount > 0 && selectedCount < milestone.tasks.length
-}
-
-const toggleTaskSelection = (mIndex: number, tIndex: number, event: Event) => {
-  const checked = (event.target as HTMLInputElement).checked
-  selectedTaskMap.value = {
-    ...selectedTaskMap.value,
-    [getTaskKey(mIndex, tIndex)]: checked,
-  }
-}
-
-const toggleMilestoneSelection = (mIndex: number, event: Event) => {
-  const checked = (event.target as HTMLInputElement).checked
-  const nextMap = { ...selectedTaskMap.value }
-  const milestone = generatedPlan.value[mIndex]
-  if (!milestone) return
-  milestone.tasks.forEach((_task, tIndex) => {
-    nextMap[getTaskKey(mIndex, tIndex)] = checked
-  })
-  selectedTaskMap.value = nextMap
-}
-
-const selectAllDraftTasks = () => {
-  const nextMap: Record<string, boolean> = {}
-  generatedPlan.value.forEach((milestone, mIndex) => {
-    milestone.tasks.forEach((_task, tIndex) => {
-      nextMap[getTaskKey(mIndex, tIndex)] = true
-    })
-  })
-  selectedTaskMap.value = nextMap
-}
-
-const clearDraftTasks = () => {
-  const nextMap: Record<string, boolean> = {}
-  generatedPlan.value.forEach((milestone, mIndex) => {
-    milestone.tasks.forEach((_task, tIndex) => {
-      nextMap[getTaskKey(mIndex, tIndex)] = false
-    })
-  })
-  selectedTaskMap.value = nextMap
-}
-
-const applyGeneratedPlan = (payload: unknown) => {
-  const normalized = normalizePlan(payload)
-  generatedPlan.value = normalized
-  initializeSelection(normalized)
-
-  if (normalized.length === 0) {
-    toast.warning('AI 未生成有效草稿，请补充描述后重试。')
-  }
-  return true
-}
-
-const consumePendingGeneratedPlan = () => {
+const consumePendingGeneratedDraft = async () => {
   const entry = plannerBreakdownEntry.value
-  if (entry.status !== 'success') return
+  if (entry.status !== 'success' || !isViewMounted.value) return
 
-  const applied = applyGeneratedPlan(entry.responsePayload)
-  if (applied) {
+  if (!isBreakdownPreviewResponse(entry.responsePayload)) {
+    toast.error('AI 返回的草稿信息格式异常，请重新生成。')
     aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN, entry.requestId)
+    return
   }
+
+  const draftId = entry.responsePayload.draftId.trim()
+  aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN, entry.requestId)
+  await router.push({ name: 'ai-draft-detail', params: { draftId } })
 }
 
 const generatePlan = async () => {
-  if (!aiForm.value.target.trim() || !aiForm.value.duration.trim()) {
+  const target = aiForm.value.target.trim()
+  const duration = aiForm.value.duration.trim()
+  if (!target || !duration) {
     toast.error('请先填写目标和期望周期。')
     return
   }
 
-  const result = await runAiRequest({
+  const result = await runAiRequest<AiBreakdownPreviewResponse>({
     board: AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN,
     requestMeta: {
-      target: aiForm.value.target.trim(),
-      duration: aiForm.value.duration.trim(),
-      hasDescription: Boolean(aiForm.value.description?.trim()),
+      target,
+      duration,
+      hasDescription: Boolean(aiForm.value.description.trim()),
+      detailed: aiForm.value.detailed,
     },
-    onStart: () => {
-      generatedPlan.value = []
-      selectedTaskMap.value = {}
-      failedImportItems.value = []
-      importProjectId.value = ''
-    },
-    request: () => aiBreakdownApi(aiForm.value),
-    successMessage: 'AI 智能规划响应完成。',
-    errorMessage: 'AI 拆解失败，请检查网络后重试。',
+    onStart: scheduleSlowGenerationHint,
+    request: () =>
+      aiBreakdownPreviewApi({
+        target,
+        description: aiForm.value.description.trim() || undefined,
+        duration,
+        detailed: aiForm.value.detailed,
+      }),
+    successMessage: 'AI 计划草稿已生成。',
+    errorMessage: resolveAiErrorMessage,
   })
 
-  if (result.status !== 'success' || !result.ticket || !isViewMounted.value) return
-
-  const applied = applyGeneratedPlan(result.payload)
-  if (applied) {
-    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN, result.ticket.requestId)
-  }
-}
-
-const openConfirmModal = () => {
-  if (generatedPlan.value.length === 0) return
-  if (selectedTaskCount.value === 0) {
-    toast.warning('请至少勾选一个任务后再导入。')
+  if (result.status === 'blocked') {
+    toast.warning('AI 正在生成计划，请等待当前请求完成。')
     return
   }
-  showConfirmModal.value = true
-}
-
-const createTask = async (projectId: string, milestoneId: string, task: DraftTask) => {
-  const finalTitle = getTaskTitle(task).slice(0, TASK_TITLE_MAX_LENGTH)
-  const normalizedPriority =
-    typeof task.priority === 'number' && Number.isFinite(task.priority) ? task.priority : 0
-  const normalizedDueDate = typeof task.dueDate === 'string' && task.dueDate.trim() ? task.dueDate.trim() : undefined
-  await addTaskApi({
-    title: finalTitle,
-    description: task.description || '',
-    projectId,
-    priority: normalizedPriority,
-    dueDate: normalizedDueDate,
-    milestoneId: milestoneId || undefined,
-  })
-}
-
-const ensureProjectId = async () => {
-  const created = await addProjectApi({ name: projectDisplayName.value, icon: 'sparkles' })
-  const directId = resolveEntityId(created)
-  if (directId) return directId
-
-  const listRes = await fetchProjectList()
-  const records = (listRes as { records?: Array<{ id: string | number; name: string }> })?.records || []
-  const matched = [...records].reverse().find((item) => item.name === projectDisplayName.value)
-  if (matched?.id !== undefined && matched?.id !== null) {
-    return String(matched.id)
-  }
-
-  throw new Error('创建项目后未返回可用的项目 ID')
-}
-
-const runImport = async (milestones: SelectedMilestone[], projectId: string) => {
-  const failures: FailedImportItem[] = []
-
-  for (const milestone of milestones) {
-    let milestoneId = ''
-
-    try {
-      const createdMilestone = await addMilestoneApi({
-        name: milestone.name,
-        projectId,
-        orderNo: milestone.orderNo,
-      })
-      milestoneId = resolveEntityId(createdMilestone)
-      if (!milestoneId) {
-        throw new Error('创建阶段后未返回阶段 ID')
-      }
-    } catch (error) {
-      failures.push({
-        kind: 'milestone',
-        milestoneName: milestone.name,
-        orderNo: milestone.orderNo,
-        tasks: milestone.tasks,
-        reason: getErrorMessage(error),
-      })
-      continue
-    }
-
-    for (const task of milestone.tasks) {
-      try {
-        await createTask(projectId, milestoneId, task)
-      } catch (error) {
-        failures.push({
-          kind: 'task',
-          milestoneName: milestone.name,
-          milestoneId,
-          task,
-          reason: getErrorMessage(error),
-        })
-      }
-    }
-  }
-
-  return failures
-}
-
-const resetPlannerState = () => {
-  if (persistDraftTimer && typeof window !== 'undefined') {
-    window.clearTimeout(persistDraftTimer)
-    persistDraftTimer = null
-  }
-  pauseDraftPersistenceOnce()
-  aiForm.value = { target: '', description: '', duration: '' }
-  generatedPlan.value = []
-  selectedTaskMap.value = {}
-  failedImportItems.value = []
-  importProjectId.value = ''
-  clearPersistedDraft()
+  if (result.status !== 'success' || !isViewMounted.value) return
+  await consumePendingGeneratedDraft()
 }
 
 const clearPlannerContent = () => {
-  showConfirmModal.value = false
-  resetPlannerState()
-  toast.success('已清空当前内容。')
+  if (isGeneratingPlan.value) return
+  aiForm.value = { target: '', description: '', duration: '', detailed: false }
+  clearAiPlannerDraftCache()
+  if (plannerBreakdownEntry.value.status !== 'pending') {
+    aiPendingRegistry.resetBoard(AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN)
+  }
+  toast.success('内容已清空。')
 }
 
-const executeImport = async () => {
-  showConfirmModal.value = false
-  if (selectedTaskCount.value === 0) {
-    toast.warning('请至少勾选一个任务后再导入。')
-    return
-  }
-
-  isApplying.value = true
-  failedImportItems.value = []
-
-  try {
-    const projectId = await ensureProjectId()
-    importProjectId.value = projectId
-
-    const failures = await runImport(selectedMilestones.value, projectId)
-    failedImportItems.value = failures
-    emit('refresh-projects')
-
-    if (failures.length === 0) {
-      toast.success('AI 计划已导入系统。')
-      resetPlannerState()
-      await router.push({ path: '/tasks', query: { projectId } })
-      return
-    }
-
-    toast.warning(`导入完成，但有 ${failures.length} 项失败。可点击“重试失败项”。`, 5000)
-  } catch (error) {
-    console.error('导入失败', error)
-    toast.error('导入失败，请检查网络后重试。')
-  } finally {
-    isApplying.value = false
-  }
-}
-
-const retryFailedItems = async () => {
-  if (isRetryingFailed.value || !importProjectId.value || failedImportItems.value.length === 0) return
-
-  isRetryingFailed.value = true
-  try {
-    const nextFailures: FailedImportItem[] = []
-    const projectId = importProjectId.value
-
-    for (const item of failedImportItems.value) {
-      if (item.kind === 'milestone') {
-        try {
-          const createdMilestone = await addMilestoneApi({
-            name: item.milestoneName,
-            projectId,
-            orderNo: item.orderNo,
-          })
-          const milestoneId = resolveEntityId(createdMilestone)
-          if (!milestoneId) {
-            throw new Error('创建阶段后未返回阶段 ID')
-          }
-
-          for (const task of item.tasks) {
-            try {
-              await createTask(projectId, milestoneId, task)
-            } catch (error) {
-              nextFailures.push({
-                kind: 'task',
-                milestoneName: item.milestoneName,
-                milestoneId,
-                task,
-                reason: getErrorMessage(error),
-              })
-            }
-          }
-        } catch (error) {
-          nextFailures.push({
-            ...item,
-            reason: getErrorMessage(error),
-          })
-        }
-      } else {
-        try {
-          await createTask(projectId, item.milestoneId, item.task)
-        } catch (error) {
-          nextFailures.push({
-            ...item,
-            reason: getErrorMessage(error),
-          })
-        }
-      }
-    }
-
-    failedImportItems.value = nextFailures
-
-    if (nextFailures.length === 0) {
-      toast.success('失败项已全部重试成功。')
-      emit('refresh-projects')
-      resetPlannerState()
-      await router.push({ path: '/tasks', query: { projectId } })
-      return
-    }
-
-    toast.warning(`仍有 ${nextFailures.length} 项失败，请稍后重试。`, 5000)
-  } finally {
-    isRetryingFailed.value = false
-  }
-}
-
-const goToImportedProject = async () => {
-  if (!importProjectId.value) {
-    await router.push('/tasks')
-    return
-  }
-  await router.push({ path: '/tasks', query: { projectId: importProjectId.value } })
-}
-
-watch(
-  [aiForm, generatedPlan, selectedTaskMap],
-  () => {
-    if (isDraftPersistencePaused.value) return
-    schedulePersistPlannerDraft()
-  },
-  { deep: true },
-)
+watch(aiForm, schedulePersistPlannerDraft, { deep: true })
 
 watch(
   () => plannerBreakdownEntry.value.status,
   (status) => {
+    if (status === 'pending') {
+      scheduleSlowGenerationHint()
+      return
+    }
+    clearSlowGenerationTimer()
     if (status === 'success' && isViewMounted.value) {
-      consumePendingGeneratedPlan()
+      void consumePendingGeneratedDraft()
     }
   },
 )
@@ -957,20 +350,13 @@ watch(
 onMounted(() => {
   isViewMounted.value = true
   hydrateDraftFromStorage()
-  if (generatedPlan.value.length === 0) {
-    consumePendingGeneratedPlan()
-  }
+  if (isGeneratingPlan.value) scheduleSlowGenerationHint()
+  void consumePendingGeneratedDraft()
 })
 
 onBeforeUnmount(() => {
   isViewMounted.value = false
   flushPersistPlannerDraft()
+  clearSlowGenerationTimer()
 })
-
-const getFailureTitle = (item: FailedImportItem) => {
-  if (item.kind === 'milestone') {
-    return `阶段导入失败：${item.milestoneName}`
-  }
-  return `任务导入失败：${getTaskTitle(item.task)}（阶段：${item.milestoneName}）`
-}
 </script>

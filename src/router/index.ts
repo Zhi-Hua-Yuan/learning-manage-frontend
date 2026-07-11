@@ -38,6 +38,12 @@ const router = createRouter({
           component: () => import('@/views/ai/AiPlanner.vue'),
         },
         {
+          path: 'ai/draft/:draftId',
+          name: 'ai-draft-detail',
+          component: () => import('@/views/ai/AiDraftDetail.vue'),
+          props: true,
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/setting/Settings.vue'),

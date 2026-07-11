@@ -4,6 +4,27 @@ import { useToastStore } from '@/stores/toast'
 import { clearAuthToken, readAuthToken } from '@/utils/authToken'
 import { syncBackendCacheVersion } from '@/utils/cacheVersion'
 
+interface ApiRequestErrorOptions {
+  code?: number | null
+  httpStatus?: number | null
+}
+
+export class ApiRequestError extends Error {
+  readonly code: number | null
+  readonly httpStatus: number | null
+
+  constructor(message: string, options: ApiRequestErrorOptions = {}) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.code = options.code ?? null
+    this.httpStatus = options.httpStatus ?? null
+  }
+}
+
+export const isApiRequestError = (error: unknown): error is ApiRequestError => {
+  return error instanceof ApiRequestError
+}
+
 const request = axios.create({
   baseURL: '/api',
   timeout: 300000,
@@ -25,6 +46,25 @@ const resolveBusinessMessage = (res: unknown) => {
   }
 
   return ''
+}
+
+const resolveBusinessCode = (res: unknown): number | null => {
+  if (!res || typeof res !== 'object') return null
+  const rawCode = (res as Record<string, unknown>).code
+  const code = Number(rawCode)
+  return Number.isFinite(code) ? code : null
+}
+
+const resolveHttpStatus = (status: unknown): number | null => {
+  const parsed = Number(status)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const createApiRequestError = (
+  message: string,
+  options: ApiRequestErrorOptions = {},
+): ApiRequestError => {
+  return new ApiRequestError(message, options)
 }
 
 const isHtmlForbiddenPage = (value: unknown) => {
@@ -105,10 +145,16 @@ request.interceptors.response.use(
 
     if (isHtmlForbiddenPage(res)) {
       if (isPublicAuthPath(requestUrl)) {
-        return Promise.reject(new Error('登录接口被拒绝（403），请检查网关或后端鉴权配置。'))
+        return Promise.reject(
+          createApiRequestError('登录接口被拒绝（403），请检查网关或后端鉴权配置。', {
+            httpStatus: response.status,
+          }),
+        )
       }
       redirectToLogin()
-      return Promise.reject(new Error('登录已失效，请重新登录。'))
+      return Promise.reject(
+        createApiRequestError('登录已失效，请重新登录。', { httpStatus: response.status }),
+      )
     }
 
     if (!res || typeof res !== 'object' || !('code' in res)) {
@@ -116,21 +162,30 @@ request.interceptors.response.use(
     }
 
     const record = res as Record<string, unknown>
-    const code = Number(record.code)
+    const code = resolveBusinessCode(record)
     const message = resolveBusinessMessage(record)
 
     if (isAuthBusinessError(record)) {
       if (isPublicAuthPath(requestUrl)) {
-        return Promise.reject(new Error(message || '登录失败，请检查账号密码。'))
+        return Promise.reject(
+          createApiRequestError(message || '登录失败，请检查账号密码。', {
+            code,
+            httpStatus: response.status,
+          }),
+        )
       }
       redirectToLogin()
-      return Promise.reject(new Error(message || '未登录'))
+      return Promise.reject(
+        createApiRequestError(message || '未登录', { code, httpStatus: response.status }),
+      )
     }
 
     if (code !== 0) {
       const detail = message || `code=${String(record.code ?? 'unknown')}`
       console.error('业务报错：', detail)
-      return Promise.reject(new Error(message || '请求失败'))
+      return Promise.reject(
+        createApiRequestError(message || '请求失败', { code, httpStatus: response.status }),
+      )
     }
 
     return record.data
@@ -138,26 +193,60 @@ request.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error)) {
       const requestUrl = error.config?.url
-      const status = Number(error.response?.status)
-      if (status === 401 || status === 403) {
+      const responseData = error.response?.data
+      const status = resolveHttpStatus(error.response?.status)
+      const code = resolveBusinessCode(responseData)
+      const message = resolveBusinessMessage(responseData)
+
+      if (status === 401 || status === 403 || isAuthBusinessError(responseData)) {
         if (isPublicAuthPath(requestUrl)) {
-          return Promise.reject(new Error('登录接口被拒绝（403），请检查网关或后端鉴权配置。'))
+          return Promise.reject(
+            createApiRequestError(message || '登录接口被拒绝，请检查网关或后端鉴权配置。', {
+              code,
+              httpStatus: status,
+            }),
+          )
         }
         redirectToLogin()
-        return Promise.reject(new Error('登录已失效，请重新登录。'))
+        return Promise.reject(
+          createApiRequestError(message || '登录已失效，请重新登录。', {
+            code,
+            httpStatus: status,
+          }),
+        )
       }
 
-      if (isHtmlForbiddenPage(error.response?.data)) {
+      if (isHtmlForbiddenPage(responseData)) {
         if (isPublicAuthPath(requestUrl)) {
-          return Promise.reject(new Error('登录接口被拒绝（403），请检查网关或后端鉴权配置。'))
+          return Promise.reject(
+            createApiRequestError('登录接口被拒绝（403），请检查网关或后端鉴权配置。', {
+              code,
+              httpStatus: status,
+            }),
+          )
         }
         redirectToLogin()
-        return Promise.reject(new Error('登录已失效，请重新登录。'))
+        return Promise.reject(
+          createApiRequestError('登录已失效，请重新登录。', {
+            code,
+            httpStatus: status,
+          }),
+        )
       }
+
+      const normalizedError = createApiRequestError(message || error.message || '网络请求失败', {
+        code,
+        httpStatus: status,
+      })
+      console.error('网络请求错误：', normalizedError.message)
+      return Promise.reject(normalizedError)
     }
 
-    console.error('网络请求错误：', error.message)
-    return Promise.reject(error)
+    if (isApiRequestError(error)) return Promise.reject(error)
+
+    const message = error instanceof Error ? error.message : '网络请求失败'
+    console.error('网络请求错误：', message)
+    return Promise.reject(createApiRequestError(message))
   },
 )
 

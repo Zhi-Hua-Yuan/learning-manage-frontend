@@ -1,5 +1,91 @@
 import request from '../utils/request'
 
+export interface AiBreakdownTaskDraft {
+  name: string
+  priority: number
+  dueDate: string
+}
+
+export interface AiBreakdownMilestoneDraft {
+  name: string
+  tasks: AiBreakdownTaskDraft[]
+}
+
+export interface AiBreakdownPreviewRequest {
+  target: string
+  description?: string
+  duration: string
+  detailed?: boolean
+}
+
+export interface AiBreakdownPreviewResponse {
+  draftId: string
+  expireAt: string
+  milestones: AiBreakdownMilestoneDraft[]
+}
+
+export type AiDraftStatus = 0 | 1 | 2 | 3
+
+export interface AiDraftDetailResponse {
+  draftId: string
+  scene: 'task-breakdown'
+  status: AiDraftStatus
+  statusText: string
+  payloadJson: string
+  expireAt: string
+  confirmedAt: string | null
+  canceledAt: string | null
+}
+
+export interface AiBreakdownDraftPayload {
+  target: string
+  description?: string
+  duration: string
+  detailed: boolean
+  milestones: AiBreakdownMilestoneDraft[]
+}
+
+export interface AiBreakdownConfirmRequest {
+  draftId: string
+  operationId: string
+  projectName?: string
+  projectGoal?: string
+}
+
+export interface AiBreakdownConfirmResponse {
+  success: boolean
+  idempotentReplay: boolean
+  businessId: number
+}
+
+export interface AiDraftCancelRequest {
+  draftId: string
+}
+
+// AI 任务拆解预览（同步创建服务端草稿）
+export const aiBreakdownPreviewApi = (
+  data: AiBreakdownPreviewRequest,
+): Promise<AiBreakdownPreviewResponse> => {
+  return request.post('/ai/breakdown/preview', data) as Promise<AiBreakdownPreviewResponse>
+}
+
+// 获取 AI 草稿详情
+export const getAiDraftDetailApi = (draftId: string): Promise<AiDraftDetailResponse> => {
+  return request.get(`/ai/draft/${encodeURIComponent(draftId)}`) as Promise<AiDraftDetailResponse>
+}
+
+// 确认任务拆解草稿并创建项目
+export const aiBreakdownConfirmApi = (
+  data: AiBreakdownConfirmRequest,
+): Promise<AiBreakdownConfirmResponse> => {
+  return request.post('/ai/breakdown/confirm', data) as Promise<AiBreakdownConfirmResponse>
+}
+
+// 取消 AI 草稿
+export const cancelAiDraftApi = (data: AiDraftCancelRequest): Promise<boolean> => {
+  return request.post('/ai/draft/cancel', data) as Promise<boolean>
+}
+
 // AI 任务拆解
 export const aiBreakdownApi = (data: {
   target: string

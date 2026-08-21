@@ -1,7 +1,7 @@
 # 阶段 0 / PR6-C3：前端 develop Ruleset 与必需状态检查
 
 执行日期：2026-08-21（Asia/Shanghai）  
-状态：执行中
+状态：已完成
 
 ## 1. 目标与边界
 
@@ -33,7 +33,7 @@ active_rules_for_develop=0
 
 ## 3. 已冻结的必需状态检查
 
-最终成功运行：
+PR6-C2 最终成功运行：
 
 ```text
 run_id=32475672554
@@ -53,9 +53,12 @@ Frontend production build
 
 三项 Check Run 均为 `completed/success`。
 
-## 4. Ruleset 期望配置
+## 4. Ruleset 最终配置
 
 ```text
+ruleset_id=21145113
+ruleset_url=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/rules/21145113
+ruleset_contract_sha256=82491817e5fa8485b84b488bd262758e419fbd0a0dc7720be18d9b5d9a8294cf
 name=protect-develop-v1
 target=branch
 include=refs/heads/develop
@@ -67,6 +70,7 @@ required_review_thread_resolution=true
 strict_required_status_checks_policy=true
 restrict_deletions=true
 block_force_pushes=true
+allow_update_branch=true
 ```
 
 允许的合并方式保持仓库现状：`merge`、`squash`、`rebase`。
@@ -84,13 +88,12 @@ PR 作者不能批准自己的 PR，因此本仓库不配置必需人工审批�
 Ruleset 已按“Disabled 创建、核验、Active 激活”的顺序执行：
 
 ```text
-ruleset_id=21145113
-ruleset_url=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/rules/21145113
-enforcement=active
-effective_rule_count=4
-allow_update_branch=true
 validation_pr=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/pull/13
 initial_validation_run=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/actions/runs/32481807113
+second_validation_commit=4550247d79de37b4689dfc4e8ebff2681c3b62cb
+second_validation_run=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/actions/runs/32482398421
+validation_merge_commit=e6b95558174d825081d851df793d0fe0f9091345
+post_merge_run=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/actions/runs/32482653744
 ```
 
 已确认：
@@ -99,15 +102,18 @@ initial_validation_run=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/
 - Disabled 状态下命中 `develop` 的 Effective Rule 为 0；
 - Active 后 deletion、non-fast-forward、pull request、required status checks 四类规则均命中 `develop`；
 - 验证 PR 第一轮三个 Job 均为 `completed/success`；
-- PR 已从 Draft 转为 Ready。
+- 验证 PR 增加新提交后，旧检查失效，合并状态重新变为 `BLOCKED`；
+- 第二轮三个 Job 全部成功后，PR 合并状态恢复为 `CLEAN`；
+- PR #13 无未解决评审对话，并通过 Ruleset 以 squash 方式合并；
+- 合并后 `develop` push CI 运行 32482653744 的三个 Job 全部成功；
+- 未通过直接推送、强制推送或管理员 bypass 测试规则。
 
-待完成：
+## 8. 验收结论
 
-- 本次新提交后确认旧检查失效并重新阻止合并；
-- 第二轮三项 CI 成功后合并；
-- 合并后的 `develop` push CI 成功；
-- 通过受保护流程提交最终收尾记录。
+PR6-C3 验收通过。前端 `develop` 已具备适配单人仓库的 PR 合并门禁：无需人工审批，但必须满足最新分支、对话清零及三项 Frontend CI 全部成功；分支删除、强制推送及日常管理员绕过均受限制。
 
-## 8. 回滚原则
+本记录通过独立收尾 PR 提交，收尾 PR 自身必须再次通过同一 Ruleset。
+
+## 9. 回滚原则
 
 若 Ruleset context、目标分支或合并行为异常，先将 Ruleset 切换为 `disabled`，保留 History，再修正配置并重新使用验证 PR。不得通过真实直接推送或强制推送测试规则。

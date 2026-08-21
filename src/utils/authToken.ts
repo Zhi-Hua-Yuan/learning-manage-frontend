@@ -76,7 +76,7 @@ export const readAuthToken = () => {
     const raw = window.localStorage.getItem(AUTH_TOKEN_KEY)
     const normalized = normalizeStoredToken(raw)
 
-    if (raw && !normalized) {
+    if (raw !== null && !normalized) {
       window.localStorage.removeItem(AUTH_TOKEN_KEY)
     }
 

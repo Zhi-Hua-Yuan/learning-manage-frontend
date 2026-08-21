@@ -44,6 +44,12 @@ jobs:
           test -f package.json
           test -f package-lock.json
           test -f .nvmrc
+          test -f scripts/ci/export-api-contract.mjs
+          test -f scripts/ci/lib/api-contract.mjs
+          test -f scripts/ci/api-contract.test.mjs
+          test -f contracts/frontend-api-contract.schema.json
+          grep -q '"contract:verify"' package.json
+          grep -q '"contract:export"' package.json
           test "$(tr -d '\r\n' < .nvmrc)" = "${NODE_VERSION}"
           grep -q '"packageManager": "npm@10.9.2"' package.json
           if grep -Eq '"lint:ci"[^\n]*(--fix|--write)' package.json; then
@@ -95,6 +101,9 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
+      - name: Verify frontend API contract
+        run: npm run contract:test && npm run contract:verify
+
       - name: Verify checks did not modify tracked files
         shell: bash
         run: git diff --exit-code
@@ -142,6 +151,9 @@ jobs:
             exit 1
           fi
           mkdir -p ci-artifacts
+          npm run contract:export
+          cp contracts/frontend-api-contract.schema.json ci-artifacts/frontend-api-contract.schema.json
+          (cd ci-artifacts && sha256sum --check frontend-api-contract.sha256)
           cp -R dist ci-artifacts/dist
           (cd ci-artifacts && find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist.sha256)
 

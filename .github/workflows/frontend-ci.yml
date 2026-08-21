@@ -1,0 +1,153 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22.13.1'
+  NPM_VERSION: '10.9.2'
+
+jobs:
+  guard:
+    name: Guard and secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+
+      - name: Verify CI contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -f package.json
+          test -f package-lock.json
+          test -f .nvmrc
+          test "$(tr -d '\r\n' < .nvmrc)" = "${NODE_VERSION}"
+          grep -q '"packageManager": "npm@10.9.2"' package.json
+          if grep -Eq '"lint:ci"[^\n]*(--fix|--write)' package.json; then
+            echo 'lint:ci must remain read-only' >&2
+            exit 1
+          fi
+          if grep -R -n --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=coverage \
+              'pull_request_target' .github; then
+            echo 'pull_request_target is not allowed in frontend CI' >&2
+            exit 1
+          fi
+          git diff --check
+
+  frontend-test:
+    name: Frontend tests and static verification
+    needs: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Verify Node and npm versions
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(node --version)" = "v${NODE_VERSION}"
+          test "$(npm --version)" = "${NPM_VERSION}"
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --fund=false
+
+      - name: Run read-only lint and repository guards
+        run: npm run lint:ci
+
+      - name: Run tests and coverage gate
+        run: npm run test:coverage
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Verify checks did not modify tracked files
+        shell: bash
+        run: git diff --exit-code
+
+      - name: Upload coverage report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: coverage
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend-build:
+    name: Frontend production build
+    needs: frontend-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --fund=false
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Verify build output and sensitive values
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -f dist/index.html
+          if grep -R -n -E 'ALIYUN_API_KEY|JWT_SECRET|DB_PASSWORD|ci-only-not-a-real-key' dist; then
+            echo 'sensitive configuration marker found in dist' >&2
+            exit 1
+          fi
+          mkdir -p ci-artifacts
+          cp -R dist ci-artifacts/dist
+          (cd ci-artifacts && find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist.sha256)
+
+      - name: Upload production assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-dist-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-artifacts
+          if-no-files-found: error
+          retention-days: 7

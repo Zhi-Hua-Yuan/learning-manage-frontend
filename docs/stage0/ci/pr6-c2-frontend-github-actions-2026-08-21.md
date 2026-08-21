@@ -84,16 +84,16 @@ git diff --check      PASS
 
 远程首轮运行 `32474718755` 暴露 Guard 自检误报：禁止事件字符串同时出现在 Guard 的搜索规则中，导致 Guard 将自身匹配。已将该字符串改为运行时拼接，保留禁止 `pull_request_target` 的检测语义，并提交修复后重新触发完整 CI。
 
-## 6. 远程验收计划
+## 6. 远程验收
 
-推送本分支并创建 Draft PR 后，记录以下结果：
+PR #11 的首轮运行 `32474718755` 因 Guard 自检误报失败；修复提交 `c7becc1e532c3afa9b3b6f50b5609732e09e6a18` 触发第二轮完整 CI `32474865852`，旧轮次未被复用。第二轮结果如下：
 
-1. 三个 Job 均成功；
-2. Node/npm 版本断言通过；
-3. Gitleaks 扫描通过；
-4. 覆盖率门槛通过；
-5. 构建 Artifact 可下载且哈希文件存在；
-6. 新提交能够使旧检查失效并触发第二轮完整 CI；
-7. 合并后 `develop` 的 push 工作流成功。
+1. `Guard and secret scan`：成功；
+2. `Frontend tests and static verification`：成功；
+3. `Frontend production build`：成功；
+4. Node/npm 版本断言、Gitleaks、覆盖率门槛、构建产物敏感信息扫描和工作区变更守卫：全部成功；
+5. 覆盖率与生产构建 Artifact 均成功上传。
+
+合并后还需确认 `develop` 的 push 工作流成功，再进入 PR6-C3 前端 `develop` Ruleset 与必需状态检查配置。
 
 远程验收通过后，再进入 PR6-C3 前端 `develop` Ruleset 与必需状态检查配置。

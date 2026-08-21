@@ -127,7 +127,7 @@
   "data": {
     "id": 1879200000000001,
     "username": "Alice Chen",
-    "token": "eyJhbGciOiJIUzI1NiJ9..."
+    "token": "<issued-jwt>"
   }
 }
 ```

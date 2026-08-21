@@ -82,6 +82,8 @@ git diff --check      PASS
 
 本机首次 `npm ci` 因旧 Oxlint 原生文件被 Windows 进程占用而返回 EPERM；未修改源码。随后使用 `npm install --prefer-offline` 恢复依赖，并重新完成上述验收。该本机文件锁问题不会进入 CI 运行环境。
 
+远程首轮运行 `32474718755` 暴露 Guard 自检误报：禁止事件字符串同时出现在 Guard 的搜索规则中，导致 Guard 将自身匹配。已将该字符串改为运行时拼接，保留禁止 `pull_request_target` 的检测语义，并提交修复后重新触发完整 CI。
+
 ## 6. 远程验收计划
 
 推送本分支并创建 Draft PR 后，记录以下结果：

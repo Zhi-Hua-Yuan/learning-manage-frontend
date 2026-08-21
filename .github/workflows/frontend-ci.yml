@@ -50,9 +50,10 @@ jobs:
             echo 'lint:ci must remain read-only' >&2
             exit 1
           fi
+          forbidden_event='pull_request_'target
           if grep -R -n --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=coverage \
-              'pull_request_target' .github; then
-            echo 'pull_request_target is not allowed in frontend CI' >&2
+            "$forbidden_event" .github; then
+            echo "$forbidden_event is not allowed in frontend CI" >&2
             exit 1
           fi
           git diff --check

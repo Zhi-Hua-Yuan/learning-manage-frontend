@@ -12,6 +12,9 @@
     "test:ci": "vitest run",
     "test:coverage": "vitest run --coverage",
     "type-check": "vue-tsc --build",
+    "lint:ci": "run-s lint:cache-views lint:task-cache-sync lint:oxlint:ci lint:eslint:ci",
+    "lint:oxlint:ci": "oxlint .",
+    "lint:eslint:ci": "eslint .",
     "lint": "run-s lint:*",
     "lint:cache-views": "node scripts/check-view-localstorage.mjs",
     "lint:task-cache-sync": "node scripts/check-task-cache-consistency.mjs",
@@ -54,5 +57,6 @@
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
-  }
+  },
+  "packageManager": "npm@10.9.2"
 }

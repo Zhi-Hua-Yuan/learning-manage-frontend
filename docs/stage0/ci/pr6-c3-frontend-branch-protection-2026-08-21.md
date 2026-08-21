@@ -81,13 +81,29 @@ PR 作者不能批准自己的 PR，因此本仓库不配置必需人工审批�
 
 ## 7. 执行与验证结果
 
+Ruleset 已按“Disabled 创建、核验、Active 激活”的顺序执行：
+
+```text
+ruleset_id=21145113
+ruleset_url=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/rules/21145113
+enforcement=active
+effective_rule_count=4
+allow_update_branch=true
+validation_pr=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/pull/13
+initial_validation_run=https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/actions/runs/32481807113
+```
+
+已确认：
+
+- Disabled 状态下三个必需检查、目标分支和空 bypass list 与期望配置一致；
+- Disabled 状态下命中 `develop` 的 Effective Rule 为 0；
+- Active 后 deletion、non-fast-forward、pull request、required status checks 四类规则均命中 `develop`；
+- 验证 PR 第一轮三个 Job 均为 `completed/success`；
+- PR 已从 Draft 转为 Ready。
+
 待完成：
 
-- 以 `disabled` 创建 Ruleset 并逐字段核验；
-- 启用 “Always suggest updating pull request branches”；
-- 激活 Ruleset 并确认命中 `develop`；
-- 验证 PR 第一轮三项 CI；
-- 新提交后确认旧检查失效并重新阻止合并；
+- 本次新提交后确认旧检查失效并重新阻止合并；
 - 第二轮三项 CI 成功后合并；
 - 合并后的 `develop` push CI 成功；
 - 通过受保护流程提交最终收尾记录。

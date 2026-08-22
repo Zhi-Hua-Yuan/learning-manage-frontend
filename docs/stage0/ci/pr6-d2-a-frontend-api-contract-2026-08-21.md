@@ -52,6 +52,27 @@ ci-artifacts/frontend-api-contract.schema.json
 
 该哈希仅代表当前工作分支源码生成结果；合并后的最终 SHA 和远程 Artifact 以受保护 PR 的 CI 结果为准。
 
+## 远程 PR 与 CI 验收
+
+受保护 PR：[#16](https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/pull/16)
+
+- PR base：`develop`
+- PR head：`ci/pr6-d2-a-frontend-api-contract`
+- CI Run：[32551620035](https://github.com/Zhi-Hua-Yuan/learning-manage-frontend/actions/runs/32551620035)
+- CI Head SHA：`365dde997be9182b93aff0ed623a5dc7fbc488fa`
+- `Guard and secret scan`：通过
+- `Frontend tests and static verification`：通过
+- `Frontend production build`：通过
+- Artifact：`frontend-dist-32551620035-1`
+- Artifact 契约 SHA-256：`39ca49e63c1d1f3c6f7d232180f57b20a668b14573ac6c2792c65c4a53f69035`
+- 下载后契约 SHA-256 校验：通过
+- 下载后 dist 清单 SHA-256 校验：通过（29 个文件）
+- 下载后契约 operations：37 个唯一操作
+- 下载后 Schema：通过（`schemaVersion=1`、`basePath=/api`）
+- dist 敏感值扫描：通过
+
+本次远程验证未连接或修改后端、3306 主库、Redis、Qdrant、生产凭据或部署环境。文档收口提交后，以上检查需要针对最新文档提交重新执行；最终合并 SHA 和 `develop` CI 结果以合并后的远程记录为准。
+
 ## 下一步
 
-提交受保护 PR，等待三项 Frontend CI 全部通过并下载 Artifact 验证契约哈希。完成后进入 PR6-D2-B：后端运行时 OpenAPI 导出与前后端接口存在性比对。
+将 PR 标记为 Ready，等待文档收口提交对应的三项 Frontend CI 全部通过后执行受保护合并。合并后记录最终前端 SHA 和 `develop` CI 结果，再进入 PR6-D2-B：后端运行时 OpenAPI 导出与前后端接口存在性比对。

@@ -8,6 +8,7 @@
 | PR6-C1 | Vitest 测试基础设施与核心测试 | 已完成 |
 | PR6-C2 | Frontend CI 与远程 Runner 验收 | 已完成 |
 | PR6-C3 | `develop` Ruleset 与必需状态检查 | 已完成 |
+| PR6-D2-A | 前端接口契约导出 | 执行中 |
 
 ## 冻结门禁
 
@@ -30,7 +31,8 @@ Frontend production build
 - [PR6-C2 GitHub Actions 记录](pr6-c2-frontend-github-actions-2026-08-21.md)
 - [PR6-C3 分支保护记录](pr6-c3-frontend-branch-protection-2026-08-21.md)
 - [Ruleset 配置契约](rulesets/protect-develop-v1.json)
+- [PR6-D2-A 前端接口契约导出记录](pr6-d2-a-frontend-api-contract-2026-08-21.md)
 
 ## 下一步
 
-进入 PR6-D：跨仓发布门禁和阶段 0 验收。
+PR6-D2-A 验收完成后，进入 PR6-D2-B：后端运行时 OpenAPI 导出与前后端接口存在性比对。

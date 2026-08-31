@@ -11,15 +11,32 @@ import {
   writeAggregateTaskCacheFromRecords,
   writeAllProjectsTaskCache,
   writeTaskCache,
-  type Task,
 } from './taskCache'
+import type { TaskModel } from '@/types/task'
 
-const task = (id: string, projectId = 'project-1', title = `Task ${id}`): Task => ({
+const task = (id: string, projectId = 'project-1', title = `Task ${id}`): TaskModel => ({
   id,
+  projectId,
+  milestoneId: null,
+  createdByUserId: 'user-1',
+  assigneeUserId: null,
+  assignedByUserId: null,
+  assignedAt: null,
   title,
+  description: null,
   status: 0,
   priority: 1,
-  projectId,
+  dueDate: null,
+  completedAt: null,
+  createTime: null,
+  updateTime: null,
+  capabilities: {
+    canEditContent: false,
+    canChangeStatus: false,
+    canReorganize: false,
+    canAssign: false,
+    canDelete: false,
+  },
 })
 
 describe('task cache coordination', () => {

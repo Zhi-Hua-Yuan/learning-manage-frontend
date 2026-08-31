@@ -1118,22 +1118,12 @@ import {
   TASK_STATUS_DONE_STANDARD,
   TASK_STATUS_TODO,
 } from '@/utils/taskStatus'
+import type { TaskModel } from '@/types/task'
+import { findTaskById, normalizeTaskRecords } from '@/utils/taskCollection'
 import {
   createTaskStatusRequestId,
   normalizeTaskStatusResult,
 } from '@/utils/taskWrite'
-
-interface Task {
-  id: string
-  title: string
-  description?: string
-  status: number
-  completedAt?: string | null
-  priority: number
-  projectId: string
-  dueDate?: string | null
-  milestoneId?: string | null
-}
 
 interface TodayAiOrderMeta {
   rank: number
@@ -1236,17 +1226,17 @@ const extractTaskPagePayload = (payload: unknown): TaskPageResponse => {
   const fallback: TaskPageResponse = { records: [] }
 
   if (Array.isArray(payload)) {
-    return { records: payload as Task[] }
+    return { records: payload }
   }
 
   if (!isRecord(payload)) return fallback
 
   if (Array.isArray(payload.data)) {
-    return { records: payload.data as Task[] }
+    return { records: payload.data }
   }
 
   const source = isRecord(payload.data) && Array.isArray(payload.data.records) ? payload.data : payload
-  const records = Array.isArray(source.records) ? (source.records as Task[]) : []
+  const records = Array.isArray(source.records) ? source.records : []
 
   return {
     records,
@@ -1471,8 +1461,8 @@ const { runAiRequest } = useAiPendingRequest()
 const undoDelete = useUndoDelete()
 
 const projectList = ref<Project[]>([])
-const taskList = ref<Task[]>([])
-const selectedTask = ref<Task | null>(null)
+const taskList = ref<TaskModel[]>([])
+const selectedTask = ref<TaskModel | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
@@ -1588,9 +1578,9 @@ const newTaskActiveMilestoneIndex = ref(0)
 const showDeleteTaskConfirm = ref(false)
 const showDeleteMilestoneConfirm = ref(false)
 const showCompletionQualityModal = ref(false)
-const pendingDeleteTask = ref<Task | null>(null)
+const pendingDeleteTask = ref<TaskModel | null>(null)
 const pendingDeleteMilestone = ref<{ id: string; name: string } | null>(null)
-const pendingCompletionTask = ref<Task | null>(null)
+const pendingCompletionTask = ref<TaskModel | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
 const milestoneRowRef = ref<HTMLElement | null>(null)
@@ -1676,8 +1666,8 @@ const projectById = computed(() => {
   return map
 })
 
-const getTaskProjectName = (task: Task) => projectById.value.get(String(task.projectId))?.name || '未命名清单'
-const getTaskProjectIcon = (task: Task): IconName =>
+const getTaskProjectName = (task: TaskModel) => projectById.value.get(String(task.projectId))?.name || '未命名清单'
+const getTaskProjectIcon = (task: TaskModel): IconName =>
   getProjectIconName(projectById.value.get(String(task.projectId))?.icon)
 
 const priorityOptions: PriorityOption[] = [
@@ -1826,14 +1816,14 @@ const consumePendingListReplanPreview = () => {
   aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
 }
 
-const getTodayAiOrderMeta = (task: Task): TodayAiOrderMeta | null => {
+const getTodayAiOrderMeta = (task: TaskModel): TodayAiOrderMeta | null => {
   if (!isTodayView.value || isTaskCompleted(task.status)) return null
   const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
   if (!meta || !Number.isFinite(meta.rank)) return null
   return meta
 }
 
-const openTodayAiReasonDialog = (task: Task) => {
+const openTodayAiReasonDialog = (task: TaskModel) => {
   const meta = getTodayAiOrderMeta(task)
   if (!meta) return
   selectedTodayAiReason.value = {
@@ -2198,7 +2188,7 @@ const handleUnifiedAiAction = () => {
   void requestListReplanPreview()
 }
 
-const getTodayAiRank = (task: Task) => {
+const getTodayAiRank = (task: TaskModel) => {
   if (!isTodayView.value || isTaskCompleted(task.status)) return Number.POSITIVE_INFINITY
   const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
   return meta && Number.isFinite(meta.rank) ? meta.rank : Number.POSITIVE_INFINITY
@@ -2210,7 +2200,7 @@ const getTaskDueDateTimestamp = (dueDate?: string | null) => {
   return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp
 }
 
-const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
+const compareTaskByDueDateThenPriority = (a: TaskModel, b: TaskModel) => {
   const isACompleted = isTaskCompleted(a.status)
   const isBCompleted = isTaskCompleted(b.status)
   if (isACompleted !== isBCompleted) {
@@ -2224,7 +2214,7 @@ const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
   return 0
 }
 
-const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: Task, b: Task) => {
+const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: TaskModel, b: TaskModel) => {
   const isACompleted = isTaskCompleted(a.status)
   const isBCompleted = isTaskCompleted(b.status)
   if (isACompleted !== isBCompleted) {
@@ -2242,10 +2232,10 @@ const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: Task, b: T
   return 0
 }
 
-const isMilestoneGroupAllCompleted = (group: { milestone: Milestone; tasks: Task[]; progress: number }) =>
+const isMilestoneGroupAllCompleted = (group: { milestone: Milestone; tasks: TaskModel[]; progress: number }) =>
   group.tasks.length > 0 && group.tasks.every((task) => isTaskCompleted(task.status))
 
-const sortTaskListForCurrentBoard = (tasks: Task[]) => {
+const sortTaskListForCurrentBoard = (tasks: TaskModel[]) => {
   if (isTodayView.value) {
     return [...tasks].sort(compareTodayTaskByCompletionThenAiThenDueDateThenPriority)
   }
@@ -2294,12 +2284,12 @@ const getCurrentWeekRange = () => {
   }
 }
 
-const filterTasksByExistingProjects = (records: Task[]) => {
+const filterTasksByExistingProjects = (records: TaskModel[]) => {
   const existingProjectIds = new Set(projectList.value.map((project) => String(project.id)))
   return records.filter((task) => existingProjectIds.has(String(task.projectId)))
 }
 
-const filterAggregateTasks = (records: Task[]) => {
+const filterAggregateTasks = (records: TaskModel[]) => {
   if (isTodayView.value) {
     const todayKey = toDateKey(new Date())
     return records.filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
@@ -2580,19 +2570,19 @@ const loadProjects = async (options: LoadOptions = {}): Promise<LoadOutcome> => 
 
 const syncSelectedTaskFromList = () => {
   if (selectedTask.value) {
-    selectedTask.value = taskList.value.find((task) => task.id === selectedTask.value?.id) || null
+    selectedTask.value = findTaskById(taskList.value, selectedTask.value.id)
   }
 }
 
 interface TaskPageResponse {
-  records?: Task[]
+  records?: unknown[]
   current?: number
   size?: number
   total?: number
 }
 
 const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean) => {
-  const aggregated: Task[] = []
+  const aggregated: TaskModel[] = []
   let page = 1
 
   for (let index = 0; index < AGGREGATE_MAX_PAGES; index += 1) {
@@ -2607,7 +2597,7 @@ const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean)
 
     if (isStale()) return []
 
-    const records = Array.isArray(res.records) ? res.records : []
+    const records = normalizeTaskRecords(res.records)
     if (records.length === 0) break
 
     aggregated.push(...records)
@@ -2650,7 +2640,8 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
         const allRecords = Object.values(cachedAllProjectsTasks).flatMap((items) =>
           Array.isArray(items) ? items : [],
         )
-        const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(allRecords))
+        const normalizedRecords = normalizeTaskRecords(allRecords)
+        const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(normalizedRecords))
         if (isTodayView.value && filteredRecords.length === 0) {
           todayAiOrderMetaByTaskId.value = {}
           clearTaskTodayAiOrderCache()
@@ -2694,7 +2685,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   if (!forceRefresh && canUsePersistentProjectTaskCache.value) {
     const cachedProjectTasks = readTaskCache(selectedProjectId.value)
     if (cachedProjectTasks) {
-      taskList.value = cachedProjectTasks
+      taskList.value = normalizeTaskRecords(cachedProjectTasks)
       syncSelectedTaskFromList()
       return okOutcome()
     }
@@ -2709,7 +2700,8 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     })
     if (requestVersion !== taskLoadVersion.value) return staleOutcome()
     if (requestProjectId !== selectedProjectId.value) return staleOutcome()
-    const records = extractListPayload<Task>(raw)
+    const rawRecords = extractListPayload<unknown>(raw)
+    const records = rawRecords ? normalizeTaskRecords(rawRecords) : null
     if (!records) {
       throw new Error('task-list-shape-invalid')
     }
@@ -2897,7 +2889,7 @@ const addTask = async () => {
   }
 }
 
-const setTaskStatus = async (task: Task, nextStatus: number) => {
+const setTaskStatus = async (task: TaskModel, nextStatus: number) => {
   const oldStatus = task.status
   const clientRequestId = createTaskStatusRequestId()
   task.status = nextStatus
@@ -2938,7 +2930,7 @@ const confirmCompletionQuality = async (status: number) => {
   }
 }
 
-const toggleTaskStatus = async (task: Task) => {
+const toggleTaskStatus = async (task: TaskModel) => {
   if (isTaskCompleted(task.status)) {
     try {
       await setTaskStatus(task, TASK_STATUS_TODO)
@@ -2964,7 +2956,7 @@ const handleCompletionQualityShortcutKeydown = (event: KeyboardEvent) => {
   void confirmCompletionQuality(nextStatus)
 }
 
-const selectTask = (task: Task) => {
+const selectTask = (task: TaskModel) => {
   selectedTask.value = task
   selectedTaskTitleBaseline.value = task.title
   isPriorityMenuOpen.value = false
@@ -3397,7 +3389,7 @@ const onTextBlur = async () => {
     await updateTaskContentApi({
       id: selectedTask.value.id,
       title: selectedTask.value.title,
-      description: selectedTask.value.description,
+      description: selectedTask.value.description ?? undefined,
     })
     if (selectedTask.value.title !== previousTitle) {
       markListReplanDirty()
@@ -3553,13 +3545,13 @@ const groupedTasks = computed(() => {
   if (isAggregateView.value) {
     return {
       unassigned: sortTaskListForCurrentBoard(taskList.value),
-      milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
+      milestones: [] as { milestone: Milestone; tasks: TaskModel[]; progress: number }[],
     }
   }
 
   const result = {
-    unassigned: [] as Task[],
-    milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
+    unassigned: [] as TaskModel[],
+    milestones: [] as { milestone: Milestone; tasks: TaskModel[]; progress: number }[],
   }
 
   milestoneList.value.forEach((m) => {

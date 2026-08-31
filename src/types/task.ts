@@ -45,8 +45,8 @@ export interface TaskModel {
   assignedAt: string | null
   title: string
   description: string | null
-  status: unknown
-  priority: unknown
+  status: number
+  priority: number
   dueDate: string | null
   completedAt: string | null
   createTime: string | null

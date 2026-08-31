@@ -47,17 +47,17 @@ const checks = [
   {
     file: taskCachePath,
     label: 'Task cache module provides centralized upsert helper',
-    pattern: /export const upsertTaskInCaches = \(task: Task\)/m,
+    pattern: /export const upsertTaskInCaches = \(task: TaskModel\)/m,
   },
   {
     file: taskCachePath,
     label: 'Task cache module provides centralized remove helper',
-    pattern: /export const removeTaskFromCaches = \(task: Pick<Task, 'id' \| 'projectId'>\)/m,
+    pattern: /export const removeTaskFromCaches = \(task: Pick<TaskModel, 'id' \| 'projectId'>\)/m,
   },
   {
     file: taskCachePath,
     label: 'Task cache module provides project aggregate sync helper',
-    pattern: /export const syncAggregateTaskCacheByProject = \(projectId: string, tasks: Task\[\]\)/m,
+    pattern: /export const syncAggregateTaskCacheByProject = \(projectId: string, tasks: TaskModel\[\]\)/m,
   },
 ]
 

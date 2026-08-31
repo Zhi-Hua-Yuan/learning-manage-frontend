@@ -4,38 +4,28 @@ import {
   getTaskListCacheEntry,
   TASK_LIST_CACHE_PREFIX,
 } from '@/utils/cacheRegistry'
-
-export interface Task {
-  id: string
-  title: string
-  description?: string
-  status: number
-  priority: number
-  projectId: string
-  dueDate?: string | null
-  milestoneId?: string | null
-}
+import type { TaskModel } from '@/types/task'
 
 export const TASK_LIST_CACHE_TTL_MS = 5 * 60 * 1000
 
-const normalizeTaskArray = (value: unknown): Task[] | null => (Array.isArray(value) ? (value as Task[]) : null)
+const normalizeTaskArray = (value: unknown): TaskModel[] | null => (Array.isArray(value) ? (value as TaskModel[]) : null)
 
-const upsertTaskList = (tasks: Task[], task: Task) =>
+const upsertTaskList = (tasks: TaskModel[], task: TaskModel) =>
   tasks.some((item) => item.id === task.id)
     ? tasks.map((item) => (item.id === task.id ? { ...item, ...task } : item))
     : [...tasks, task]
 
-export const readTaskCache = (projectId: string, maxAgeMs = TASK_LIST_CACHE_TTL_MS): Task[] | null => {
+export const readTaskCache = (projectId: string, maxAgeMs = TASK_LIST_CACHE_TTL_MS): TaskModel[] | null => {
   if (!projectId) return null
   const entry = getTaskListCacheEntry(projectId)
-  const cached = readCache<Task[]>(entry, {
+  const cached = readCache<TaskModel[]>(entry, {
     maxAgeMs,
     allowLegacyVersionless: true,
   })
   return normalizeTaskArray(cached)
 }
 
-export const writeTaskCache = (projectId: string, tasks: Task[]) => {
+export const writeTaskCache = (projectId: string, tasks: TaskModel[]) => {
   if (!projectId) return
   writeCache(getTaskListCacheEntry(projectId), tasks)
 }
@@ -52,8 +42,8 @@ export const clearTaskCache = (projectId?: string) => {
   removeCache(getTaskListCacheEntry(projectId))
 }
 
-export const readAllProjectsTaskCache = (maxAgeMs = TASK_LIST_CACHE_TTL_MS): Record<string, Task[]> | null => {
-  const cached = readCache<Record<string, Task[]>>(getTaskListAllCacheEntry(), {
+export const readAllProjectsTaskCache = (maxAgeMs = TASK_LIST_CACHE_TTL_MS): Record<string, TaskModel[]> | null => {
+  const cached = readCache<Record<string, TaskModel[]>>(getTaskListAllCacheEntry(), {
     maxAgeMs,
     allowLegacyVersionless: true,
   })
@@ -61,11 +51,11 @@ export const readAllProjectsTaskCache = (maxAgeMs = TASK_LIST_CACHE_TTL_MS): Rec
   return cached
 }
 
-export const writeAllProjectsTaskCache = (data: Record<string, Task[]>) => {
+export const writeAllProjectsTaskCache = (data: Record<string, TaskModel[]>) => {
   writeCache(getTaskListAllCacheEntry(), data)
 }
 
-export const upsertTaskInCaches = (task: Task) => {
+export const upsertTaskInCaches = (task: TaskModel) => {
   const projectId = String(task.projectId || '')
   if (!projectId) return
 
@@ -80,7 +70,7 @@ export const upsertTaskInCaches = (task: Task) => {
   })
 }
 
-export const removeTaskFromCaches = (task: Pick<Task, 'id' | 'projectId'>) => {
+export const removeTaskFromCaches = (task: Pick<TaskModel, 'id' | 'projectId'>) => {
   const projectId = String(task.projectId || '')
   if (!projectId) return
 
@@ -95,8 +85,8 @@ export const removeTaskFromCaches = (task: Pick<Task, 'id' | 'projectId'>) => {
   })
 }
 
-export const writeAggregateTaskCacheFromRecords = (records: Task[]) => {
-  const nextCache: Record<string, Task[]> = {}
+export const writeAggregateTaskCacheFromRecords = (records: TaskModel[]) => {
+  const nextCache: Record<string, TaskModel[]> = {}
   records.forEach((task) => {
     const projectId = String(task.projectId || '')
     if (!projectId) return
@@ -108,7 +98,7 @@ export const writeAggregateTaskCacheFromRecords = (records: Task[]) => {
   writeAllProjectsTaskCache(nextCache)
 }
 
-export const syncAggregateTaskCacheByProject = (projectId: string, tasks: Task[]) => {
+export const syncAggregateTaskCacheByProject = (projectId: string, tasks: TaskModel[]) => {
   if (!projectId) return
   const cachedAllProjectsTasks = readAllProjectsTaskCache(Number.POSITIVE_INFINITY) || {}
   writeAllProjectsTaskCache({

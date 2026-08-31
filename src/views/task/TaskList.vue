@@ -877,9 +877,11 @@
           </div>
 
           <TaskAssigneeEntry
+            ref="taskAssigneeEntryRef"
             :presentation="selectedAssigneePresentation"
             :assign-allowed="selectedAssignUi.allowed"
             :assign-denied-message="selectedAssignUi.deniedMessage"
+            @request-change="openTaskAssignmentDialog"
           />
 
           <textarea
@@ -1086,6 +1088,22 @@
       </div>
     </transition>
 
+    <TaskAssignmentDialog
+      :open="Boolean(taskAssignmentDraft)"
+      :task-title="assignmentTask?.title || ''"
+      :current-assignee="selectedAssigneePresentation"
+      :target-assignee-user-id="taskAssignmentDraft?.targetAssigneeUserId ?? null"
+      :options="taskAssignmentAssigneeOptions"
+      :candidates-loading="taskAssignmentCandidatesLoading"
+      :candidates-error-message="taskAssignmentCandidatesErrorMessage"
+      :reason="taskAssignmentDraft?.reason || ''"
+      @update:target-assignee-user-id="setTaskAssignmentTarget"
+      @update:reason="setTaskAssignmentReason"
+      @retry="retryTaskAssignmentCandidates"
+      @cancel="closeTaskAssignmentDialog"
+      @confirm="previewTaskAssignment"
+    />
+
     <AppConfirmDialog
       v-model="showDeleteTaskConfirm"
       variant="danger"
@@ -1201,12 +1219,14 @@ import {
   useTaskAssigneeCandidates,
   type TaskAssigneeCandidateContext,
 } from '@/composables/useTaskAssigneeCandidates'
+import { useTaskAssignmentDraft } from '@/composables/useTaskAssignmentDraft'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { useToastStore } from '@/stores/toast'
 import TaskAssigneeEntry from '@/components/TaskAssigneeEntry.vue'
 import TaskAssigneePicker from '@/components/TaskAssigneePicker.vue'
+import TaskAssignmentDialog from '@/components/TaskAssignmentDialog.vue'
 import {
   buildPersonalProjectRoute,
   parseTaskProjectContext,
@@ -1602,6 +1622,14 @@ const undoDelete = useUndoDelete()
 const projectList = ref<Project[]>([])
 const taskList = ref<TaskModel[]>([])
 const selectedTask = ref<TaskModel | null>(null)
+const {
+  draft: taskAssignmentDraft,
+  open: openTaskAssignmentDraft,
+  close: closeTaskAssignmentDraft,
+  setTargetAssigneeUserId: setTaskAssignmentTarget,
+  setReason: setTaskAssignmentReason,
+  invalidateUnlessCurrent: invalidateTaskAssignmentDraft,
+} = useTaskAssignmentDraft()
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
@@ -1728,6 +1756,35 @@ const currentContextKey = computed(() => {
   }
   return `project:personal:${selectedProjectId.value || 'none'}`
 })
+const assignmentTask = computed(() => {
+  const taskId = taskAssignmentDraft.value?.taskId
+  return taskId ? findTaskById(taskList.value, taskId) : null
+})
+const taskAssignmentCandidateContext = computed<TaskAssigneeCandidateContext>(() => {
+  const draft = taskAssignmentDraft.value
+  if (!draft || draft.contextKey !== currentContextKey.value || !assignmentTask.value) {
+    return { kind: 'unavailable' }
+  }
+  if (isTeamProjectContext.value) {
+    return selectedTeamId.value
+      ? { kind: 'team', teamId: selectedTeamId.value }
+      : { kind: 'unavailable' }
+  }
+  return { kind: 'personal' }
+})
+const {
+  options: taskAssignmentAssigneeOptions,
+  status: taskAssignmentCandidatesStatus,
+  loading: taskAssignmentCandidatesLoading,
+  errorMessage: taskAssignmentCandidatesErrorMessage,
+  loadCandidates: loadTaskAssignmentCandidates,
+  retry: retryTaskAssignmentCandidateLoad,
+  reset: resetTaskAssignmentCandidates,
+  isSelectableAssignee: isSelectableTaskAssignmentAssignee,
+} = useTaskAssigneeCandidates({
+  context: taskAssignmentCandidateContext,
+  store: collaborationStore,
+})
 const boardRenderPhase = computed<DisplayPhase>(() => {
   if (!isCurrentDisplayContext(currentContextKey.value)) {
     return 'loading'
@@ -1771,6 +1828,7 @@ const newTaskFlagTriggerRef = ref<HTMLButtonElement | null>(null)
 const newTaskFlagMenuRef = ref<HTMLElement | null>(null)
 const newTaskTitleInputRef = ref<HTMLInputElement | null>(null)
 const newTaskAssigneePickerRef = ref<{ close: (restoreFocus?: boolean) => void } | null>(null)
+const taskAssigneeEntryRef = ref<{ focusChangeButton: () => void } | null>(null)
 const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const MIN_DETAIL_WIDTH = 320
@@ -3598,7 +3656,66 @@ const closeDueDatePicker = () => {
   isDueDatePickerOpen.value = false
 }
 
+const closeTaskAssignmentDialog = (restoreFocus = true) => {
+  const wasOpen = Boolean(taskAssignmentDraft.value)
+  closeTaskAssignmentDraft()
+  resetTaskAssignmentCandidates()
+  if (wasOpen && restoreFocus) {
+    void nextTick(() => taskAssigneeEntryRef.value?.focusChangeButton())
+  }
+}
+
+const openTaskAssignmentDialog = () => {
+  if (!selectedTask.value) return
+  const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'assign')
+  if (!currentTask) return
+
+  closeNewTaskQuickCreateMenus()
+  closeDueDatePicker()
+  isPriorityMenuOpen.value = false
+  isMilestoneMenuOpen.value = false
+  openTaskAssignmentDraft({
+    taskId: currentTask.id,
+    projectId: currentTask.projectId,
+    contextKey: currentContextKey.value,
+    currentAssigneeUserId: currentTask.assigneeUserId,
+  })
+  void loadTaskAssignmentCandidates()
+}
+
+const retryTaskAssignmentCandidates = () => {
+  if (!taskAssignmentDraft.value) return
+  void retryTaskAssignmentCandidateLoad()
+}
+
+const previewTaskAssignment = (payload: {
+  targetAssigneeUserId: string | null
+  reason?: string
+}) => {
+  const draft = taskAssignmentDraft.value
+  if (!draft) return
+  const latestTask = ensureTaskActionAllowed(draft.taskId, 'assign')
+  if (!latestTask || latestTask.projectId !== draft.projectId) {
+    closeTaskAssignmentDialog(false)
+    return
+  }
+  if (payload.targetAssigneeUserId !== draft.targetAssigneeUserId) {
+    toast.warning('负责人草稿已发生变化，请重新确认。')
+    return
+  }
+  if (
+    payload.targetAssigneeUserId !== draft.expectedAssigneeUserId
+    && !isSelectableTaskAssignmentAssignee(payload.targetAssigneeUserId)
+  ) {
+    toast.warning('负责人列表已发生变化，请重新选择。')
+    return
+  }
+
+  toast.info('负责人变更已准备完成，将在下一工作包接入安全提交。')
+}
+
 const closeTaskScopedInteractions = () => {
+  closeTaskAssignmentDialog(false)
   closeDueDatePicker()
   isPriorityMenuOpen.value = false
   isMilestoneMenuOpen.value = false
@@ -3994,11 +4111,34 @@ watch(newTaskAssigneeStatus, (status) => {
   }
 })
 
+watch(taskAssignmentCandidatesStatus, (status) => {
+  const draft = taskAssignmentDraft.value
+  if (!draft || status !== 'ready') return
+  if (
+    draft.targetAssigneeUserId !== draft.expectedAssigneeUserId
+    && !isSelectableTaskAssignmentAssignee(draft.targetAssigneeUserId)
+  ) {
+    setTaskAssignmentTarget(draft.expectedAssigneeUserId)
+    toast.warning('负责人列表已发生变化，请重新选择。')
+  }
+})
+
+watch(
+  [currentContextKey, () => selectedTask.value?.id ?? null],
+  ([contextKey, taskId]) => {
+    if (invalidateTaskAssignmentDraft(contextKey, taskId)) {
+      resetTaskAssignmentCandidates()
+    }
+  },
+  { flush: 'sync' },
+)
+
 watch(
   () => collaborationStore.currentUser?.id,
   (currentActorId, previousActorId) => {
     if (previousActorId !== undefined && currentActorId !== previousActorId) {
       resetNewTaskDraft({ blurInput: true })
+      closeTaskAssignmentDialog(false)
     }
   },
 )
@@ -4107,6 +4247,9 @@ watch(
       isPriorityMenuOpen.value = false
       isMilestoneMenuOpen.value = false
     }
+    if (previous.canAssign && !next.canAssign) {
+      closeTaskAssignmentDialog(false)
+    }
     if (previous.canDelete && !next.canDelete) {
       showDeleteTaskConfirm.value = false
       pendingDeleteTask.value = null
@@ -4167,6 +4310,7 @@ onBeforeUnmount(() => {
   closeTodayAiReasonDialog()
   closeListReplanPreviewDialog()
   closeCompletionQualityModal()
+  closeTaskAssignmentDialog(false)
   if (!isAggregateView.value && !isTeamProjectContext.value && selectedProjectId.value) {
     if (isListReplanOperationExpired(pendingListReplanOperation.value)) {
       clearListReplanPreviewState({

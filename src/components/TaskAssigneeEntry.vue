@@ -33,8 +33,19 @@
     >
       已不在团队
     </span>
+    <button
+      v-if="assignAllowed"
+      ref="changeButtonRef"
+      type="button"
+      class="focus-ring shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--color-primary)]"
+      aria-label="变更任务负责人"
+      data-testid="task-assignee-change"
+      @click="emit('request-change')"
+    >
+      变更
+    </button>
     <span
-      v-if="!assignAllowed"
+      v-else
       class="shrink-0 text-xs text-[var(--color-text-tertiary)]"
       :title="assignDeniedMessage || '当前任务不可变更负责人。'"
       data-testid="task-assignee-locked"
@@ -45,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { TaskAssigneePresentation } from '@/utils/taskAssigneePresentation'
 
 defineProps<{
@@ -52,4 +64,14 @@ defineProps<{
   assignAllowed: boolean
   assignDeniedMessage: string | null
 }>()
+
+const emit = defineEmits<{
+  'request-change': []
+}>()
+
+const changeButtonRef = ref<HTMLButtonElement | null>(null)
+
+defineExpose({
+  focusChangeButton: () => changeButtonRef.value?.focus(),
+})
 </script>

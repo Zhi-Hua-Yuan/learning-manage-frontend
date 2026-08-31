@@ -1,6 +1,8 @@
 import request from '../utils/request'
-
-type EntityId = string | number
+import type { EntityId } from '@/types/common'
+import type { ProjectWire } from '@/types/project'
+import type { WirePage } from '@/types/common'
+import { omitUndefined, requireEntityId } from './guards'
 
 export type ProjectListParams = Record<string, string | number | boolean | undefined>
 
@@ -59,4 +61,24 @@ export const fetchArchivedProjectsApi = () => {
 
 export const recoverProjectApi = (id: EntityId) => {
   return request.post(`/project/recover/${id}`)
+}
+
+export interface TeamProjectListParams {
+  teamId: EntityId
+  pageNum?: number
+  pageSize?: number
+  status?: number
+  keyword?: string
+}
+
+export const fetchTeamProjectsApi = (params: TeamProjectListParams) => {
+  const teamId = requireEntityId(params.teamId, 'teamId')
+  const query = omitUndefined({
+    teamId,
+    pageNum: params.pageNum,
+    pageSize: params.pageSize,
+    status: params.status,
+    keyword: params.keyword,
+  })
+  return request.get<unknown, Promise<WirePage<ProjectWire>>>('/project/team/list', { params: query })
 }

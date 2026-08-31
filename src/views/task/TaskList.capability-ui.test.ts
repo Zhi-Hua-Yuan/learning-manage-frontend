@@ -158,6 +158,25 @@ describe('TaskList capability-driven controls', () => {
     expect(statusButton.attributes('aria-label')).toContain('切换任务')
   })
 
+  it('only opens the completion quality flow when status capability is enabled', async () => {
+    const deniedWrapper = await mountTaskList()
+    const deniedVm = deniedWrapper.vm as unknown as {
+      showCompletionQualityModal: boolean
+    }
+
+    await deniedWrapper.get('[data-testid="task-status-toggle-1"]').trigger('click')
+    expect(deniedVm.showCompletionQualityModal).toBe(false)
+    deniedWrapper.unmount()
+
+    const allowedWrapper = await mountTaskList({ ...allDenied, canChangeStatus: true })
+    const allowedVm = allowedWrapper.vm as unknown as {
+      showCompletionQualityModal: boolean
+    }
+
+    await allowedWrapper.get('[data-testid="task-status-toggle-1"]').trigger('click')
+    expect(allowedVm.showCompletionQualityModal).toBe(true)
+  })
+
   it('enables only reorganization controls when canReorganize is true', async () => {
     const wrapper = await mountTaskList({ ...allDenied, canReorganize: true })
 
@@ -210,6 +229,40 @@ describe('TaskList capability-driven controls', () => {
     vm.selectedTask.capabilities = allDenied
     await nextTick()
 
+    expect(vm.isDueDatePickerOpen).toBe(false)
+    expect(vm.isPriorityMenuOpen).toBe(false)
+    expect(vm.isMilestoneMenuOpen).toBe(false)
+    expect(vm.showCompletionQualityModal).toBe(false)
+    expect(vm.showDeleteTaskConfirm).toBe(false)
+  })
+
+  it('clears task-scoped interactions when switching to another task', async () => {
+    const wrapper = await mountTaskList({
+      canEditContent: true,
+      canChangeStatus: true,
+      canReorganize: true,
+      canAssign: true,
+      canDelete: true,
+    })
+    const vm = wrapper.vm as unknown as {
+      selectedTask: { id: string } | null
+      isDueDatePickerOpen: boolean
+      isPriorityMenuOpen: boolean
+      isMilestoneMenuOpen: boolean
+      showCompletionQualityModal: boolean
+      showDeleteTaskConfirm: boolean
+      selectTask: (task: unknown) => void
+    }
+
+    vm.isDueDatePickerOpen = true
+    vm.isPriorityMenuOpen = true
+    vm.isMilestoneMenuOpen = true
+    vm.showCompletionQualityModal = true
+    vm.showDeleteTaskConfirm = true
+    vm.selectTask({ ...task(allDenied), id: '2', title: '第二任务' })
+    await nextTick()
+
+    expect(vm.selectedTask?.id).toBe('2')
     expect(vm.isDueDatePickerOpen).toBe(false)
     expect(vm.isPriorityMenuOpen).toBe(false)
     expect(vm.isMilestoneMenuOpen).toBe(false)

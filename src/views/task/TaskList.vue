@@ -2622,6 +2622,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
   const isStaleRequest = () => requestVersion !== taskLoadVersion.value
+  let hasCachedSnapshot = false
 
   if (isAggregateView.value) {
     if (projectList.value.length === 0) {
@@ -2648,7 +2649,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
         }
         taskList.value = sortTaskListForCurrentBoard(filteredRecords)
         syncSelectedTaskFromList()
-        return okOutcome()
+        hasCachedSnapshot = true
       }
     }
 
@@ -2672,6 +2673,10 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     } catch (error) {
       if (isStaleRequest()) return staleOutcome()
       console.error('加载今日任务失败', error)
+      if (hasCachedSnapshot) {
+        toast.error('任务权限校验失败，当前缓存仅供查看。')
+        return okOutcome()
+      }
       return errorOutcome(error)
     }
   }
@@ -2687,7 +2692,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     if (cachedProjectTasks) {
       taskList.value = normalizeTaskRecords(cachedProjectTasks)
       syncSelectedTaskFromList()
-      return okOutcome()
+      hasCachedSnapshot = true
     }
   }
 
@@ -2715,6 +2720,10 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   } catch (error) {
     if (requestVersion !== taskLoadVersion.value) return staleOutcome()
     console.error('加载任务失败', error)
+    if (hasCachedSnapshot) {
+      toast.error('任务权限校验失败，当前缓存仅供查看。')
+      return okOutcome()
+    }
     return errorOutcome(error)
   }
 }

@@ -54,14 +54,14 @@ export const CACHE_REGISTRY = {
 export const getTaskListCacheEntry = (projectId: string): CacheEntry => ({
   key: `${TASK_LIST_CACHE_PREFIX}:${projectId}`,
   ttlMs: 5 * 60 * 1000,
-  version: 1,
+  version: 2,
   owner: 'task-list',
 })
 
 export const getTaskListAllCacheEntry = (): CacheEntry => ({
   key: TASK_LIST_ALL_CACHE_KEY,
   ttlMs: 5 * 60 * 1000,
-  version: 1,
+  version: 2,
   owner: 'task-list-aggregate',
 })
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { DENY_ALL_TASK_CAPABILITIES } from '@/types/task'
-import { findTaskById, normalizeTaskRecords } from './taskCollection'
+import { findTaskById, normalizeCachedTaskRecords, normalizeTaskRecords } from './taskCollection'
 
 describe('task collection normalization', () => {
   it('normalizes wire records into the shared TaskModel shape', () => {
@@ -59,6 +59,23 @@ describe('task collection normalization', () => {
     const [task] = normalizeTaskRecords([{ id: 1, projectId: 2, createdByUserId: 3 }])
 
     expect(task?.capabilities).toEqual(DENY_ALL_TASK_CAPABILITIES)
+  })
+
+  it('always strips allowed capabilities from persistent cache records', () => {
+    const [task] = normalizeCachedTaskRecords([{
+      id: 1,
+      projectId: 2,
+      createdByUserId: 3,
+      capabilities: {
+        canEditContent: true,
+        canChangeStatus: true,
+        canReorganize: true,
+        canAssign: true,
+        canDelete: true,
+      },
+    }])
+
+    expect(task?.capabilities).toBe(DENY_ALL_TASK_CAPABILITIES)
   })
 
   it('finds the selected task by its normalized string id', () => {

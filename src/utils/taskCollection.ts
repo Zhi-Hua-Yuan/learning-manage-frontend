@@ -1,5 +1,5 @@
 import { normalizeTaskWire } from '@/types/normalization'
-import type { TaskModel } from '@/types/task'
+import { DENY_ALL_TASK_CAPABILITIES, type TaskModel } from '@/types/task'
 
 /**
  * Converts untrusted task records at the API/cache boundary into the single
@@ -14,6 +14,17 @@ export const normalizeTaskRecords = (records: unknown): TaskModel[] => {
     return task ? [task] : []
   })
 }
+
+/**
+ * Persistent task caches are display-only snapshots. Capabilities are always
+ * discarded at both cache read and write boundaries so stale local data can
+ * never grant a task mutation.
+ */
+export const normalizeCachedTaskRecords = (records: unknown): TaskModel[] =>
+  normalizeTaskRecords(records).map((task) => ({
+    ...task,
+    capabilities: DENY_ALL_TASK_CAPABILITIES,
+  }))
 
 export const findTaskById = (tasks: readonly TaskModel[], taskId: string | null | undefined) => {
   if (!taskId) return null

@@ -14,11 +14,11 @@ import {
 } from './taskCache'
 import type { TaskModel } from '@/types/task'
 
-const task = (id: string, projectId = 'project-1', title = `Task ${id}`): TaskModel => ({
+const task = (id: string, projectId = '101', title = `Task ${id}`): TaskModel => ({
   id,
   projectId,
   milestoneId: null,
-  createdByUserId: 'user-1',
+  createdByUserId: '301',
   assigneeUserId: null,
   assignedByUserId: null,
   assignedAt: null,
@@ -39,76 +39,93 @@ const task = (id: string, projectId = 'project-1', title = `Task ${id}`): TaskMo
   },
 })
 
+const taskWithAllowedCapabilities = (id: string, projectId = '101'): TaskModel => ({
+  ...task(id, projectId),
+  capabilities: {
+    canEditContent: true,
+    canChangeStatus: true,
+    canReorganize: true,
+    canAssign: true,
+    canDelete: true,
+  },
+})
+
 describe('task cache coordination', () => {
   it('reads and writes project task lists', () => {
-    writeTaskCache('project-1', [task('task-1')])
+    writeTaskCache('101', [task('1')])
 
-    expect(readTaskCache('project-1')).toEqual([task('task-1')])
+    expect(readTaskCache('101')).toEqual([task('1')])
     expect(readTaskCache('')).toBeNull()
   })
 
-  it('upserts a new task into project and aggregate caches', () => {
-    upsertTaskInCaches(task('task-1'))
+  it('strips allowed capabilities at both cache write and read boundaries', () => {
+    writeTaskCache('101', [taskWithAllowedCapabilities('1')])
 
-    expect(readTaskCache('project-1')).toEqual([task('task-1')])
-    expect(readAllProjectsTaskCache()).toEqual({ 'project-1': [task('task-1')] })
+    expect(readTaskCache('101')).toEqual([task('1')])
+  })
+
+  it('upserts a new task into project and aggregate caches', () => {
+    upsertTaskInCaches(task('1'))
+
+    expect(readTaskCache('101')).toEqual([task('1')])
+    expect(readAllProjectsTaskCache()).toEqual({ '101': [task('1')] })
   })
 
   it('updates an existing task without duplicating it', () => {
-    upsertTaskInCaches(task('task-1'))
-    upsertTaskInCaches({ ...task('task-1'), status: 2, title: 'Updated' })
+    upsertTaskInCaches(task('1'))
+    upsertTaskInCaches({ ...task('1'), status: 2, title: 'Updated' })
 
-    expect(readTaskCache('project-1')).toEqual([{ ...task('task-1'), status: 2, title: 'Updated' }])
+    expect(readTaskCache('101')).toEqual([{ ...task('1'), status: 2, title: 'Updated' }])
   })
 
   it('removes a task from both caches', () => {
-    upsertTaskInCaches(task('task-1'))
-    upsertTaskInCaches(task('task-2'))
+    upsertTaskInCaches(task('1'))
+    upsertTaskInCaches(task('2'))
 
-    removeTaskFromCaches({ id: 'task-1', projectId: 'project-1' })
+    removeTaskFromCaches({ id: '1', projectId: '101' })
 
-    expect(readTaskCache('project-1')).toEqual([task('task-2')])
-    expect(readAllProjectsTaskCache()).toEqual({ 'project-1': [task('task-2')] })
+    expect(readTaskCache('101')).toEqual([task('2')])
+    expect(readAllProjectsTaskCache()).toEqual({ '101': [task('2')] })
   })
 
   it('groups records by project', () => {
-    writeAggregateTaskCacheFromRecords([task('task-1', 'project-1'), task('task-2', 'project-2')])
+    writeAggregateTaskCacheFromRecords([task('1', '101'), task('2', '202')])
 
     expect(readAllProjectsTaskCache()).toEqual({
-      'project-1': [task('task-1', 'project-1')],
-      'project-2': [task('task-2', 'project-2')],
+      '101': [task('1', '101')],
+      '202': [task('2', '202')],
     })
   })
 
   it('syncs one project without overwriting other projects', () => {
-    writeAllProjectsTaskCache({ 'project-1': [task('old', 'project-1')], 'project-2': [task('keep', 'project-2')] })
+    writeAllProjectsTaskCache({ '101': [task('1', '101')], '202': [task('2', '202')] })
 
-    syncAggregateTaskCacheByProject('project-1', [task('new', 'project-1')])
+    syncAggregateTaskCacheByProject('101', [task('3', '101')])
 
     expect(readAllProjectsTaskCache()).toEqual({
-      'project-1': [task('new', 'project-1')],
-      'project-2': [task('keep', 'project-2')],
+      '101': [task('3', '101')],
+      '202': [task('2', '202')],
     })
   })
 
   it('removes all caches for one project', () => {
-    upsertTaskInCaches(task('task-1'))
-    upsertTaskInCaches(task('task-2', 'project-2'))
+    upsertTaskInCaches(task('1'))
+    upsertTaskInCaches(task('2', '202'))
 
-    removeProjectTaskCaches('project-1')
+    removeProjectTaskCaches('101')
 
-    expect(readTaskCache('project-1')).toBeNull()
-    expect(readAllProjectsTaskCache()).toEqual({ 'project-2': [task('task-2', 'project-2')] })
+    expect(readTaskCache('101')).toBeNull()
+    expect(readAllProjectsTaskCache()).toEqual({ '202': [task('2', '202')] })
   })
 
   it('clears all project task caches when no project is specified', () => {
-    upsertTaskInCaches(task('task-1'))
-    upsertTaskInCaches(task('task-2', 'project-2'))
+    upsertTaskInCaches(task('1'))
+    upsertTaskInCaches(task('2', '202'))
 
     clearTaskCache()
 
-    expect(readTaskCache('project-1')).toBeNull()
-    expect(readTaskCache('project-2')).toBeNull()
+    expect(readTaskCache('101')).toBeNull()
+    expect(readTaskCache('202')).toBeNull()
     expect(readAllProjectsTaskCache()).toBeNull()
   })
 })

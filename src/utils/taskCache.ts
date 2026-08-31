@@ -5,10 +5,26 @@ import {
   TASK_LIST_CACHE_PREFIX,
 } from '@/utils/cacheRegistry'
 import type { TaskModel } from '@/types/task'
+import { normalizeCachedTaskRecords } from '@/utils/taskCollection'
 
 export const TASK_LIST_CACHE_TTL_MS = 5 * 60 * 1000
 
-const normalizeTaskArray = (value: unknown): TaskModel[] | null => (Array.isArray(value) ? (value as TaskModel[]) : null)
+const normalizeTaskArray = (value: unknown): TaskModel[] | null => (
+  Array.isArray(value) ? normalizeCachedTaskRecords(value) : null
+)
+
+const normalizeAllProjectsTaskCache = (value: unknown): Record<string, TaskModel[]> | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([projectId, tasks]) => {
+      if (!Array.isArray(tasks)) return []
+      const normalizedTasks = normalizeCachedTaskRecords(tasks)
+        .filter((task) => task.projectId === projectId)
+      return [[projectId, normalizedTasks]]
+    }),
+  )
+}
 
 const upsertTaskList = (tasks: TaskModel[], task: TaskModel) =>
   tasks.some((item) => item.id === task.id)
@@ -27,7 +43,7 @@ export const readTaskCache = (projectId: string, maxAgeMs = TASK_LIST_CACHE_TTL_
 
 export const writeTaskCache = (projectId: string, tasks: TaskModel[]) => {
   if (!projectId) return
-  writeCache(getTaskListCacheEntry(projectId), tasks)
+  writeCache(getTaskListCacheEntry(projectId), normalizeCachedTaskRecords(tasks))
 }
 
 export const clearTaskCache = (projectId?: string) => {
@@ -47,12 +63,11 @@ export const readAllProjectsTaskCache = (maxAgeMs = TASK_LIST_CACHE_TTL_MS): Rec
     maxAgeMs,
     allowLegacyVersionless: true,
   })
-  if (!cached || typeof cached !== 'object') return null
-  return cached
+  return normalizeAllProjectsTaskCache(cached)
 }
 
 export const writeAllProjectsTaskCache = (data: Record<string, TaskModel[]>) => {
-  writeCache(getTaskListAllCacheEntry(), data)
+  writeCache(getTaskListAllCacheEntry(), normalizeAllProjectsTaskCache(data) || {})
 }
 
 export const upsertTaskInCaches = (task: TaskModel) => {

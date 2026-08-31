@@ -176,8 +176,22 @@
                 "
                 :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
               >
-                <div
-                  class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
+                <button
+                  type="button"
+                  :data-testid="`task-status-toggle-${task.id}`"
+                  :disabled="!canPerformTaskAction(task, 'changeStatus')"
+                  :aria-pressed="isTaskCompleted(task.status)"
+                  :aria-label="
+                    canPerformTaskAction(task, 'changeStatus')
+                      ? `切换任务“${task.title}”状态`
+                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                  "
+                  :title="
+                    canPerformTaskAction(task, 'changeStatus')
+                      ? '切换任务状态'
+                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                  "
+                  class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   :class="
                     isTaskCompleted(task.status)
                       ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
@@ -200,7 +214,7 @@
                       d="M5 13l4 4L19 7"
                     ></path>
                   </svg>
-                </div>
+                </button>
 
                 <span
                   class="min-w-0 flex-1 text-sm transition-colors"
@@ -342,8 +356,22 @@
                 "
                 :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
               >
-                <div
-                  class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
+                <button
+                  type="button"
+                  :data-testid="`task-status-toggle-${task.id}`"
+                  :disabled="!canPerformTaskAction(task, 'changeStatus')"
+                  :aria-pressed="isTaskCompleted(task.status)"
+                  :aria-label="
+                    canPerformTaskAction(task, 'changeStatus')
+                      ? `切换任务“${task.title}”状态`
+                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                  "
+                  :title="
+                    canPerformTaskAction(task, 'changeStatus')
+                      ? '切换任务状态'
+                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                  "
+                  class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   :class="
                     isTaskCompleted(task.status)
                       ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
@@ -366,7 +394,7 @@
                       d="M5 13l4 4L19 7"
                     ></path>
                   </svg>
-                </div>
+                </button>
 
                 <span
                   class="min-w-0 flex-1 text-sm transition-colors"
@@ -497,9 +525,12 @@
 
           <div class="flex items-center gap-1">
             <button
+              :data-testid="'task-delete-button'"
+              :disabled="!selectedDeleteUi.allowed"
+              :aria-label="selectedDeleteUi.allowed ? '删除任务' : selectedDeleteUi.deniedMessage || '删除任务'"
+              :title="selectedDeleteUi.allowed ? '删除任务' : selectedDeleteUi.deniedMessage || '删除任务'"
               @click="requestDeleteTask"
-              class="rounded p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
-              title="删除任务"
+              class="rounded p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-secondary)]"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -524,10 +555,39 @@
         </div>
 
         <div class="flex-1 min-h-0 space-y-4 overflow-y-auto p-4">
+          <div
+            v-if="!selectedEditContentUi.allowed || !selectedReorganizeUi.allowed || !selectedDeleteUi.allowed"
+            class="rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-secondary)]"
+            role="status"
+          >
+            <span v-if="selectedTaskIsReadOnly">此任务当前为只读状态。 </span>
+            <span v-if="!selectedEditContentUi.allowed" id="task-edit-content-permission-hint">
+              {{ selectedEditContentUi.deniedMessage }}
+            </span>
+            <span
+              v-if="!selectedEditContentUi.allowed && !selectedReorganizeUi.allowed"
+              aria-hidden="true"
+            >；</span>
+            <span v-if="!selectedReorganizeUi.allowed" id="task-reorganize-permission-hint">
+              {{ selectedReorganizeUi.deniedMessage }}
+            </span>
+            <span
+              v-if="(!selectedEditContentUi.allowed || !selectedReorganizeUi.allowed) && !selectedDeleteUi.allowed"
+              aria-hidden="true"
+            >；</span>
+            <span v-if="!selectedDeleteUi.allowed">
+              {{ selectedDeleteUi.deniedMessage }}
+            </span>
+          </div>
+
           <div class="space-y-1">
             <textarea
               ref="detailTitleInputRef"
               :value="selectedTask.title"
+              :data-testid="'task-title-input'"
+              :disabled="!selectedEditContentUi.allowed"
+              :title="selectedEditContentUi.deniedMessage || undefined"
+              :aria-describedby="selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'"
               maxlength="50"
               rows="1"
               @input="onDetailTitleInput"
@@ -556,6 +616,10 @@
             <div class="relative min-w-0 flex-1">
               <button
                 type="button"
+                :data-testid="'task-priority-trigger'"
+                :disabled="!selectedReorganizeUi.allowed"
+                :title="selectedReorganizeUi.deniedMessage || '设置优先级'"
+                :aria-describedby="selectedReorganizeUi.allowed ? undefined : 'task-reorganize-permission-hint'"
                 @click.stop="togglePriorityMenu"
                 class="task-detail-select-trigger"
               >
@@ -571,7 +635,7 @@
               </button>
 
               <div
-                v-if="isPriorityMenuOpen"
+                v-if="isPriorityMenuOpen && selectedReorganizeUi.allowed"
                 @click.stop
                 class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 w-full overflow-hidden rounded-lg py-1"
               >
@@ -614,6 +678,10 @@
             <div class="relative min-w-0 flex-1">
               <button
                 type="button"
+                :data-testid="'task-due-date-trigger'"
+                :disabled="!selectedEditContentUi.allowed"
+                :title="selectedEditContentUi.deniedMessage || '设置截止日期'"
+                :aria-describedby="selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'"
                 @click="openDueDatePicker"
                 class="task-detail-select-trigger text-left"
               >
@@ -638,7 +706,7 @@
               </button>
 
               <div
-                v-if="isDueDatePickerOpen"
+                v-if="isDueDatePickerOpen && selectedEditContentUi.allowed"
                 @click.stop
                 class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 flex w-full max-w-[320px] aspect-[5/6] flex-col overflow-hidden rounded-lg p-2"
               >
@@ -731,6 +799,10 @@
             <div class="relative min-w-0 flex-1">
               <button
                 type="button"
+                :data-testid="'task-milestone-trigger'"
+                :disabled="!selectedReorganizeUi.allowed"
+                :title="selectedReorganizeUi.deniedMessage || '设置所属阶段'"
+                :aria-describedby="selectedReorganizeUi.allowed ? undefined : 'task-reorganize-permission-hint'"
                 @click.stop="toggleMilestoneMenu"
                 class="task-detail-select-trigger"
               >
@@ -741,7 +813,7 @@
               </button>
 
               <div
-                v-if="isMilestoneMenuOpen"
+                v-if="isMilestoneMenuOpen && selectedReorganizeUi.allowed"
                 @click.stop
                 class="surface-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 max-h-56 w-full overflow-y-auto rounded-lg py-1"
               >
@@ -766,8 +838,18 @@
             </div>
           </div>
 
+          <TaskAssigneeEntry
+            :presentation="selectedAssigneePresentation"
+            :assign-allowed="selectedAssignUi.allowed"
+            :assign-denied-message="selectedAssignUi.deniedMessage"
+          />
+
           <textarea
             ref="detailDescriptionInputRef"
+            :data-testid="'task-description-input'"
+            :disabled="!selectedEditContentUi.allowed"
+            :title="selectedEditContentUi.deniedMessage || undefined"
+            :aria-describedby="selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'"
             v-model="selectedTask.description"
             @input="onDetailDescriptionInput"
             @blur="onTextBlur"
@@ -1081,6 +1163,7 @@ import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { useToastStore } from '@/stores/toast'
+import TaskAssigneeEntry from '@/components/TaskAssigneeEntry.vue'
 import {
   buildPersonalProjectRoute,
   parseTaskProjectContext,
@@ -1122,8 +1205,11 @@ import { DENY_ALL_TASK_CAPABILITIES, type TaskModel } from '@/types/task'
 import { findTaskById, normalizeTaskRecords } from '@/utils/taskCollection'
 import {
   canPerformTaskAction,
+  resolveTaskActionUiState,
+  TASK_ACTION_DENIED_MESSAGE,
   type TaskAction,
 } from '@/utils/taskCapabilities'
+import { resolveTaskAssigneePresentation } from '@/utils/taskAssigneePresentation'
 import { classifyApiError } from '@/utils/request'
 import {
   createTaskStatusRequestId,
@@ -2317,6 +2403,37 @@ const calendarMonthCursor = ref(getMonthStart(new Date()))
 
 const currentDueDateLabel = computed(() => normalizeTaskDueDate(selectedTask.value?.dueDate) || '设置截止日期')
 
+const selectedEditContentUi = computed(() =>
+  resolveTaskActionUiState(selectedTask.value, 'editContent'),
+)
+const selectedReorganizeUi = computed(() =>
+  resolveTaskActionUiState(selectedTask.value, 'reorganize'),
+)
+const selectedDeleteUi = computed(() =>
+  resolveTaskActionUiState(selectedTask.value, 'delete'),
+)
+const selectedAssignUi = computed(() =>
+  resolveTaskActionUiState(selectedTask.value, 'assign'),
+)
+const selectedAssigneePresentation = computed(() =>
+  resolveTaskAssigneePresentation({
+    task: selectedTask.value,
+    currentUser: collaborationStore.currentUser,
+    teamMembers: selectedTeamId.value
+      ? collaborationStore.getTeamMembers(selectedTeamId.value)
+      : [],
+    teamMembersReady: selectedTeamId.value
+      ? collaborationStore.teamMembersByTeamId[selectedTeamId.value]?.loadState.status === 'ready'
+      : false,
+    isTeamProject: isTeamProjectContext.value,
+  }),
+)
+const selectedTaskIsReadOnly = computed(() => {
+  const capabilities = selectedTask.value?.capabilities
+  if (!capabilities) return false
+  return !Object.values(capabilities).some((allowed) => allowed === true)
+})
+
 const currentCalendarMonthLabel = computed(
   () => `${calendarMonthCursor.value.getFullYear()}年${calendarMonthCursor.value.getMonth() + 1}月`,
 )
@@ -2580,14 +2697,6 @@ const syncSelectedTaskFromList = () => {
     selectedTaskTitleBaseline.value = selectedTask.value?.title || ''
     selectedTaskDescriptionBaseline.value = selectedTask.value?.description ?? null
   }
-}
-
-const TASK_ACTION_DENIED_MESSAGE: Record<TaskAction, string> = {
-  editContent: '你没有修改此任务内容的权限。',
-  changeStatus: '你没有变更此任务状态的权限。',
-  reorganize: '你没有调整任务优先级或里程碑的权限。',
-  assign: '你没有变更任务负责人的权限。',
-  delete: '你没有删除此任务的权限。',
 }
 
 const resolveLatestTask = (taskOrId: TaskModel | string) => {
@@ -3041,20 +3150,16 @@ const handleCompletionQualityShortcutKeydown = (event: KeyboardEvent) => {
 }
 
 const selectTask = (task: TaskModel) => {
+  closeTaskScopedInteractions()
   selectedTask.value = task
   selectedTaskTitleBaseline.value = task.title
   selectedTaskDescriptionBaseline.value = task.description
-  isPriorityMenuOpen.value = false
-  isDueDatePickerOpen.value = false
-  isMilestoneMenuOpen.value = false
   isNewTaskMilestoneMenuOpen.value = false
 }
 
 const closeDetail = () => {
-  closeDueDatePicker()
+  closeTaskScopedInteractions()
   selectedTask.value = null
-  isPriorityMenuOpen.value = false
-  isMilestoneMenuOpen.value = false
   isNewTaskMilestoneMenuOpen.value = false
 }
 
@@ -3347,6 +3452,15 @@ const toggleMilestoneMenu = () => {
 
 const closeDueDatePicker = () => {
   isDueDatePickerOpen.value = false
+}
+
+const closeTaskScopedInteractions = () => {
+  closeDueDatePicker()
+  isPriorityMenuOpen.value = false
+  isMilestoneMenuOpen.value = false
+  closeCompletionQualityModal()
+  showDeleteTaskConfirm.value = false
+  pendingDeleteTask.value = null
 }
 
 const openDueDatePicker = () => {
@@ -3792,6 +3906,42 @@ watch(
     selectedTaskDescriptionBaseline.value = selectedTask.value?.description ?? null
     await nextTick()
     syncDetailEditorHeights()
+  },
+)
+
+watch(
+  () => {
+    const task = selectedTask.value
+    if (!task) return null
+    return {
+      id: task.id,
+      canEditContent: task.capabilities.canEditContent,
+      canChangeStatus: task.capabilities.canChangeStatus,
+      canReorganize: task.capabilities.canReorganize,
+      canAssign: task.capabilities.canAssign,
+      canDelete: task.capabilities.canDelete,
+    }
+  },
+  (next, previous) => {
+    if (!next || !previous || next.id !== previous.id) {
+      closeTaskScopedInteractions()
+      return
+    }
+
+    if (previous.canEditContent && !next.canEditContent) {
+      closeDueDatePicker()
+    }
+    if (previous.canChangeStatus && !next.canChangeStatus) {
+      closeCompletionQualityModal()
+    }
+    if (previous.canReorganize && !next.canReorganize) {
+      isPriorityMenuOpen.value = false
+      isMilestoneMenuOpen.value = false
+    }
+    if (previous.canDelete && !next.canDelete) {
+      showDeleteTaskConfirm.value = false
+      pendingDeleteTask.value = null
+    }
   },
 )
 

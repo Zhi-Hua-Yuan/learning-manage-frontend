@@ -4,7 +4,9 @@ import type { TaskModel } from '@/types/task'
 import {
   canPerformTaskAction,
   hasTaskCapability,
+  resolveTaskActionUiState,
   TASK_ACTION_CAPABILITY,
+  TASK_ACTION_DENIED_MESSAGE,
 } from './taskCapabilities'
 
 const task = (capabilities: TaskModel['capabilities']): TaskModel => ({
@@ -65,5 +67,36 @@ describe('task capability policy', () => {
     expect(hasTaskCapability(null, 'canDelete')).toBe(false)
     expect(hasTaskCapability(undefined, 'canDelete')).toBe(false)
     expect(canPerformTaskAction(deniedTask, 'delete')).toBe(false)
+  })
+
+  it('provides precise, action-specific UI denial messages', () => {
+    expect(TASK_ACTION_DENIED_MESSAGE).toEqual({
+      editContent: '你可以查看此任务，但不能修改标题、描述或截止日期。',
+      changeStatus: '你没有变更此任务状态的权限。',
+      reorganize: '你没有调整此任务优先级或所属阶段的权限。',
+      assign: '你没有变更此任务负责人的权限。',
+      delete: '你没有删除此任务的权限。',
+    })
+
+    const editOnlyTask = task({
+      canEditContent: true,
+      canChangeStatus: false,
+      canReorganize: false,
+      canAssign: false,
+      canDelete: false,
+    })
+
+    expect(resolveTaskActionUiState(editOnlyTask, 'editContent')).toEqual({
+      allowed: true,
+      deniedMessage: null,
+    })
+    expect(resolveTaskActionUiState(editOnlyTask, 'delete')).toEqual({
+      allowed: false,
+      deniedMessage: TASK_ACTION_DENIED_MESSAGE.delete,
+    })
+    expect(resolveTaskActionUiState(null, 'changeStatus')).toEqual({
+      allowed: false,
+      deniedMessage: TASK_ACTION_DENIED_MESSAGE.changeStatus,
+    })
   })
 })

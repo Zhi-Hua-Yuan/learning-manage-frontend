@@ -1062,7 +1062,13 @@ import {
   type AiTodayOrderRecommendRequest,
 } from '@/api/ai'
 import { fetchProjectList } from '@/api/project'
-import { addTaskApi, deleteTaskApi, fetchTaskList, updateTaskApi } from '@/api/task'
+import {
+  addTaskApi,
+  changeTaskStatusApi,
+  deleteTaskApi,
+  fetchTaskList,
+  updateTaskContentApi,
+} from '@/api/task'
 import {
   addMilestoneApi,
   deleteMilestoneApi,
@@ -1112,12 +1118,17 @@ import {
   TASK_STATUS_DONE_STANDARD,
   TASK_STATUS_TODO,
 } from '@/utils/taskStatus'
+import {
+  createTaskStatusRequestId,
+  normalizeTaskStatusResult,
+} from '@/utils/taskWrite'
 
 interface Task {
   id: string
   title: string
   description?: string
   status: number
+  completedAt?: string | null
   priority: number
   projectId: string
   dueDate?: string | null
@@ -2888,15 +2899,24 @@ const addTask = async () => {
 
 const setTaskStatus = async (task: Task, nextStatus: number) => {
   const oldStatus = task.status
+  const clientRequestId = createTaskStatusRequestId()
   task.status = nextStatus
   try {
-    await updateTaskApi({ ...task, status: nextStatus })
-    if (canUsePersistentProjectTaskCache.value) {
-      upsertTaskInCaches(task)
+    const result = await changeTaskStatusApi({
+      taskId: task.id,
+      targetStatus: nextStatus,
+      expectedStatus: oldStatus,
+      clientRequestId,
+    })
+    task.status = normalizeTaskStatusResult(result.finalStatus)
+    if (result.completedAt !== undefined) {
+      task.completedAt = result.completedAt
     }
-    markListReplanDirty()
+    await loadTasks({ forceRefresh: true })
+    if (result.changed) markListReplanDirty()
   } catch {
     task.status = oldStatus
+    await loadTasks({ forceRefresh: true })
     toast.error('更新状态失败，请检查网络后重试。')
     throw new Error('update-task-status-failed')
   }
@@ -3303,10 +3323,8 @@ const selectPriority = async (val: number) => {
   isPriorityMenuOpen.value = false
 
   try {
-    await updateTaskApi({ ...selectedTask.value, priority: val })
-    if (canUsePersistentProjectTaskCache.value) {
-      upsertTaskInCaches(selectedTask.value)
-    }
+    await updateTaskContentApi({ id: selectedTask.value.id, priority: val })
+    await loadTasks({ forceRefresh: true })
     markListReplanDirty()
   } catch {
     selectedTask.value.priority = oldPriority
@@ -3329,7 +3347,7 @@ const updateDueDate = async (nextDate: string | null) => {
   isDueDatePickerOpen.value = false
 
   try {
-    await updateTaskApi({ ...selectedTask.value, dueDate: finalDate })
+    await updateTaskContentApi({ id: selectedTask.value.id, dueDate: finalDate })
     markListReplanDirty()
     await loadTasks({ forceRefresh: true })
   } catch {
@@ -3363,7 +3381,7 @@ const selectMilestone = async (milestoneId: string | null) => {
   isMilestoneMenuOpen.value = false
 
   try {
-    await updateTaskApi({ ...selectedTask.value, milestoneId: finalMilestoneId })
+    await updateTaskContentApi({ id: selectedTask.value.id, milestoneId: finalMilestoneId })
     await loadTasks({ forceRefresh: true })
   } catch {
     selectedTask.value.milestoneId = oldMilestoneId
@@ -3376,7 +3394,11 @@ const onTextBlur = async () => {
 
   const previousTitle = selectedTaskTitleBaseline.value
   try {
-    await updateTaskApi({ ...selectedTask.value })
+    await updateTaskContentApi({
+      id: selectedTask.value.id,
+      title: selectedTask.value.title,
+      description: selectedTask.value.description,
+    })
     if (selectedTask.value.title !== previousTitle) {
       markListReplanDirty()
     }

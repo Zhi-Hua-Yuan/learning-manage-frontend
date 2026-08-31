@@ -4,17 +4,30 @@ import path from 'node:path'
 const rootDir = process.cwd()
 const taskListPath = path.join(rootDir, 'src', 'views', 'task', 'TaskList.vue')
 const taskCachePath = path.join(rootDir, 'src', 'utils', 'taskCache.ts')
+const taskApiPath = path.join(rootDir, 'src', 'api', 'task.ts')
 
 const checks = [
   {
     file: taskListPath,
-    label: 'Status update flow upserts both caches',
-    pattern: /await updateTaskApi\(\{ \.\.\.task, status: nextStatus \}\)\s*\n(?:\s*if \(canUsePersistentProjectTaskCache\.value\) \{\s*)?upsertTaskInCaches\(task\)/m,
+    label: 'Status update flow uses the dedicated endpoint and refreshes facts',
+    pattern: /await changeTaskStatusApi\(\{[\s\S]*?\}\)\s*\n\s*task\.status = normalizeTaskStatusResult\(result\.finalStatus\)\s*\n[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/m,
   },
   {
     file: taskListPath,
-    label: 'Priority update flow upserts both caches',
-    pattern: /await updateTaskApi\(\{ \.\.\.selectedTask\.value, priority: val \}\)\s*\n(?:\s*if \(canUsePersistentProjectTaskCache\.value\) \{\s*)?upsertTaskInCaches\(selectedTask\.value\)/m,
+    label: 'Priority update flow uses the content-only endpoint and refreshes facts',
+    pattern: /await updateTaskContentApi\(\{ id: selectedTask\.value\.id, priority: val \}\)\s*\n\s*await loadTasks\(\{ forceRefresh: true \}\)/m,
+  },
+  {
+    file: taskListPath,
+    label: 'Task page does not call the deprecated task update API',
+    pattern: /\bupdateTaskApi\b/,
+    invert: true,
+  },
+  {
+    file: taskApiPath,
+    label: 'Task API does not export the deprecated task update API',
+    pattern: /\bupdateTaskApi\b/,
+    invert: true,
   },
   {
     file: taskListPath,
@@ -52,7 +65,8 @@ const failures = []
 
 checks.forEach((item) => {
   const content = fs.readFileSync(item.file, 'utf8')
-  if (!item.pattern.test(content)) {
+  const matched = item.pattern.test(content)
+  if (item.invert ? matched : !matched) {
     failures.push(item.label)
   }
 })

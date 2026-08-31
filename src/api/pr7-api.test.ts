@@ -128,6 +128,12 @@ describe('PR7 B2 API clients', () => {
       expectedStatus: 1,
     })
     expect(read()).toMatchObject({ method: 'POST', url: '/task/status/change' })
+    expect(parseBody(read()?.data)).toEqual({
+      taskId: 11,
+      targetStatus: 2,
+      clientRequestId: 'request-1',
+      expectedStatus: 1,
+    })
   })
 
   it('keeps the typed task update payload content-only', async () => {

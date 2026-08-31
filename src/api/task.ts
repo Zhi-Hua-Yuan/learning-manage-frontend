@@ -3,6 +3,7 @@ import type { EntityId } from '@/types/common'
 import type {
   AssignTaskPayload,
   ChangeTaskStatusPayload,
+  CreateTaskPayload,
   TaskAssignmentHistoryPageWire,
   TaskAssignmentResultWire,
   TaskStatusResultWire,
@@ -18,41 +19,14 @@ export interface TaskListParams {
   size?: number
 }
 
-export interface AddTaskPayload {
-  title: string
-  projectId: EntityId
-  description?: string
-  status?: number
-  priority?: number
-  dueDate?: string | null
-  milestoneId?: EntityId | null
-}
-
-export interface UpdateTaskPayload {
-  id: EntityId
-  title?: string
-  projectId?: EntityId
-  description?: string
-  status?: number
-  priority?: number
-  dueDate?: string | null
-  milestoneId?: EntityId | null
-}
-
 // 获取任务列表 (对应你后端的 GET /task/list)
 export const fetchTaskList = (params: TaskListParams) => {
   return request.get('/task/list', { params })
 }
 
 // 新增任务 (对应你后端的 POST /task/add)
-export const addTaskApi = (data: AddTaskPayload) => {
+export const addTaskApi = (data: CreateTaskPayload) => {
   return request.post('/task/add', data)
-}
-
-// 更新任务 (对应你后端的 POST /task/update)
-/** @deprecated Use updateTaskContentApi for content updates and changeTaskStatusApi for status changes. */
-export const updateTaskApi = (data: UpdateTaskPayload) => {
-  return request.post('/task/update', data)
 }
 
 /** Typed content-only update for the PR7 task editor. Status changes use changeTaskStatusApi. */

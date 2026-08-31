@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getTaskListCacheEntry } from '@/utils/cacheRegistry'
 
 import {
   clearTaskCache,
@@ -62,6 +63,23 @@ describe('task cache coordination', () => {
     writeTaskCache('101', [taskWithAllowedCapabilities('1')])
 
     expect(readTaskCache('101')).toEqual([task('1')])
+
+    const raw = window.localStorage.getItem(getTaskListCacheEntry('101').key)
+    expect(raw).not.toBeNull()
+    const envelope = JSON.parse(raw || '{}') as { data?: TaskModel[] }
+    expect(envelope.data?.[0]?.capabilities).toEqual(task('1').capabilities)
+  })
+
+  it('rejects the previous task cache schema instead of trusting old capabilities', () => {
+    const entry = getTaskListCacheEntry('101')
+    window.localStorage.setItem(entry.key, JSON.stringify({
+      version: 1,
+      updatedAt: Date.now(),
+      data: [taskWithAllowedCapabilities('1')],
+    }))
+
+    expect(entry.version).toBe(2)
+    expect(readTaskCache('101')).toBeNull()
   })
 
   it('upserts a new task into project and aggregate caches', () => {

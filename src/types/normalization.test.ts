@@ -7,6 +7,7 @@ import {
   normalizePage,
   normalizeProjectWire,
   normalizeSharedWeeklyReviewWire,
+  normalizeTaskAssignmentResult,
   normalizeTaskWire,
   normalizeTaskCapabilities,
   normalizeTeamMemberWire,
@@ -104,6 +105,74 @@ describe('shared type normalizers', () => {
       capabilities: DENY_ALL_TASK_CAPABILITIES,
     })
     expect(normalizeTaskWire({ id: 1, projectId: 2, createdByUserId: 3, assigneeUserId: 'bad' })).toBeNull()
+  })
+
+  it('normalizes a complete task assignment result for the expected task', () => {
+    expect(normalizeTaskAssignmentResult({
+      taskId: 101,
+      changed: true,
+      previousAssigneeUserId: null,
+      assigneeUserId: '202',
+      assignedByUserId: 303,
+      assignedAt: '2026-09-01T12:00:00',
+    }, '101')).toEqual({
+      taskId: '101',
+      changed: true,
+      previousAssigneeUserId: null,
+      assigneeUserId: '202',
+      assignedByUserId: '303',
+      assignedAt: '2026-09-01T12:00:00',
+    })
+  })
+
+  it('accepts explicit null assignment result fields for an idempotent unassigned task', () => {
+    expect(normalizeTaskAssignmentResult({
+      taskId: '101',
+      changed: false,
+      previousAssigneeUserId: null,
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+    }, 101)).toEqual({
+      taskId: '101',
+      changed: false,
+      previousAssigneeUserId: null,
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+    })
+  })
+
+  it('rejects malformed, incomplete or stale task assignment results', () => {
+    const valid = {
+      taskId: 101,
+      changed: true,
+      previousAssigneeUserId: null,
+      assigneeUserId: 202,
+      assignedByUserId: 303,
+      assignedAt: null,
+    }
+
+    expect(normalizeTaskAssignmentResult(valid, 999)).toBeNull()
+    expect(normalizeTaskAssignmentResult({ ...valid, changed: 'true' } as never, 101)).toBeNull()
+    expect(normalizeTaskAssignmentResult({ ...valid, assigneeUserId: 0 }, 101)).toBeNull()
+    expect(normalizeTaskAssignmentResult({ ...valid, assignedAt: 123 } as never, 101)).toBeNull()
+    expect(normalizeTaskAssignmentResult({ ...valid, assignedByUserId: undefined }, 101)).toBeNull()
+    expect(normalizeTaskAssignmentResult({
+      taskId: 101,
+      changed: true,
+      previousAssigneeUserId: null,
+      assigneeUserId: 202,
+      assignedAt: null,
+    }, 101)).toBeNull()
+    expect(normalizeTaskAssignmentResult({
+      taskId: 101,
+      changed: true,
+      previousAssigneeUserId: null,
+      assigneeUserId: 202,
+      assignedByUserId: 303,
+    }, 101)).toBeNull()
+    expect(normalizeTaskAssignmentResult(null, 101)).toBeNull()
   })
 
   it('keeps shared review normalization on the public whitelist', () => {

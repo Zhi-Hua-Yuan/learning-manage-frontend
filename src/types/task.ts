@@ -89,6 +89,15 @@ export interface TaskAssignmentResultWire {
   assignedAt?: string | null
 }
 
+export interface TaskAssignmentResult {
+  taskId: string
+  changed: boolean
+  previousAssigneeUserId: string | null
+  assigneeUserId: string | null
+  assignedByUserId: string | null
+  assignedAt: string | null
+}
+
 export interface ChangeTaskStatusPayload {
   taskId: EntityId
   targetStatus: number

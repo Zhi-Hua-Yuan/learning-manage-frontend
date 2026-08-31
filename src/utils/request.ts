@@ -112,7 +112,12 @@ export const classifyApiError = (error: unknown): ApiErrorKind => {
   if (!isApiRequestError(error)) return error instanceof TypeError ? 'VALIDATION' : 'UNKNOWN'
   if (error.code === 40300 || error.code === 40101 || error.httpStatus === 403) return 'PERMISSION_DENIED'
   if (error.httpStatus === 401 || error.code === 401 || error.code === 40100) return 'AUTHENTICATION_REQUIRED'
-  if (error.httpStatus === 409 || error.code === 409 || error.code === 40900) return 'CONFLICT'
+  if (
+    error.code === 50001
+    || error.httpStatus === 409
+    || error.code === 409
+    || error.code === 40900
+  ) return 'CONFLICT'
   if (error.httpStatus === 404 || error.code === 404 || error.code === 40400) return 'NOT_FOUND'
   if (error.httpStatus != null && error.httpStatus >= 500) return 'SERVER'
   if (error.httpStatus != null && error.httpStatus >= 400) return 'VALIDATION'

@@ -104,6 +104,15 @@
           {{ operationSummary }}
         </p>
 
+        <p
+          v-if="submissionErrorMessage"
+          class="mt-3 rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-danger)]"
+          role="alert"
+          data-testid="task-assignment-submit-error"
+        >
+          {{ submissionErrorMessage }}
+        </p>
+
         <div class="mt-6 flex justify-end gap-3">
           <button
             type="button"
@@ -152,10 +161,14 @@ const props = withDefaults(defineProps<{
   candidatesErrorMessage?: string | null
   reason: string
   busy?: boolean
+  submissionBlocked?: boolean
+  submissionErrorMessage?: string | null
 }>(), {
   candidatesLoading: false,
   candidatesErrorMessage: null,
   busy: false,
+  submissionBlocked: false,
+  submissionErrorMessage: null,
 })
 
 const emit = defineEmits<{
@@ -204,6 +217,7 @@ const targetSelectable = computed(() => {
 })
 const confirmDisabled = computed(() => (
   props.busy
+  || props.submissionBlocked
   || props.candidatesLoading
   || Boolean(props.candidatesErrorMessage)
   || operation.value === 'NO_CHANGE'

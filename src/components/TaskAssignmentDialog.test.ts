@@ -103,4 +103,29 @@ describe('TaskAssignmentDialog', () => {
     expect(wrapper.emitted('cancel')).toHaveLength(1)
     wrapper.unmount()
   })
+
+  it('freezes confirmation and renders a safe submission error while blocked', async () => {
+    const wrapper = mountDialog({
+      targetAssigneeUserId: '2',
+      submissionBlocked: true,
+      submissionErrorMessage: '任务负责人已发生变化，请重新核对最新状态后再确认。',
+    })
+
+    expect(wrapper.get('[data-testid="task-assignment-submit-error"]').text()).toContain('重新核对')
+    expect(wrapper.get('[data-testid="task-assignment-confirm"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-testid="task-assignment-confirm"]').trigger('click')
+    expect(wrapper.emitted('confirm')).toBeUndefined()
+  })
+
+  it('keeps Escape and cancellation disabled while submitting', async () => {
+    const wrapper = mountDialog({ targetAssigneeUserId: '2', busy: true })
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    await wrapper.get('[data-testid="task-assignment-cancel"]').trigger('click')
+
+    expect(wrapper.emitted('cancel')).toBeUndefined()
+    expect(wrapper.get('[data-testid="task-assignment-confirm"]').text()).toBe('处理中…')
+    wrapper.unmount()
+  })
 })

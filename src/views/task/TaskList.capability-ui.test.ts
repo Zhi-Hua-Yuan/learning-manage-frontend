@@ -49,12 +49,12 @@ vi.mock('@/api/ai', () => ({
   aiTodayOrderRecommendApi: vi.fn(),
 }))
 
-const task = (capabilities: Record<string, boolean>) => ({
+const task = (capabilities: Record<string, boolean>, assigneeUserId: string | null = null) => ({
   id: '1',
   projectId: '1',
   milestoneId: null,
   createdByUserId: '1',
-  assigneeUserId: null,
+  assigneeUserId,
   assignedByUserId: null,
   assignedAt: null,
   title: '权限任务',
@@ -76,14 +76,14 @@ const allDenied = {
   canDelete: false,
 }
 
-const mountTaskList = async (capabilities = allDenied) => {
+const mountTaskList = async (capabilities = allDenied, assigneeUserId: string | null = null) => {
   const projectApi = await import('@/api/project')
   const milestoneApi = await import('@/api/milestone')
   vi.mocked(projectApi.fetchProjectList).mockResolvedValue({ data: [{ id: '1', name: '项目', icon: 'folder' }] } as never)
   vi.mocked(milestoneApi.fetchMilestoneList).mockResolvedValue({ data: [] } as never)
   taskApi.fetchTaskList.mockResolvedValue({
     data: {
-      records: [task(capabilities)],
+      records: [task(capabilities, assigneeUserId)],
       current: 1,
       size: 100,
       total: 1,
@@ -131,6 +131,8 @@ describe('TaskList capability-driven controls', () => {
     expect(wrapper.get('[data-testid="task-priority-trigger"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="task-milestone-trigger"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="task-delete-button"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="task-assignee-label"]').text()).toBe('未分配')
+    expect(wrapper.get('[data-testid="task-assignee-locked"]').text()).toBe('仅查看')
     expect(wrapper.text()).toContain('只读')
   })
 
@@ -173,5 +175,45 @@ describe('TaskList capability-driven controls', () => {
     expect(wrapper.get('[data-testid="task-title-input"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="task-status-toggle-1"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="task-priority-trigger"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('renders the assignee fact row without inventing a mutation control', async () => {
+    const wrapper = await mountTaskList({ ...allDenied, canAssign: true }, '8')
+
+    expect(wrapper.get('[data-testid="task-assignee-label"]').text()).toBe('用户 #8')
+    expect(wrapper.find('[data-testid="task-assignee-locked"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="task-assignee-inactive"]').exists()).toBe(false)
+  })
+
+  it('closes task-scoped interactions after a refreshed capability downgrade', async () => {
+    const wrapper = await mountTaskList({
+      canEditContent: true,
+      canChangeStatus: true,
+      canReorganize: true,
+      canAssign: true,
+      canDelete: true,
+    })
+    const vm = wrapper.vm as unknown as {
+      selectedTask: { capabilities: typeof allDenied }
+      isDueDatePickerOpen: boolean
+      isPriorityMenuOpen: boolean
+      isMilestoneMenuOpen: boolean
+      showCompletionQualityModal: boolean
+      showDeleteTaskConfirm: boolean
+    }
+
+    vm.isDueDatePickerOpen = true
+    vm.isPriorityMenuOpen = true
+    vm.isMilestoneMenuOpen = true
+    vm.showCompletionQualityModal = true
+    vm.showDeleteTaskConfirm = true
+    vm.selectedTask.capabilities = allDenied
+    await nextTick()
+
+    expect(vm.isDueDatePickerOpen).toBe(false)
+    expect(vm.isPriorityMenuOpen).toBe(false)
+    expect(vm.isMilestoneMenuOpen).toBe(false)
+    expect(vm.showCompletionQualityModal).toBe(false)
+    expect(vm.showDeleteTaskConfirm).toBe(false)
   })
 })

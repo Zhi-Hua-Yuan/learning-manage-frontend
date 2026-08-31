@@ -838,6 +838,12 @@
             </div>
           </div>
 
+          <TaskAssigneeEntry
+            :presentation="selectedAssigneePresentation"
+            :assign-allowed="selectedAssignUi.allowed"
+            :assign-denied-message="selectedAssignUi.deniedMessage"
+          />
+
           <textarea
             ref="detailDescriptionInputRef"
             :data-testid="'task-description-input'"
@@ -1157,6 +1163,7 @@ import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { useToastStore } from '@/stores/toast'
+import TaskAssigneeEntry from '@/components/TaskAssigneeEntry.vue'
 import {
   buildPersonalProjectRoute,
   parseTaskProjectContext,
@@ -1202,6 +1209,7 @@ import {
   TASK_ACTION_DENIED_MESSAGE,
   type TaskAction,
 } from '@/utils/taskCapabilities'
+import { resolveTaskAssigneePresentation } from '@/utils/taskAssigneePresentation'
 import { classifyApiError } from '@/utils/request'
 import {
   createTaskStatusRequestId,
@@ -2404,6 +2412,22 @@ const selectedReorganizeUi = computed(() =>
 const selectedDeleteUi = computed(() =>
   resolveTaskActionUiState(selectedTask.value, 'delete'),
 )
+const selectedAssignUi = computed(() =>
+  resolveTaskActionUiState(selectedTask.value, 'assign'),
+)
+const selectedAssigneePresentation = computed(() =>
+  resolveTaskAssigneePresentation({
+    task: selectedTask.value,
+    currentUser: collaborationStore.currentUser,
+    teamMembers: selectedTeamId.value
+      ? collaborationStore.getTeamMembers(selectedTeamId.value)
+      : [],
+    teamMembersReady: selectedTeamId.value
+      ? collaborationStore.teamMembersByTeamId[selectedTeamId.value]?.loadState.status === 'ready'
+      : false,
+    isTeamProject: isTeamProjectContext.value,
+  }),
+)
 const selectedTaskIsReadOnly = computed(() => {
   const capabilities = selectedTask.value?.capabilities
   if (!capabilities) return false
@@ -3126,20 +3150,16 @@ const handleCompletionQualityShortcutKeydown = (event: KeyboardEvent) => {
 }
 
 const selectTask = (task: TaskModel) => {
+  closeTaskScopedInteractions()
   selectedTask.value = task
   selectedTaskTitleBaseline.value = task.title
   selectedTaskDescriptionBaseline.value = task.description
-  isPriorityMenuOpen.value = false
-  isDueDatePickerOpen.value = false
-  isMilestoneMenuOpen.value = false
   isNewTaskMilestoneMenuOpen.value = false
 }
 
 const closeDetail = () => {
-  closeDueDatePicker()
+  closeTaskScopedInteractions()
   selectedTask.value = null
-  isPriorityMenuOpen.value = false
-  isMilestoneMenuOpen.value = false
   isNewTaskMilestoneMenuOpen.value = false
 }
 
@@ -3432,6 +3452,15 @@ const toggleMilestoneMenu = () => {
 
 const closeDueDatePicker = () => {
   isDueDatePickerOpen.value = false
+}
+
+const closeTaskScopedInteractions = () => {
+  closeDueDatePicker()
+  isPriorityMenuOpen.value = false
+  isMilestoneMenuOpen.value = false
+  closeCompletionQualityModal()
+  showDeleteTaskConfirm.value = false
+  pendingDeleteTask.value = null
 }
 
 const openDueDatePicker = () => {
@@ -3877,6 +3906,42 @@ watch(
     selectedTaskDescriptionBaseline.value = selectedTask.value?.description ?? null
     await nextTick()
     syncDetailEditorHeights()
+  },
+)
+
+watch(
+  () => {
+    const task = selectedTask.value
+    if (!task) return null
+    return {
+      id: task.id,
+      canEditContent: task.capabilities.canEditContent,
+      canChangeStatus: task.capabilities.canChangeStatus,
+      canReorganize: task.capabilities.canReorganize,
+      canAssign: task.capabilities.canAssign,
+      canDelete: task.capabilities.canDelete,
+    }
+  },
+  (next, previous) => {
+    if (!next || !previous || next.id !== previous.id) {
+      closeTaskScopedInteractions()
+      return
+    }
+
+    if (previous.canEditContent && !next.canEditContent) {
+      closeDueDatePicker()
+    }
+    if (previous.canChangeStatus && !next.canChangeStatus) {
+      closeCompletionQualityModal()
+    }
+    if (previous.canReorganize && !next.canReorganize) {
+      isPriorityMenuOpen.value = false
+      isMilestoneMenuOpen.value = false
+    }
+    if (previous.canDelete && !next.canDelete) {
+      showDeleteTaskConfirm.value = false
+      pendingDeleteTask.value = null
+    }
   },
 )
 

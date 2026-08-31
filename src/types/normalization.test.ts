@@ -39,12 +39,21 @@ describe('shared type normalizers', () => {
 
   it('fails closed for missing or malformed task capabilities', () => {
     expect(normalizeTaskCapabilities(undefined)).toBe(DENY_ALL_TASK_CAPABILITIES)
+    expect(normalizeTaskCapabilities(null)).toBe(DENY_ALL_TASK_CAPABILITIES)
+    expect(normalizeTaskCapabilities([])).toBe(DENY_ALL_TASK_CAPABILITIES)
     expect(normalizeTaskCapabilities({ canAssign: true })).toBe(DENY_ALL_TASK_CAPABILITIES)
     expect(normalizeTaskCapabilities({
       canEditContent: true,
       canChangeStatus: false,
       canReorganize: false,
       canAssign: 'true',
+      canDelete: false,
+    })).toBe(DENY_ALL_TASK_CAPABILITIES)
+    expect(normalizeTaskCapabilities({
+      canEditContent: 1,
+      canChangeStatus: false,
+      canReorganize: false,
+      canAssign: false,
       canDelete: false,
     })).toBe(DENY_ALL_TASK_CAPABILITIES)
     expect(normalizeTaskCapabilities({

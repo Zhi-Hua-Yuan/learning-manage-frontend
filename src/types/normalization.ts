@@ -44,7 +44,9 @@ export function normalizePage<T>(page: WirePage<T> | null | undefined): PageResu
 }
 
 export function normalizeTaskCapabilities(value: unknown): TaskCapabilities {
-  if (!value || typeof value !== 'object') return DENY_ALL_TASK_CAPABILITIES
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return DENY_ALL_TASK_CAPABILITIES
+  }
 
   const candidate = value as Record<string, unknown>
   const keys: Array<keyof TaskCapabilities> = [

@@ -116,6 +116,7 @@ export const classifyApiError = (error: unknown): ApiErrorKind => {
   if (error.httpStatus === 404 || error.code === 404 || error.code === 40400) return 'NOT_FOUND'
   if (error.httpStatus != null && error.httpStatus >= 500) return 'SERVER'
   if (error.httpStatus != null && error.httpStatus >= 400) return 'VALIDATION'
+  if (error.httpStatus == null && error.code == null) return 'NETWORK'
   return 'UNKNOWN'
 }
 

@@ -44,7 +44,9 @@ export function normalizePage<T>(page: WirePage<T> | null | undefined): PageResu
 }
 
 export function normalizeTaskCapabilities(value: unknown): TaskCapabilities {
-  if (!value || typeof value !== 'object') return DENY_ALL_TASK_CAPABILITIES
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return DENY_ALL_TASK_CAPABILITIES
+  }
 
   const candidate = value as Record<string, unknown>
   const keys: Array<keyof TaskCapabilities> = [
@@ -152,8 +154,8 @@ export function normalizeTaskWire(task: TaskWire | null | undefined): TaskModel 
     assignedAt: typeof task.assignedAt === 'string' ? task.assignedAt : null,
     title: typeof task.title === 'string' ? task.title : '',
     description: typeof task.description === 'string' ? task.description : null,
-    status: task.status,
-    priority: task.priority,
+    status: normalizeNumeric(task.status, 0, 0),
+    priority: normalizeNumeric(task.priority, 0, 0),
     dueDate: typeof task.dueDate === 'string' ? task.dueDate : null,
     completedAt: typeof task.completedAt === 'string' ? task.completedAt : null,
     createTime: typeof task.createTime === 'string' ? task.createTime : null,

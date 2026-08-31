@@ -1118,22 +1118,17 @@ import {
   TASK_STATUS_DONE_STANDARD,
   TASK_STATUS_TODO,
 } from '@/utils/taskStatus'
+import { DENY_ALL_TASK_CAPABILITIES, type TaskModel } from '@/types/task'
+import { findTaskById, normalizeTaskRecords } from '@/utils/taskCollection'
+import {
+  canPerformTaskAction,
+  type TaskAction,
+} from '@/utils/taskCapabilities'
+import { classifyApiError } from '@/utils/request'
 import {
   createTaskStatusRequestId,
   normalizeTaskStatusResult,
 } from '@/utils/taskWrite'
-
-interface Task {
-  id: string
-  title: string
-  description?: string
-  status: number
-  completedAt?: string | null
-  priority: number
-  projectId: string
-  dueDate?: string | null
-  milestoneId?: string | null
-}
 
 interface TodayAiOrderMeta {
   rank: number
@@ -1236,17 +1231,17 @@ const extractTaskPagePayload = (payload: unknown): TaskPageResponse => {
   const fallback: TaskPageResponse = { records: [] }
 
   if (Array.isArray(payload)) {
-    return { records: payload as Task[] }
+    return { records: payload }
   }
 
   if (!isRecord(payload)) return fallback
 
   if (Array.isArray(payload.data)) {
-    return { records: payload.data as Task[] }
+    return { records: payload.data }
   }
 
   const source = isRecord(payload.data) && Array.isArray(payload.data.records) ? payload.data : payload
-  const records = Array.isArray(source.records) ? (source.records as Task[]) : []
+  const records = Array.isArray(source.records) ? source.records : []
 
   return {
     records,
@@ -1471,8 +1466,8 @@ const { runAiRequest } = useAiPendingRequest()
 const undoDelete = useUndoDelete()
 
 const projectList = ref<Project[]>([])
-const taskList = ref<Task[]>([])
-const selectedTask = ref<Task | null>(null)
+const taskList = ref<TaskModel[]>([])
+const selectedTask = ref<TaskModel | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
@@ -1588,9 +1583,9 @@ const newTaskActiveMilestoneIndex = ref(0)
 const showDeleteTaskConfirm = ref(false)
 const showDeleteMilestoneConfirm = ref(false)
 const showCompletionQualityModal = ref(false)
-const pendingDeleteTask = ref<Task | null>(null)
+const pendingDeleteTask = ref<TaskModel | null>(null)
 const pendingDeleteMilestone = ref<{ id: string; name: string } | null>(null)
-const pendingCompletionTask = ref<Task | null>(null)
+const pendingCompletionTask = ref<TaskModel | null>(null)
 const priorityRowRef = ref<HTMLElement | null>(null)
 const dueDateRowRef = ref<HTMLElement | null>(null)
 const milestoneRowRef = ref<HTMLElement | null>(null)
@@ -1629,6 +1624,7 @@ const isListReplanConfirming = ref(false)
 const isListReplanCancelling = ref(false)
 const lastListReplanReminderRequestId = ref(0)
 const selectedTaskTitleBaseline = ref('')
+const selectedTaskDescriptionBaseline = ref<string | null>(null)
 
 const isMobile = computed(() => viewportWidth.value < 768)
 let boardSlowTimer: ReturnType<typeof setTimeout> | null = null
@@ -1676,8 +1672,8 @@ const projectById = computed(() => {
   return map
 })
 
-const getTaskProjectName = (task: Task) => projectById.value.get(String(task.projectId))?.name || '未命名清单'
-const getTaskProjectIcon = (task: Task): IconName =>
+const getTaskProjectName = (task: TaskModel) => projectById.value.get(String(task.projectId))?.name || '未命名清单'
+const getTaskProjectIcon = (task: TaskModel): IconName =>
   getProjectIconName(projectById.value.get(String(task.projectId))?.icon)
 
 const priorityOptions: PriorityOption[] = [
@@ -1826,14 +1822,14 @@ const consumePendingListReplanPreview = () => {
   aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW, entry.requestId)
 }
 
-const getTodayAiOrderMeta = (task: Task): TodayAiOrderMeta | null => {
+const getTodayAiOrderMeta = (task: TaskModel): TodayAiOrderMeta | null => {
   if (!isTodayView.value || isTaskCompleted(task.status)) return null
   const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
   if (!meta || !Number.isFinite(meta.rank)) return null
   return meta
 }
 
-const openTodayAiReasonDialog = (task: Task) => {
+const openTodayAiReasonDialog = (task: TaskModel) => {
   const meta = getTodayAiOrderMeta(task)
   if (!meta) return
   selectedTodayAiReason.value = {
@@ -2198,7 +2194,7 @@ const handleUnifiedAiAction = () => {
   void requestListReplanPreview()
 }
 
-const getTodayAiRank = (task: Task) => {
+const getTodayAiRank = (task: TaskModel) => {
   if (!isTodayView.value || isTaskCompleted(task.status)) return Number.POSITIVE_INFINITY
   const meta = todayAiOrderMetaByTaskId.value[String(task.id)]
   return meta && Number.isFinite(meta.rank) ? meta.rank : Number.POSITIVE_INFINITY
@@ -2210,7 +2206,7 @@ const getTaskDueDateTimestamp = (dueDate?: string | null) => {
   return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp
 }
 
-const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
+const compareTaskByDueDateThenPriority = (a: TaskModel, b: TaskModel) => {
   const isACompleted = isTaskCompleted(a.status)
   const isBCompleted = isTaskCompleted(b.status)
   if (isACompleted !== isBCompleted) {
@@ -2224,7 +2220,7 @@ const compareTaskByDueDateThenPriority = (a: Task, b: Task) => {
   return 0
 }
 
-const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: Task, b: Task) => {
+const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: TaskModel, b: TaskModel) => {
   const isACompleted = isTaskCompleted(a.status)
   const isBCompleted = isTaskCompleted(b.status)
   if (isACompleted !== isBCompleted) {
@@ -2242,10 +2238,10 @@ const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: Task, b: T
   return 0
 }
 
-const isMilestoneGroupAllCompleted = (group: { milestone: Milestone; tasks: Task[]; progress: number }) =>
+const isMilestoneGroupAllCompleted = (group: { milestone: Milestone; tasks: TaskModel[]; progress: number }) =>
   group.tasks.length > 0 && group.tasks.every((task) => isTaskCompleted(task.status))
 
-const sortTaskListForCurrentBoard = (tasks: Task[]) => {
+const sortTaskListForCurrentBoard = (tasks: TaskModel[]) => {
   if (isTodayView.value) {
     return [...tasks].sort(compareTodayTaskByCompletionThenAiThenDueDateThenPriority)
   }
@@ -2294,12 +2290,12 @@ const getCurrentWeekRange = () => {
   }
 }
 
-const filterTasksByExistingProjects = (records: Task[]) => {
+const filterTasksByExistingProjects = (records: TaskModel[]) => {
   const existingProjectIds = new Set(projectList.value.map((project) => String(project.id)))
   return records.filter((task) => existingProjectIds.has(String(task.projectId)))
 }
 
-const filterAggregateTasks = (records: Task[]) => {
+const filterAggregateTasks = (records: TaskModel[]) => {
   if (isTodayView.value) {
     const todayKey = toDateKey(new Date())
     return records.filter((task) => normalizeTaskDueDate(task.dueDate) === todayKey)
@@ -2580,19 +2576,76 @@ const loadProjects = async (options: LoadOptions = {}): Promise<LoadOutcome> => 
 
 const syncSelectedTaskFromList = () => {
   if (selectedTask.value) {
-    selectedTask.value = taskList.value.find((task) => task.id === selectedTask.value?.id) || null
+    selectedTask.value = findTaskById(taskList.value, selectedTask.value.id)
+    selectedTaskTitleBaseline.value = selectedTask.value?.title || ''
+    selectedTaskDescriptionBaseline.value = selectedTask.value?.description ?? null
   }
 }
 
+const TASK_ACTION_DENIED_MESSAGE: Record<TaskAction, string> = {
+  editContent: '你没有修改此任务内容的权限。',
+  changeStatus: '你没有变更此任务状态的权限。',
+  reorganize: '你没有调整任务优先级或里程碑的权限。',
+  assign: '你没有变更任务负责人的权限。',
+  delete: '你没有删除此任务的权限。',
+}
+
+const resolveLatestTask = (taskOrId: TaskModel | string) => {
+  const taskId = typeof taskOrId === 'string' ? taskOrId : taskOrId.id
+  return findTaskById(taskList.value, taskId)
+}
+
+const ensureTaskActionAllowed = (
+  taskOrId: TaskModel | string,
+  action: TaskAction,
+): TaskModel | null => {
+  const latestTask = resolveLatestTask(taskOrId)
+  if (latestTask && canPerformTaskAction(latestTask, action)) {
+    return latestTask
+  }
+
+  toast.warning(TASK_ACTION_DENIED_MESSAGE[action])
+  return null
+}
+
+const failClosedTaskCapabilities = (taskId: string) => {
+  taskList.value = taskList.value.map((task) => (
+    task.id === taskId
+      ? { ...task, capabilities: DENY_ALL_TASK_CAPABILITIES }
+      : task
+  ))
+  syncSelectedTaskFromList()
+}
+
+const recoverTaskPermissionDenial = async (taskId: string) => {
+  failClosedTaskCapabilities(taskId)
+  await loadTasks({ forceRefresh: true })
+}
+
+const handleTaskMutationFailure = async (
+  error: unknown,
+  taskId: string,
+  fallbackMessage: string,
+) => {
+  if (classifyApiError(error) === 'PERMISSION_DENIED') {
+    await recoverTaskPermissionDenial(taskId)
+    toast.warning('任务权限已发生变化，已刷新最新权限。')
+    return true
+  }
+
+  toast.error(fallbackMessage)
+  return false
+}
+
 interface TaskPageResponse {
-  records?: Task[]
+  records?: unknown[]
   current?: number
   size?: number
   total?: number
 }
 
 const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean) => {
-  const aggregated: Task[] = []
+  const aggregated: TaskModel[] = []
   let page = 1
 
   for (let index = 0; index < AGGREGATE_MAX_PAGES; index += 1) {
@@ -2607,7 +2660,7 @@ const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean)
 
     if (isStale()) return []
 
-    const records = Array.isArray(res.records) ? res.records : []
+    const records = normalizeTaskRecords(res.records)
     if (records.length === 0) break
 
     aggregated.push(...records)
@@ -2632,6 +2685,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
   const isStaleRequest = () => requestVersion !== taskLoadVersion.value
+  let hasCachedSnapshot = false
 
   if (isAggregateView.value) {
     if (projectList.value.length === 0) {
@@ -2650,14 +2704,15 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
         const allRecords = Object.values(cachedAllProjectsTasks).flatMap((items) =>
           Array.isArray(items) ? items : [],
         )
-        const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(allRecords))
+        const normalizedRecords = normalizeTaskRecords(allRecords)
+        const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(normalizedRecords))
         if (isTodayView.value && filteredRecords.length === 0) {
           todayAiOrderMetaByTaskId.value = {}
           clearTaskTodayAiOrderCache()
         }
         taskList.value = sortTaskListForCurrentBoard(filteredRecords)
         syncSelectedTaskFromList()
-        return okOutcome()
+        hasCachedSnapshot = true
       }
     }
 
@@ -2681,6 +2736,10 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     } catch (error) {
       if (isStaleRequest()) return staleOutcome()
       console.error('加载今日任务失败', error)
+      if (hasCachedSnapshot) {
+        toast.error('任务权限校验失败，当前缓存仅供查看。')
+        return okOutcome()
+      }
       return errorOutcome(error)
     }
   }
@@ -2694,9 +2753,9 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   if (!forceRefresh && canUsePersistentProjectTaskCache.value) {
     const cachedProjectTasks = readTaskCache(selectedProjectId.value)
     if (cachedProjectTasks) {
-      taskList.value = cachedProjectTasks
+      taskList.value = normalizeTaskRecords(cachedProjectTasks)
       syncSelectedTaskFromList()
-      return okOutcome()
+      hasCachedSnapshot = true
     }
   }
 
@@ -2709,7 +2768,8 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     })
     if (requestVersion !== taskLoadVersion.value) return staleOutcome()
     if (requestProjectId !== selectedProjectId.value) return staleOutcome()
-    const records = extractListPayload<Task>(raw)
+    const rawRecords = extractListPayload<unknown>(raw)
+    const records = rawRecords ? normalizeTaskRecords(rawRecords) : null
     if (!records) {
       throw new Error('task-list-shape-invalid')
     }
@@ -2723,6 +2783,10 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   } catch (error) {
     if (requestVersion !== taskLoadVersion.value) return staleOutcome()
     console.error('加载任务失败', error)
+    if (hasCachedSnapshot) {
+      toast.error('任务权限校验失败，当前缓存仅供查看。')
+      return okOutcome()
+    }
     return errorOutcome(error)
   }
 }
@@ -2897,27 +2961,36 @@ const addTask = async () => {
   }
 }
 
-const setTaskStatus = async (task: Task, nextStatus: number) => {
-  const oldStatus = task.status
+const setTaskStatus = async (task: TaskModel, nextStatus: number) => {
+  const currentTask = ensureTaskActionAllowed(task, 'changeStatus')
+  if (!currentTask) return
+
+  const oldStatus = currentTask.status
   const clientRequestId = createTaskStatusRequestId()
-  task.status = nextStatus
+  currentTask.status = nextStatus
   try {
     const result = await changeTaskStatusApi({
-      taskId: task.id,
+      taskId: currentTask.id,
       targetStatus: nextStatus,
       expectedStatus: oldStatus,
       clientRequestId,
     })
-    task.status = normalizeTaskStatusResult(result.finalStatus)
+    currentTask.status = normalizeTaskStatusResult(result.finalStatus)
     if (result.completedAt !== undefined) {
-      task.completedAt = result.completedAt
+      currentTask.completedAt = result.completedAt
     }
     await loadTasks({ forceRefresh: true })
     if (result.changed) markListReplanDirty()
-  } catch {
-    task.status = oldStatus
-    await loadTasks({ forceRefresh: true })
-    toast.error('更新状态失败，请检查网络后重试。')
+  } catch (error) {
+    currentTask.status = oldStatus
+    const permissionRecovered = await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '更新状态失败，请检查网络后重试。',
+    )
+    if (!permissionRecovered) {
+      await loadTasks({ forceRefresh: true })
+    }
     throw new Error('update-task-status-failed')
   }
 }
@@ -2938,16 +3011,19 @@ const confirmCompletionQuality = async (status: number) => {
   }
 }
 
-const toggleTaskStatus = async (task: Task) => {
-  if (isTaskCompleted(task.status)) {
+const toggleTaskStatus = async (task: TaskModel) => {
+  const currentTask = ensureTaskActionAllowed(task, 'changeStatus')
+  if (!currentTask) return
+
+  if (isTaskCompleted(currentTask.status)) {
     try {
-      await setTaskStatus(task, TASK_STATUS_TODO)
+      await setTaskStatus(currentTask, TASK_STATUS_TODO)
     } catch {
       // toast already handled in setTaskStatus
     }
     return
   }
-  pendingCompletionTask.value = task
+  pendingCompletionTask.value = currentTask
   showCompletionQualityModal.value = true
 }
 
@@ -2964,9 +3040,10 @@ const handleCompletionQualityShortcutKeydown = (event: KeyboardEvent) => {
   void confirmCompletionQuality(nextStatus)
 }
 
-const selectTask = (task: Task) => {
+const selectTask = (task: TaskModel) => {
   selectedTask.value = task
   selectedTaskTitleBaseline.value = task.title
+  selectedTaskDescriptionBaseline.value = task.description
   isPriorityMenuOpen.value = false
   isDueDatePickerOpen.value = false
   isMilestoneMenuOpen.value = false
@@ -3317,42 +3394,54 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
 
 const selectPriority = async (val: number) => {
   if (!selectedTask.value) return
+  const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'reorganize')
+  if (!currentTask) return
 
-  const oldPriority = selectedTask.value.priority
-  selectedTask.value.priority = val
+  const oldPriority = currentTask.priority
+  currentTask.priority = val
   isPriorityMenuOpen.value = false
 
   try {
-    await updateTaskContentApi({ id: selectedTask.value.id, priority: val })
+    await updateTaskContentApi({ id: currentTask.id, priority: val })
     await loadTasks({ forceRefresh: true })
     markListReplanDirty()
-  } catch {
-    selectedTask.value.priority = oldPriority
-    toast.error('更新优先级失败，请检查网络后重试。')
+  } catch (error) {
+    currentTask.priority = oldPriority
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '更新优先级失败，请检查网络后重试。',
+    )
   }
 }
 
 const updateDueDate = async (nextDate: string | null) => {
   if (!selectedTask.value) return
+  const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'editContent')
+  if (!currentTask) return
 
   const finalDate = nextDate || null
-  const oldDate = selectedTask.value.dueDate
+  const oldDate = currentTask.dueDate
   const oldDateKey = normalizeTaskDueDate(oldDate) || null
   if (oldDateKey === finalDate) {
     isDueDatePickerOpen.value = false
     return
   }
 
-  selectedTask.value.dueDate = finalDate
+  currentTask.dueDate = finalDate
   isDueDatePickerOpen.value = false
 
   try {
-    await updateTaskContentApi({ id: selectedTask.value.id, dueDate: finalDate })
+    await updateTaskContentApi({ id: currentTask.id, dueDate: finalDate })
     markListReplanDirty()
     await loadTasks({ forceRefresh: true })
-  } catch {
-    selectedTask.value.dueDate = oldDate
-    toast.error('更新日期失败，请检查网络后重试。')
+  } catch (error) {
+    currentTask.dueDate = oldDate
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '更新日期失败，请检查网络后重试。',
+    )
   }
 }
 
@@ -3370,55 +3459,81 @@ const selectTodayDueDate = async () => {
 
 const selectMilestone = async (milestoneId: string | null) => {
   if (!selectedTask.value) return
+  const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'reorganize')
+  if (!currentTask) return
 
   const finalMilestoneId = milestoneId && milestoneId !== '0' ? milestoneId : null
-  const oldMilestoneId = selectedTask.value.milestoneId
+  const oldMilestoneId = currentTask.milestoneId
   if ((oldMilestoneId ?? null) === finalMilestoneId) {
     isMilestoneMenuOpen.value = false
     return
   }
-  selectedTask.value.milestoneId = finalMilestoneId
+  currentTask.milestoneId = finalMilestoneId
   isMilestoneMenuOpen.value = false
 
   try {
-    await updateTaskContentApi({ id: selectedTask.value.id, milestoneId: finalMilestoneId })
+    await updateTaskContentApi({ id: currentTask.id, milestoneId: finalMilestoneId })
     await loadTasks({ forceRefresh: true })
-  } catch {
-    selectedTask.value.milestoneId = oldMilestoneId
-    toast.error('更新所属阶段失败，请检查网络后重试。')
+  } catch (error) {
+    currentTask.milestoneId = oldMilestoneId
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '更新所属阶段失败，请检查网络后重试。',
+    )
   }
 }
 
 const onTextBlur = async () => {
   if (!selectedTask.value) return
+  const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'editContent')
+  if (!currentTask) {
+    selectedTask.value.title = selectedTaskTitleBaseline.value
+    selectedTask.value.description = selectedTaskDescriptionBaseline.value
+    return
+  }
 
   const previousTitle = selectedTaskTitleBaseline.value
   try {
     await updateTaskContentApi({
-      id: selectedTask.value.id,
-      title: selectedTask.value.title,
-      description: selectedTask.value.description,
+      id: currentTask.id,
+      title: currentTask.title,
+      description: currentTask.description ?? undefined,
     })
-    if (selectedTask.value.title !== previousTitle) {
+    if (currentTask.title !== previousTitle) {
       markListReplanDirty()
     }
-    selectedTaskTitleBaseline.value = selectedTask.value.title
+    selectedTaskTitleBaseline.value = currentTask.title
+    selectedTaskDescriptionBaseline.value = currentTask.description
     await loadTasks({ forceRefresh: true })
   } catch (error) {
     console.error('保存任务失败', error)
-    toast.error('保存失败，请检查网络后重试。')
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '保存失败，请检查网络后重试。',
+    )
   }
 }
 
 const requestDeleteTask = () => {
   if (!selectedTask.value) return
-  pendingDeleteTask.value = { ...selectedTask.value }
+  const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'delete')
+  if (!currentTask) return
+  pendingDeleteTask.value = { ...currentTask }
   showDeleteTaskConfirm.value = true
 }
 
 const confirmDeleteTask = async () => {
-  const taskToDelete = pendingDeleteTask.value
-  if (!taskToDelete) return
+  const pendingTask = pendingDeleteTask.value
+  if (!pendingTask) return
+
+  const latestTask = ensureTaskActionAllowed(pendingTask.id, 'delete')
+  if (!latestTask) {
+    showDeleteTaskConfirm.value = false
+    return
+  }
+  const taskToDelete = { ...latestTask }
 
   showDeleteTaskConfirm.value = false
 
@@ -3450,6 +3565,11 @@ const confirmDeleteTask = async () => {
       if (canUsePersistentProjectTaskCache.value) {
         upsertTaskInCaches(taskToDelete)
       }
+    },
+    onCommitError: async (error) => {
+      if (classifyApiError(error) !== 'PERMISSION_DENIED') return
+      await recoverTaskPermissionDenial(taskToDelete.id)
+      return '删除权限已发生变化，已恢复任务并刷新最新权限。'
     },
   })
 }
@@ -3553,13 +3673,13 @@ const groupedTasks = computed(() => {
   if (isAggregateView.value) {
     return {
       unassigned: sortTaskListForCurrentBoard(taskList.value),
-      milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
+      milestones: [] as { milestone: Milestone; tasks: TaskModel[]; progress: number }[],
     }
   }
 
   const result = {
-    unassigned: [] as Task[],
-    milestones: [] as { milestone: Milestone; tasks: Task[]; progress: number }[],
+    unassigned: [] as TaskModel[],
+    milestones: [] as { milestone: Milestone; tasks: TaskModel[]; progress: number }[],
   }
 
   milestoneList.value.forEach((m) => {
@@ -3669,6 +3789,7 @@ watch(
   () => selectedTask.value?.id,
   async () => {
     selectedTaskTitleBaseline.value = selectedTask.value?.title || ''
+    selectedTaskDescriptionBaseline.value = selectedTask.value?.description ?? null
     await nextTick()
     syncDetailEditorHeights()
   },

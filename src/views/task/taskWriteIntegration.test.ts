@@ -40,12 +40,12 @@ describe('TaskList write integration contract', () => {
     const calls = extractObjectArgumentCalls('changeTaskStatusApi')
 
     expect(calls).toHaveLength(1)
-    expect(calls[0]).toContain('taskId: task.id')
+    expect(calls[0]).toContain('taskId: currentTask.id')
     expect(calls[0]).toContain('targetStatus: nextStatus')
     expect(calls[0]).toContain('expectedStatus: oldStatus')
     expect(calls[0]).toContain('clientRequestId')
     expect(taskListSource).toMatch(
-      /task\.status = normalizeTaskStatusResult\(result\.finalStatus\)[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/,
+      /currentTask\.status = normalizeTaskStatusResult\(result\.finalStatus\)[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/,
     )
     expect(taskListSource).not.toMatch(/\bupdateTaskApi\b/)
   })
@@ -59,13 +59,13 @@ describe('TaskList write integration contract', () => {
       expect(call).not.toMatch(/\bstatus\s*:/)
       expect(call).not.toMatch(/\bprojectId\s*:/)
       expect(call).not.toMatch(/\bcapabilities\s*:/)
-      expect(call).toContain('id: selectedTask.value.id')
+      expect(call).toContain('id: currentTask.id')
     }
 
     expect(calls.some((call) => call.includes('priority: val'))).toBe(true)
     expect(calls.some((call) => call.includes('dueDate: finalDate'))).toBe(true)
     expect(calls.some((call) => call.includes('milestoneId: finalMilestoneId'))).toBe(true)
-    expect(calls.some((call) => call.includes('title: selectedTask.value.title')
-      && call.includes('description: selectedTask.value.description'))).toBe(true)
+    expect(calls.some((call) => call.includes('title: currentTask.title')
+      && call.includes('description: currentTask.description'))).toBe(true)
   })
 })

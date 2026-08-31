@@ -4,6 +4,7 @@ export interface UndoDeleteOptions {
   label: string
   onCommit: () => Promise<void>
   onRollback: () => void | Promise<void>
+  onCommitError?: (error: unknown) => string | void | Promise<string | void>
   onCommitSuccess?: () => void | Promise<void>
   pendingMessage?: string
   commitSuccessMessage?: string
@@ -30,7 +31,10 @@ export const useUndoDelete = () => {
       } catch (error) {
         console.error('删除提交失败', error)
         await options.onRollback()
-        toast.error(options.commitErrorMessage || '删除失败，请检查网络后重试。')
+        const recoveredMessage = options.onCommitError
+          ? await options.onCommitError(error)
+          : undefined
+        toast.error(recoveredMessage || options.commitErrorMessage || '删除失败，请检查网络后重试。')
       }
     }, UNDO_TIMEOUT)
 

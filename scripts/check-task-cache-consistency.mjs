@@ -10,12 +10,12 @@ const checks = [
   {
     file: taskListPath,
     label: 'Status update flow uses the dedicated endpoint and refreshes facts',
-    pattern: /await changeTaskStatusApi\(\{[\s\S]*?\}\)\s*\n\s*task\.status = normalizeTaskStatusResult\(result\.finalStatus\)\s*\n[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/m,
+    pattern: /await changeTaskStatusApi\(\{[\s\S]*?taskId: currentTask\.id[\s\S]*?\}\)\s*\n\s*currentTask\.status = normalizeTaskStatusResult\(result\.finalStatus\)\s*\n[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/m,
   },
   {
     file: taskListPath,
     label: 'Priority update flow uses the content-only endpoint and refreshes facts',
-    pattern: /await updateTaskContentApi\(\{ id: selectedTask\.value\.id, priority: val \}\)\s*\n\s*await loadTasks\(\{ forceRefresh: true \}\)/m,
+    pattern: /await updateTaskContentApi\(\{ id: currentTask\.id, priority: val \}\)\s*\n\s*await loadTasks\(\{ forceRefresh: true \}\)/m,
   },
   {
     file: taskListPath,

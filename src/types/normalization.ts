@@ -5,7 +5,17 @@ import type {
   SharedWeeklyReview,
   SharedWeeklyReviewWire,
 } from './review'
-import type { AssignmentAction, AssignmentUserSummary, AssignmentUserSummaryWire, TaskAssignmentHistory, TaskAssignmentHistoryWire, TaskModel, TaskWire } from './task'
+import type {
+  AssignmentAction,
+  AssignmentUserSummary,
+  AssignmentUserSummaryWire,
+  TaskAssignmentHistory,
+  TaskAssignmentHistoryWire,
+  TaskAssignmentResult,
+  TaskAssignmentResultWire,
+  TaskModel,
+  TaskWire,
+} from './task'
 import { DENY_ALL_TASK_CAPABILITIES, type TaskCapabilities } from './task'
 import type { TeamContext, TeamMemberContext, TeamMemberWire, TeamRole, TeamWire } from './team'
 import type { CurrentUserContext, CurrentUserWire, SystemRole } from './user'
@@ -161,6 +171,49 @@ export function normalizeTaskWire(task: TaskWire | null | undefined): TaskModel 
     createTime: typeof task.createTime === 'string' ? task.createTime : null,
     updateTime: typeof task.updateTime === 'string' ? task.updateTime : null,
     capabilities: normalizeTaskCapabilities(task.capabilities),
+  }
+}
+
+function normalizeRequiredNullableEntityId(
+  record: Record<string, unknown>,
+  key: string,
+): { valid: true; value: string | null } | { valid: false } {
+  if (!Object.prototype.hasOwnProperty.call(record, key)) return { valid: false }
+  const rawValue = record[key]
+  if (rawValue === null) return { valid: true, value: null }
+
+  const value = normalizeEntityId(rawValue)
+  return value ? { valid: true, value } : { valid: false }
+}
+
+export function normalizeTaskAssignmentResult(
+  result: TaskAssignmentResultWire | null | undefined,
+  expectedTaskIdValue: EntityId,
+): TaskAssignmentResult | null {
+  if (!result || typeof result !== 'object') return null
+
+  const record = result as Record<string, unknown>
+  const taskId = normalizeEntityId(record.taskId)
+  const expectedTaskId = normalizeEntityId(expectedTaskIdValue)
+  if (!taskId || !expectedTaskId || taskId !== expectedTaskId) return null
+  if (typeof record.changed !== 'boolean') return null
+
+  const previousAssignee = normalizeRequiredNullableEntityId(record, 'previousAssigneeUserId')
+  const assignee = normalizeRequiredNullableEntityId(record, 'assigneeUserId')
+  const assignedBy = normalizeRequiredNullableEntityId(record, 'assignedByUserId')
+  if (!previousAssignee.valid || !assignee.valid || !assignedBy.valid) return null
+
+  if (!Object.prototype.hasOwnProperty.call(record, 'assignedAt')) return null
+  const assignedAt = record.assignedAt
+  if (assignedAt !== null && (typeof assignedAt !== 'string' || !assignedAt.trim())) return null
+
+  return {
+    taskId,
+    changed: record.changed,
+    previousAssigneeUserId: previousAssignee.value,
+    assigneeUserId: assignee.value,
+    assignedByUserId: assignedBy.value,
+    assignedAt,
   }
 }
 

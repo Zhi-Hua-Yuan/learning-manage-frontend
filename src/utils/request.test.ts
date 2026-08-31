@@ -17,7 +17,7 @@ vi.mock('@/stores/toast', () => ({
   useToastStore: () => ({ push: mocks.toastPush }),
 }))
 
-import request, { ApiRequestError } from './request'
+import request, { ApiRequestError, classifyApiError } from './request'
 import { clearAuthToken, writeAuthToken } from './authToken'
 
 const setResponse = (data: unknown, status = 200) => {
@@ -114,5 +114,31 @@ describe('request client', () => {
     setResponse([{ id: 1 }])
 
     await expect(request.get('/projects')).resolves.toEqual([{ id: 1 }])
+  })
+})
+
+describe('classifyApiError', () => {
+  it('classifies assignment operation errors as conflicts before generic server errors', () => {
+    expect(classifyApiError(new ApiRequestError('负责人已变化', {
+      code: 50001,
+      httpStatus: 200,
+    }))).toBe('CONFLICT')
+    expect(classifyApiError(new ApiRequestError('负责人已被其他请求更新', {
+      code: 50001,
+      httpStatus: 500,
+    }))).toBe('CONFLICT')
+  })
+
+  it('preserves the existing authentication, permission and server classifications', () => {
+    expect(classifyApiError(new ApiRequestError('冲突', { code: 40900 }))).toBe('CONFLICT')
+    expect(classifyApiError(new ApiRequestError('无权限', {
+      code: 40300,
+      httpStatus: 403,
+    }))).toBe('PERMISSION_DENIED')
+    expect(classifyApiError(new ApiRequestError('未登录', { code: 40100 }))).toBe('AUTHENTICATION_REQUIRED')
+    expect(classifyApiError(new ApiRequestError('系统错误', {
+      code: 50000,
+      httpStatus: 500,
+    }))).toBe('SERVER')
   })
 })

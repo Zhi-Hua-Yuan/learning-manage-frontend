@@ -1097,11 +1097,14 @@
       :candidates-loading="taskAssignmentCandidatesLoading"
       :candidates-error-message="taskAssignmentCandidatesErrorMessage"
       :reason="taskAssignmentDraft?.reason || ''"
+      :busy="taskAssignmentMutationBusy"
+      :submission-blocked="taskAssignmentMutationBlocked"
+      :submission-error-message="taskAssignmentMutationErrorMessage"
       @update:target-assignee-user-id="setTaskAssignmentTarget"
       @update:reason="setTaskAssignmentReason"
       @retry="retryTaskAssignmentCandidates"
       @cancel="closeTaskAssignmentDialog"
-      @confirm="previewTaskAssignment"
+      @confirm="submitTaskAssignment"
     />
 
     <AppConfirmDialog
@@ -1220,6 +1223,7 @@ import {
   type TaskAssigneeCandidateContext,
 } from '@/composables/useTaskAssigneeCandidates'
 import { useTaskAssignmentDraft } from '@/composables/useTaskAssignmentDraft'
+import { useTaskAssignmentMutation } from '@/composables/useTaskAssignmentMutation'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useCollaborationStore } from '@/stores/collaboration'
@@ -1241,6 +1245,7 @@ import {
 import {
   readAllProjectsTaskCache,
   readTaskCache,
+  removeProjectTaskCaches,
   removeTaskFromCaches,
   syncAggregateTaskCacheByProject,
   upsertTaskInCaches,
@@ -1273,6 +1278,10 @@ import {
   type TaskAction,
 } from '@/utils/taskCapabilities'
 import { resolveTaskAssigneePresentation } from '@/utils/taskAssigneePresentation'
+import {
+  normalizeTaskAssignmentReason,
+  type TaskAssignmentOperation,
+} from '@/utils/taskAssignment'
 import {
   buildTaskQuickCreatePayload,
   resolveTaskQuickCreateAccess,
@@ -1624,12 +1633,24 @@ const taskList = ref<TaskModel[]>([])
 const selectedTask = ref<TaskModel | null>(null)
 const {
   draft: taskAssignmentDraft,
+  operation: taskAssignmentOperation,
   open: openTaskAssignmentDraft,
   close: closeTaskAssignmentDraft,
   setTargetAssigneeUserId: setTaskAssignmentTarget,
   setReason: setTaskAssignmentReason,
   invalidateUnlessCurrent: invalidateTaskAssignmentDraft,
 } = useTaskAssignmentDraft()
+const {
+  errorMessage: taskAssignmentMutationErrorMessage,
+  busy: taskAssignmentMutationBusy,
+  blocked: taskAssignmentMutationBlocked,
+  submit: submitTaskAssignmentMutation,
+  complete: completeTaskAssignmentMutation,
+  markCommittedRefreshError: markTaskAssignmentCommittedRefreshError,
+  block: blockTaskAssignmentMutation,
+  reset: resetTaskAssignmentMutation,
+} = useTaskAssignmentMutation()
+const taskAssignmentChangedRevision = ref(0)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
@@ -3658,6 +3679,7 @@ const closeDueDatePicker = () => {
 
 const closeTaskAssignmentDialog = (restoreFocus = true) => {
   const wasOpen = Boolean(taskAssignmentDraft.value)
+  resetTaskAssignmentMutation()
   closeTaskAssignmentDraft()
   resetTaskAssignmentCandidates()
   if (wasOpen && restoreFocus) {
@@ -3688,7 +3710,14 @@ const retryTaskAssignmentCandidates = () => {
   void retryTaskAssignmentCandidateLoad()
 }
 
-const previewTaskAssignment = (payload: {
+const getTaskAssignmentSuccessMessage = (operation: TaskAssignmentOperation) => {
+  if (operation === 'ASSIGN') return '负责人已分配。'
+  if (operation === 'REASSIGN') return '负责人已转派。'
+  if (operation === 'UNASSIGN') return '已解除任务负责人。'
+  return '负责人已同步。'
+}
+
+const submitTaskAssignment = async (payload: {
   targetAssigneeUserId: string | null
   reason?: string
 }) => {
@@ -3703,6 +3732,19 @@ const previewTaskAssignment = (payload: {
     toast.warning('负责人草稿已发生变化，请重新确认。')
     return
   }
+  if (draft.contextKey !== currentContextKey.value) {
+    closeTaskAssignmentDialog(false)
+    return
+  }
+  if (latestTask.assigneeUserId !== draft.expectedAssigneeUserId) {
+    blockTaskAssignmentMutation('任务负责人已经发生变化，请关闭后重新打开并核对最新状态。')
+    toast.warning('任务负责人已经发生变化，请重新核对后再确认。')
+    return
+  }
+  if (taskAssignmentCandidatesStatus.value !== 'ready') {
+    toast.warning('负责人列表尚未准备完成，请重新加载。')
+    return
+  }
   if (
     payload.targetAssigneeUserId !== draft.expectedAssigneeUserId
     && !isSelectableTaskAssignmentAssignee(payload.targetAssigneeUserId)
@@ -3711,7 +3753,94 @@ const previewTaskAssignment = (payload: {
     return
   }
 
-  toast.info('负责人变更已准备完成，将在下一工作包接入安全提交。')
+  const reasonResult = normalizeTaskAssignmentReason(draft.reason)
+  if (!reasonResult.valid) {
+    toast.warning(reasonResult.message)
+    return
+  }
+  if (payload.reason !== reasonResult.value) {
+    toast.warning('负责人变更原因已发生变化，请重新确认。')
+    return
+  }
+
+  const operation = taskAssignmentOperation.value
+  const outcome = await submitTaskAssignmentMutation({
+    taskId: draft.taskId,
+    assigneeUserId: draft.targetAssigneeUserId,
+    expectedAssigneeUserId: draft.expectedAssigneeUserId,
+    ...(reasonResult.value ? { reason: reasonResult.value } : {}),
+  })
+
+  if (outcome.kind === 'ignored' || outcome.kind === 'stale') return
+
+  if (outcome.kind === 'error') {
+    if (outcome.errorKind === 'PERMISSION_DENIED') {
+      await recoverTaskPermissionDenial(draft.taskId)
+      closeTaskAssignmentDialog(false)
+      toast.warning('负责人变更权限已发生变化，已刷新最新任务权限。')
+      return
+    }
+
+    if (outcome.errorKind === 'NOT_FOUND') {
+      closeTaskAssignmentDialog(false)
+      await loadTasks({ forceRefresh: true })
+      toast.warning('任务已不存在或当前不可访问。')
+      return
+    }
+
+    if (outcome.errorKind === 'AUTHENTICATION_REQUIRED') {
+      closeTaskAssignmentDialog(false)
+      return
+    }
+
+    if (outcome.errorKind === 'VALIDATION') {
+      toast.warning(taskAssignmentMutationErrorMessage.value || '负责人变更请求不合法。')
+      return
+    }
+
+    removeProjectTaskCaches(draft.projectId)
+    resetTaskAssignmentCandidates()
+    await loadTasks({ forceRefresh: true })
+    toast.warning(taskAssignmentMutationErrorMessage.value || '负责人状态无法确认，请重新核对。')
+    return
+  }
+
+  if (outcome.result.changed) {
+    removeProjectTaskCaches(draft.projectId)
+  }
+
+  if (
+    draft.contextKey !== currentContextKey.value
+    || selectedTask.value?.id !== draft.taskId
+  ) {
+    completeTaskAssignmentMutation()
+    return
+  }
+
+  const refreshOutcome = await loadTasks({ forceRefresh: true })
+  const refreshedTask = findTaskById(taskList.value, draft.taskId)
+  if (
+    refreshOutcome.status !== 'ok'
+    || !refreshedTask
+    || refreshedTask.assigneeUserId !== outcome.result.assigneeUserId
+  ) {
+    markTaskAssignmentCommittedRefreshError()
+    failClosedTaskCapabilities(draft.taskId)
+    closeTaskAssignmentDialog(false)
+    toast.warning('负责人变更已提交，但最新任务状态加载失败，请重新加载后再操作。')
+    return
+  }
+
+  completeTaskAssignmentMutation()
+  if (outcome.result.changed) {
+    taskAssignmentChangedRevision.value += 1
+    closeTaskAssignmentDialog()
+    toast.success(getTaskAssignmentSuccessMessage(operation))
+    return
+  }
+
+  closeTaskAssignmentDialog()
+  toast.info('负责人未发生变化，已同步最新任务状态。')
 }
 
 const closeTaskScopedInteractions = () => {

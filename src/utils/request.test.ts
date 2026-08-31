@@ -136,6 +136,7 @@ describe('classifyApiError', () => {
       httpStatus: 403,
     }))).toBe('PERMISSION_DENIED')
     expect(classifyApiError(new ApiRequestError('未登录', { code: 40100 }))).toBe('AUTHENTICATION_REQUIRED')
+    expect(classifyApiError(new ApiRequestError('参数错误', { code: 40000 }))).toBe('VALIDATION')
     expect(classifyApiError(new ApiRequestError('系统错误', {
       code: 50000,
       httpStatus: 500,

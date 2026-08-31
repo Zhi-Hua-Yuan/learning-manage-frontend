@@ -95,7 +95,10 @@ const mountTaskList = async (context: 'personal' | 'team' = 'team') => {
   })
 
   await vi.waitFor(() => {
-    if (context === 'team' && collaborationStore.state.teamRole === 'MEMBER') {
+    if (
+      context === 'team'
+      && !['OWNER', 'ADMIN'].includes(collaborationStore.state.teamRole)
+    ) {
       wrapper.get('[data-testid="new-task-create-denied"]')
     } else {
       wrapper.get('input[placeholder^="输入任务标题"]')
@@ -194,6 +197,94 @@ describe('TaskList initial assignee quick create', () => {
     }
     vm.newTaskTitle = '绕过界面创建'
     await vm.addTask()
+    expect(taskApi.addTaskApi).not.toHaveBeenCalled()
+  })
+
+  it('allows team admins to create a task with the default unassigned value', async () => {
+    collaborationStore.state.teamRole = 'ADMIN'
+    const wrapper = await mountTaskList('team')
+    const input = wrapper.get('input[placeholder^="输入任务标题"]')
+    await input.setValue('管理员创建任务')
+    await input.trigger('keydown', { key: 'Enter' })
+
+    await vi.waitFor(() => expect(taskApi.addTaskApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: '1',
+        assigneeUserId: null,
+      }),
+    ))
+  })
+
+  it('fails closed for unknown team roles', async () => {
+    collaborationStore.state.teamRole = 'UNKNOWN'
+    const wrapper = await mountTaskList('team')
+    expect(wrapper.get('[data-testid="new-task-create-denied"]').text()).toContain('尚未确认')
+
+    const vm = wrapper.vm as unknown as {
+      newTaskTitle: string
+      addTask: () => Promise<void>
+    }
+    vm.newTaskTitle = '未知角色绕过创建'
+    await vm.addTask()
+    expect(taskApi.addTaskApi).not.toHaveBeenCalled()
+  })
+
+  it('preserves the complete draft after a create failure and re-enables controls', async () => {
+    const wrapper = await mountTaskList('team')
+    await wrapper.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="task-assignee-picker-menu"]').text()).toContain('成员二'))
+    await wrapper.findAll('[role="option"]').find((option) => option.text().includes('成员二'))?.trigger('click')
+    const vm = wrapper.vm as unknown as {
+      newTaskTitle: string
+      newTaskMilestoneId: string
+      newTaskAssigneeUserId: string | null
+      addTask: () => Promise<void>
+    }
+    vm.newTaskTitle = '失败后保留草稿'
+    vm.newTaskMilestoneId = '8'
+    vm.newTaskAssigneeUserId = '2'
+    taskApi.addTaskApi.mockRejectedValueOnce(new Error('network'))
+
+    await vm.addTask()
+
+    expect(vm.newTaskTitle).toBe('失败后保留草稿')
+    expect(vm.newTaskMilestoneId).toBe('8')
+    expect(vm.newTaskAssigneeUserId).toBe('2')
+    expect(wrapper.get('input[placeholder^="输入任务标题"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="task-assignee-picker-trigger"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('clears the assignee draft after a successful create', async () => {
+    const wrapper = await mountTaskList('team')
+    await wrapper.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="task-assignee-picker-menu"]').text()).toContain('成员二'))
+    await wrapper.findAll('[role="option"]').find((option) => option.text().includes('成员二'))?.trigger('click')
+    const vm = wrapper.vm as unknown as {
+      newTaskTitle: string
+      newTaskMilestoneId: string
+      newTaskAssigneeUserId: string | null
+      addTask: () => Promise<void>
+    }
+    vm.newTaskTitle = '成功后清理草稿'
+    vm.newTaskMilestoneId = '8'
+    vm.newTaskAssigneeUserId = '2'
+
+    await vm.addTask()
+
+    expect(vm.newTaskTitle).toBe('')
+    expect(vm.newTaskMilestoneId).toBe('')
+    expect(vm.newTaskAssigneeUserId).toBeNull()
+  })
+
+  it('does not submit while the assignee picker is open', async () => {
+    const wrapper = await mountTaskList('team')
+    const input = wrapper.get('input[placeholder^="输入任务标题"]')
+    await input.setValue('选择负责人时不创建')
+    await wrapper.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
+    await vi.waitFor(() => wrapper.get('[data-testid="task-assignee-picker-menu"]'))
+
+    await wrapper.get('[data-testid="task-assignee-picker-menu"]').trigger('keydown', { key: 'Enter' })
+
     expect(taskApi.addTaskApi).not.toHaveBeenCalled()
   })
 

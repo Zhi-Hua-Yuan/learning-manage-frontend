@@ -10,12 +10,16 @@ const options: TaskAssigneeOption[] = [
   { value: '2', label: '不可选成员', description: '成员', role: 'MEMBER', disabled: true, kind: 'member' },
 ]
 
-const mountPicker = (overrides: Record<string, unknown> = {}) => mount(TaskAssigneePicker, {
+const mountPicker = (
+  overrides: Record<string, unknown> = {},
+  mountOptions: Record<string, unknown> = {},
+) => mount(TaskAssigneePicker, {
   props: {
     modelValue: null,
     options,
     ...overrides,
   },
+  ...mountOptions,
 })
 
 describe('TaskAssigneePicker', () => {
@@ -60,6 +64,40 @@ describe('TaskAssigneePicker', () => {
     await trigger.trigger('keydown', { key: 'ArrowDown' })
     await wrapper.get('[data-testid="task-assignee-picker-menu"]').trigger('keydown', { key: 'Escape' })
     expect(wrapper.find('[data-testid="task-assignee-picker-menu"]').exists()).toBe(false)
+  })
+
+  it('skips disabled options and supports Home and End navigation', async () => {
+    const keyboardOptions: TaskAssigneeOption[] = [
+      { value: 'a', label: '成员 A', description: null, role: 'MEMBER', disabled: false, kind: 'member' },
+      { value: 'b', label: '禁用成员', description: null, role: 'MEMBER', disabled: true, kind: 'member' },
+      { value: 'c', label: '成员 C', description: null, role: 'MEMBER', disabled: false, kind: 'member' },
+    ]
+    const wrapper = mountPicker({ options: keyboardOptions, modelValue: 'a' })
+    await wrapper.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
+    const menu = wrapper.get('[data-testid="task-assignee-picker-menu"]')
+
+    await menu.trigger('keydown', { key: 'ArrowDown' })
+    expect(menu.attributes('aria-activedescendant')).toContain('option-2')
+    await menu.trigger('keydown', { key: 'Home' })
+    expect(menu.attributes('aria-activedescendant')).toContain('option-0')
+    await menu.trigger('keydown', { key: 'End' })
+    expect(menu.attributes('aria-activedescendant')).toContain('option-2')
+    await menu.trigger('keydown', { key: 'Enter' })
+
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['c'])
+    expect(wrapper.find('[data-testid="task-assignee-picker-menu"]').exists()).toBe(false)
+  })
+
+  it('restores focus to the trigger after selection and escape', async () => {
+    const wrapper = mountPicker({}, { attachTo: document.body })
+    const trigger = wrapper.get('[data-testid="task-assignee-picker-trigger"]')
+    await trigger.trigger('click')
+    await wrapper.get('[role="option"]:not([disabled])').trigger('click')
+    expect(document.activeElement).toBe(trigger.element)
+
+    await trigger.trigger('click')
+    await wrapper.get('[data-testid="task-assignee-picker-menu"]').trigger('keydown', { key: 'Escape' })
+    expect(document.activeElement).toBe(trigger.element)
   })
 
   it('renders labels as text and skips disabled options', async () => {

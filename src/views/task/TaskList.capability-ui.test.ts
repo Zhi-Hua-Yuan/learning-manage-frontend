@@ -133,6 +133,7 @@ describe('TaskList capability-driven controls', () => {
     expect(wrapper.get('[data-testid="task-delete-button"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="task-assignee-label"]').text()).toBe('未分配')
     expect(wrapper.get('[data-testid="task-assignee-locked"]').text()).toBe('仅查看')
+    expect(wrapper.find('[data-testid="task-assignee-change"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('只读')
   })
 
@@ -196,12 +197,13 @@ describe('TaskList capability-driven controls', () => {
     expect(wrapper.get('[data-testid="task-priority-trigger"]').attributes('disabled')).toBeDefined()
   })
 
-  it('renders the assignee fact row without inventing a mutation control', async () => {
+  it('renders the assignee mutation entry only when canAssign is enabled', async () => {
     const wrapper = await mountTaskList({ ...allDenied, canAssign: true }, '8')
 
     expect(wrapper.get('[data-testid="task-assignee-label"]').text()).toBe('用户 #8')
     expect(wrapper.find('[data-testid="task-assignee-locked"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="task-assignee-inactive"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="task-assignee-change"]').text()).toBe('变更')
   })
 
   it('closes task-scoped interactions after a refreshed capability downgrade', async () => {

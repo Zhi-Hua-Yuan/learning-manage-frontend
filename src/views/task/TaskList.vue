@@ -1073,7 +1073,13 @@ import { useToast } from '@/composables/useToast'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
+import { useCollaborationStore } from '@/stores/collaboration'
 import { useToastStore } from '@/stores/toast'
+import {
+  buildPersonalProjectRoute,
+  parseTaskProjectContext,
+  resolvePersonalProjectFallback,
+} from '@/router/taskProjectContext'
 import { readProjectListCache, writeProjectListCache } from '@/utils/projectCache'
 import {
   offProjectListUpdated,
@@ -1449,6 +1455,7 @@ const router = useRouter()
 const toast = useToast()
 const toastStore = useToastStore()
 const aiPendingRegistry = useAiPendingRegistryStore()
+const collaborationStore = useCollaborationStore()
 const { runAiRequest } = useAiPendingRequest()
 const undoDelete = useUndoDelete()
 
@@ -1460,18 +1467,39 @@ const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
 const isWeekView = computed(() => route.query.view === 'week')
 const isAggregateView = computed(() => isTodayView.value || isWeekView.value)
+const taskProjectContext = computed(() => parseTaskProjectContext(route.query))
+const isTeamProjectContext = computed(() => taskProjectContext.value.type === 'team-project')
+const selectedTeamId = computed(() => (
+  taskProjectContext.value.type === 'team-project' ? taskProjectContext.value.teamId : ''
+))
+const canUsePersistentProjectTaskCache = computed(() => !isTeamProjectContext.value)
 const boardView = computed(() =>
   route.query.view === 'today' || route.query.view === 'week' ? route.query.view : 'project',
 )
 const boardTransitionKey = computed(() =>
-  boardView.value === 'project' ? `project:${selectedProjectId.value || 'none'}` : String(boardView.value),
+  boardView.value === 'project'
+    ? `${isTeamProjectContext.value ? `team:${selectedTeamId.value}` : 'personal'}:${selectedProjectId.value || 'none'}`
+    : String(boardView.value),
 )
 const displayContextKey = ref(`${PROJECT_CONTEXT_PREFIX}none`)
 const displayPhase = ref<DisplayPhase>('loading')
 const boardErrorMessage = ref(DEFAULT_BOARD_ERROR_MESSAGE)
-const selectedProject = computed(() =>
-  projectList.value.find((project) => project.id === selectedProjectId.value),
-)
+const selectedProject = computed<Project | undefined>(() => {
+  if (!isTeamProjectContext.value) {
+    return projectList.value.find((project) => project.id === selectedProjectId.value)
+  }
+
+  const project = collaborationStore
+    .getTeamProjects(selectedTeamId.value)
+    .find((candidate) => candidate.id === selectedProjectId.value)
+  if (!project) return undefined
+  return {
+    id: project.id,
+    name: project.name,
+    icon: project.icon ?? '',
+    color: project.color ?? undefined,
+  }
+})
 const selectedProjectColor = computed(() =>
   isAggregateView.value ? '' : normalizeProjectColorValue(selectedProject.value?.color),
 )
@@ -1487,7 +1515,9 @@ const mainTaskSectionTitle = computed(() => {
 })
 const shouldShowUnifiedAiButton = computed(
   () =>
-    taskList.value.length > 0 && (isTodayView.value || (!isAggregateView.value && Boolean(selectedProjectId.value))),
+    !isTeamProjectContext.value
+    && taskList.value.length > 0
+    && (isTodayView.value || (!isAggregateView.value && Boolean(selectedProjectId.value))),
 )
 const todayAiOrderEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER])
 const listReplanPreviewEntry = computed(
@@ -1513,7 +1543,10 @@ const unifiedAiButtonHint = computed(() => {
 const currentContextKey = computed(() => {
   if (isTodayView.value) return 'aggregate:today'
   if (isWeekView.value) return 'aggregate:week'
-  return `project:${selectedProjectId.value || 'none'}`
+  if (isTeamProjectContext.value) {
+    return `project:team:${selectedTeamId.value}:${selectedProjectId.value || 'none'}`
+  }
+  return `project:personal:${selectedProjectId.value || 'none'}`
 })
 const boardRenderPhase = computed<DisplayPhase>(() => {
   if (!isCurrentDisplayContext(currentContextKey.value)) {
@@ -1853,7 +1886,7 @@ const resetListReplanRuntimeState = () => {
 }
 
 const persistCurrentListReplanState = () => {
-  if (isAggregateView.value || !selectedProjectId.value) return
+  if (isAggregateView.value || isTeamProjectContext.value || !selectedProjectId.value) return
   const listId = selectedProjectId.value
   const pendingOperation =
     pendingListReplanOperation.value &&
@@ -1871,6 +1904,12 @@ const persistCurrentListReplanState = () => {
 }
 
 const hydrateListReplanStateForList = (listId: string) => {
+  if (isTeamProjectContext.value) {
+    isListReplanDirty.value = false
+    resetListReplanRuntimeState()
+    return
+  }
+
   const normalizedListId = normalizeListId(listId)
   if (!normalizedListId) {
     isListReplanDirty.value = false
@@ -1901,6 +1940,7 @@ const hydrateListReplanStateForList = (listId: string) => {
 }
 
 const hydrateListReplanDirtyForList = (listId: string) => {
+  if (isTeamProjectContext.value) return false
   const normalizedListId = normalizeListId(listId)
   if (!normalizedListId) return false
   const stateMap = readListReplanStateMap()
@@ -1912,6 +1952,12 @@ const closeListReplanPreviewDialog = () => {
 }
 
 const clearListReplanPreviewState = (options: { persistListId?: string; keepDirty?: boolean } = {}) => {
+  if (isTeamProjectContext.value) {
+    isListReplanDirty.value = false
+    resetListReplanRuntimeState()
+    return
+  }
+
   const keepDirty = options.keepDirty !== false
   const listId =
     normalizeListId(options.persistListId) ||
@@ -1956,12 +2002,17 @@ const ensureFreshPendingListReplanOperation = (options: { notify?: boolean } = {
 }
 
 const markListReplanDirty = () => {
-  if (isAggregateView.value || !selectedProjectId.value) return
+  if (isAggregateView.value || isTeamProjectContext.value || !selectedProjectId.value) return
   isListReplanDirty.value = true
   persistCurrentListReplanState()
 }
 
 const requestListReplanPreview = async () => {
+  if (isTeamProjectContext.value) {
+    toast.warning('团队项目的 AI 重排将在权限能力接入后开放。')
+    return
+  }
+
   if (isAggregateView.value || !selectedProjectId.value) {
     toast.warning('仅支持在单个清单视图中使用 AI 重排。')
     return
@@ -2387,7 +2438,7 @@ const vFocus = {
 
 const navigateToProject = (projectId: string) => {
   writeSelectedProjectIdCache(projectId)
-  router.push({ path: '/tasks', query: { projectId } })
+  void router.push(buildPersonalProjectRoute(projectId))
 }
 
 const syncSelectedProject = () => {
@@ -2396,10 +2447,20 @@ const syncSelectedProject = () => {
     return
   }
 
-  const queryId = route.query.projectId
-  if (typeof queryId === 'string' && queryId) {
-    selectedProjectId.value = queryId
-    writeSelectedProjectIdCache(queryId)
+  const context = taskProjectContext.value
+  if (context.type === 'team-project') {
+    selectedProjectId.value = context.projectId
+    return
+  }
+
+  if (context.type === 'personal-project') {
+    selectedProjectId.value = context.projectId
+    writeSelectedProjectIdCache(context.projectId)
+    return
+  }
+
+  if (context.type === 'invalid') {
+    selectedProjectId.value = ''
     return
   }
 
@@ -2459,7 +2520,12 @@ const markBoardError = (contextKey: string, error: unknown) => {
 const isProjectContextKey = (contextKey: string) => contextKey.startsWith(PROJECT_CONTEXT_PREFIX)
 const hasRouteProjectId = () => typeof route.query.projectId === 'string' && route.query.projectId.length > 0
 const ensureSelectedProjectFromList = async () => {
-  if (isAggregateView.value || selectedProjectId.value || projectList.value.length === 0) return
+  if (
+    isAggregateView.value
+    || isTeamProjectContext.value
+    || selectedProjectId.value
+    || projectList.value.length === 0
+  ) return
   const firstProject = projectList.value[0]
   if (!firstProject) return
 
@@ -2614,7 +2680,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     return okOutcome()
   }
 
-  if (!forceRefresh) {
+  if (!forceRefresh && canUsePersistentProjectTaskCache.value) {
     const cachedProjectTasks = readTaskCache(selectedProjectId.value)
     if (cachedProjectTasks) {
       taskList.value = cachedProjectTasks
@@ -2637,8 +2703,10 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
       throw new Error('task-list-shape-invalid')
     }
     taskList.value = records
-    writeTaskCache(requestProjectId, taskList.value)
-    syncAggregateTaskCacheByProject(requestProjectId, taskList.value)
+    if (canUsePersistentProjectTaskCache.value) {
+      writeTaskCache(requestProjectId, taskList.value)
+      syncAggregateTaskCacheByProject(requestProjectId, taskList.value)
+    }
     syncSelectedTaskFromList()
     return okOutcome()
   } catch (error) {
@@ -2684,12 +2752,74 @@ const loadMilestones = async (options: LoadOptions = {}): Promise<LoadOutcome> =
   }
 }
 
+const replaceWithPersonalProjectFallback = async () => {
+  const fallbackProjectId = resolvePersonalProjectFallback(
+    projectList.value,
+    readSelectedProjectIdCache(),
+  )
+
+  if (fallbackProjectId) {
+    writeSelectedProjectIdCache(fallbackProjectId)
+    await router.replace(buildPersonalProjectRoute(fallbackProjectId))
+    return
+  }
+
+  selectedProjectId.value = ''
+  await router.replace({ path: '/tasks' })
+}
+
+const ensureRouteProjectContext = async (): Promise<LoadOutcome> => {
+  const context = taskProjectContext.value
+  if (context.type === 'aggregate' || context.type === 'empty') return okOutcome()
+
+  if (context.type === 'invalid') {
+    await replaceWithPersonalProjectFallback()
+    return staleOutcome()
+  }
+
+  if (context.type === 'personal-project') {
+    if (projectList.value.some((project) => project.id === context.projectId)) return okOutcome()
+
+    const refreshOutcome = await loadProjects({ forceRefresh: true })
+    if (refreshOutcome.status !== 'ok') return refreshOutcome
+    if (projectList.value.some((project) => project.id === context.projectId)) return okOutcome()
+
+    await replaceWithPersonalProjectFallback()
+    return staleOutcome()
+  }
+
+  const restoreResult = await collaborationStore.restoreTeamProjectContext(
+    context.teamId,
+    context.projectId,
+  )
+  if (restoreResult.kind === 'ready') return okOutcome()
+  if (restoreResult.kind === 'retryable-error') {
+    return errorOutcome(new Error(`团队项目上下文暂时无法恢复（${restoreResult.errorKind}），请重试。`))
+  }
+
+  await replaceWithPersonalProjectFallback()
+  return staleOutcome()
+}
+
 const loadContextData = async (contextKey: string, options: ContextLoadOptions = {}) => {
   enterBoardLoading(contextKey)
 
   const projectContext = isProjectContextKey(contextKey)
   const projectOutcome = await loadProjects({ forceRefresh: options.forceProjectRefresh === true })
   if (!isCurrentDisplayContext(contextKey)) return
+
+  if (projectOutcome.status === 'error') {
+    markBoardError(contextKey, projectOutcome.error)
+    return
+  }
+
+  const routeContextOutcome = await ensureRouteProjectContext()
+  if (!isCurrentDisplayContext(contextKey)) return
+  if (routeContextOutcome.status === 'stale') return
+  if (routeContextOutcome.status === 'error') {
+    markBoardError(contextKey, routeContextOutcome.error)
+    return
+  }
 
   const [milestoneOutcome, taskOutcome] = await Promise.all([
     loadMilestones({ forceRefresh: options.forceMilestoneRefresh === true }),
@@ -2698,7 +2828,7 @@ const loadContextData = async (contextKey: string, options: ContextLoadOptions =
 
   if (!isCurrentDisplayContext(contextKey)) return
 
-  const outcomes = [projectOutcome, milestoneOutcome, taskOutcome]
+  const outcomes = [projectOutcome, routeContextOutcome, milestoneOutcome, taskOutcome]
   const failedOutcome = outcomes.find((outcome) => outcome.status === 'error')
   if (failedOutcome) {
     markBoardError(contextKey, failedOutcome.error)
@@ -2761,7 +2891,9 @@ const setTaskStatus = async (task: Task, nextStatus: number) => {
   task.status = nextStatus
   try {
     await updateTaskApi({ ...task, status: nextStatus })
-    upsertTaskInCaches(task)
+    if (canUsePersistentProjectTaskCache.value) {
+      upsertTaskInCaches(task)
+    }
     markListReplanDirty()
   } catch {
     task.status = oldStatus
@@ -3172,7 +3304,9 @@ const selectPriority = async (val: number) => {
 
   try {
     await updateTaskApi({ ...selectedTask.value, priority: val })
-    upsertTaskInCaches(selectedTask.value)
+    if (canUsePersistentProjectTaskCache.value) {
+      upsertTaskInCaches(selectedTask.value)
+    }
     markListReplanDirty()
   } catch {
     selectedTask.value.priority = oldPriority
@@ -3268,7 +3402,9 @@ const confirmDeleteTask = async () => {
 
   const originalIndex = taskList.value.findIndex((task) => task.id === taskToDelete.id)
   taskList.value = taskList.value.filter((task) => task.id !== taskToDelete.id)
-  removeTaskFromCaches(taskToDelete)
+  if (canUsePersistentProjectTaskCache.value) {
+    removeTaskFromCaches(taskToDelete)
+  }
   selectedTask.value = null
 
   undoDelete.scheduleUndoDelete({
@@ -3289,7 +3425,9 @@ const confirmDeleteTask = async () => {
         nextTasks.splice(insertIndex, 0, taskToDelete)
         taskList.value = nextTasks
       }
-      upsertTaskInCaches(taskToDelete)
+      if (canUsePersistentProjectTaskCache.value) {
+        upsertTaskInCaches(taskToDelete)
+      }
     },
   })
 }
@@ -3445,8 +3583,13 @@ const groupedTasks = computed(() => {
 })
 
 watch(
-  [() => route.query.projectId, () => route.query.view],
-  async ([nextProjectIdRaw, nextViewRaw], [prevProjectIdRaw, prevViewRaw]) => {
+  [() => route.query.teamId, () => route.query.projectId, () => route.query.view],
+  async (
+    [nextTeamIdRaw, nextProjectIdRaw, nextViewRaw],
+    [prevTeamIdRaw, prevProjectIdRaw, prevViewRaw],
+  ) => {
+    const prevTeamId = typeof prevTeamIdRaw === 'string' ? prevTeamIdRaw : ''
+    const nextTeamId = typeof nextTeamIdRaw === 'string' ? nextTeamIdRaw : ''
     const prevProjectId = typeof prevProjectIdRaw === 'string' ? prevProjectIdRaw : ''
     const nextProjectId = typeof nextProjectIdRaw === 'string' ? nextProjectIdRaw : ''
     const prevView = typeof prevViewRaw === 'string' ? prevViewRaw : 'project'
@@ -3454,6 +3597,7 @@ watch(
     const preserveDirty =
       prevView === 'project' &&
       nextView === 'project' &&
+      prevTeamId === nextTeamId &&
       prevProjectId === nextProjectId &&
       prevProjectId !== ''
     const previousListId = prevProjectId || selectedProjectId.value
@@ -3463,7 +3607,7 @@ watch(
     closeListReplanPreviewDialog()
     resetNewTaskDraft({ blurInput: true })
 
-    if (previousListId) {
+    if (previousListId && !prevTeamId) {
       clearListReplanPreviewState({
         persistListId: previousListId,
         keepDirty: true,
@@ -3479,7 +3623,10 @@ watch(
     isMilestoneMenuOpen.value = false
     isNewTaskMilestoneMenuOpen.value = false
 
-    if (preserveDirty && !isAggregateView.value && selectedProjectId.value) {
+    if (isTeamProjectContext.value) {
+      isListReplanDirty.value = false
+      resetListReplanRuntimeState()
+    } else if (preserveDirty && !isAggregateView.value && selectedProjectId.value) {
       persistCurrentListReplanState()
     } else if (isAggregateView.value || !selectedProjectId.value) {
       isListReplanDirty.value = false
@@ -3542,7 +3689,7 @@ onMounted(async () => {
   window.addEventListener('resize', updateViewport)
   onProjectListUpdated(handleProjectListUpdated)
   syncSelectedProject()
-  if (!isAggregateView.value && selectedProjectId.value) {
+  if (!isAggregateView.value && !isTeamProjectContext.value && selectedProjectId.value) {
     hydrateListReplanStateForList(selectedProjectId.value)
   } else {
     isListReplanDirty.value = false
@@ -3558,7 +3705,7 @@ onBeforeUnmount(() => {
   closeTodayAiReasonDialog()
   closeListReplanPreviewDialog()
   closeCompletionQualityModal()
-  if (!isAggregateView.value && selectedProjectId.value) {
+  if (!isAggregateView.value && !isTeamProjectContext.value && selectedProjectId.value) {
     if (isListReplanOperationExpired(pendingListReplanOperation.value)) {
       clearListReplanPreviewState({
         persistListId: selectedProjectId.value,

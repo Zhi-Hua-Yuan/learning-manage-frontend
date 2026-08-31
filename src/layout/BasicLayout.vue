@@ -126,7 +126,7 @@
       <div class="flex-1 overflow-y-auto px-2 py-3">
         <div class="px-3 pb-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-[var(--color-text-tertiary)]">清单</span>
+            <span class="text-xs font-medium text-[var(--color-text-tertiary)]">个人项目</span>
             <button
               @click="openAddProjectInput"
               type="button"
@@ -152,7 +152,7 @@
             @click="handleProjectRowClick(project.id)"
             class="interactive-row group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
             :class="
-              (route.path === '/tasks' || route.path === '/') && !isTodayRoute && !isWeekRoute && selectedProjectId === project.id
+              (route.path === '/tasks' || route.path === '/') && !isTodayRoute && !isWeekRoute && !selectedTeamId && selectedProjectId === project.id
                 ? 'is-active font-medium'
                 : 'text-[var(--color-text-secondary)]'
             "
@@ -254,6 +254,20 @@
             </div>
           </div>
         </div>
+
+        <TeamProjectNavigation
+          :teams="teams"
+          :teams-load-state="teamsLoadState"
+          :project-buckets="teamProjectsByTeamId"
+          :expanded-team-ids="expandedTeamIds"
+          :selected-team-id="selectedTeamId"
+          :selected-project-id="selectedProjectId"
+          @toggle-team="toggleTeam"
+          @retry-teams="retryTeams"
+          @retry-projects="retryTeamProjects"
+          @load-more-projects="loadMoreTeamProjects"
+          @select-project="selectTeamProject"
+        />
       </div>
 
       <button
@@ -531,9 +545,11 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import TeamProjectNavigation from '@/components/navigation/TeamProjectNavigation.vue'
 import {
   addProjectApi,
   archiveProjectApi,
@@ -542,9 +558,11 @@ import {
   reorderProjectApi,
   updateProjectApi,
 } from '@/api/project'
-import { getUserMeApi, logoutApi } from '@/api/user'
+import { logoutApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { useCollaborationStore } from '@/stores/collaboration'
+import { buildTeamProjectRoute, parseTaskProjectContext } from '@/router/taskProjectContext'
 import {
   clearSelectedProjectIdCache,
   readSelectedProjectIdCache,
@@ -589,16 +607,6 @@ const extractListPayload = <T>(payload: unknown): T[] | null => {
   if (Array.isArray(nested)) return nested as T[]
   if (isRecord(nested) && Array.isArray(nested.records)) return nested.records as T[]
   return null
-}
-
-const extractObjectPayload = <T>(payload: unknown): T | null => {
-  if (!isRecord(payload)) return null
-
-  if ('data' in payload && isRecord(payload.data)) {
-    return payload.data as T
-  }
-
-  return payload as T
 }
 
 const USER_INFO_UPDATED_EVENT = 'tick:user-updated'
@@ -654,6 +662,8 @@ const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const undoDelete = useUndoDelete()
+const collaborationStore = useCollaborationStore()
+const { teams, teamProjectsByTeamId, teamsLoadState } = storeToRefs(collaborationStore)
 
 const projectList = ref<Project[]>([])
 const isUserMenuOpen = ref(false)
@@ -677,10 +687,15 @@ const sidebarWidth = ref(Number(localStorage.getItem('tick_sidebarWidth')) || 25
 const isResizingLeft = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
 const isSidebarOpen = ref(false)
+const expandedTeamIds = ref<string[]>([])
 
 const isCompactViewport = computed(() => viewportWidth.value < 1024)
 const isTodayRoute = computed(() => route.path === '/tasks' && route.query.view === 'today')
 const isWeekRoute = computed(() => route.path === '/tasks' && route.query.view === 'week')
+const taskProjectContext = computed(() => parseTaskProjectContext(route.query))
+const selectedTeamId = computed(() => (
+  taskProjectContext.value.type === 'team-project' ? taskProjectContext.value.teamId : ''
+))
 const pageTransitionKey = computed(() => route.path)
 const sidebarStyle = computed(() =>
   isCompactViewport.value ? undefined : { width: `${sidebarWidth.value}px` },
@@ -703,6 +718,71 @@ const closeSidebar = () => {
   if (isCompactViewport.value) {
     isSidebarOpen.value = false
   }
+}
+
+const expandTeam = (teamId: string) => {
+  if (!expandedTeamIds.value.includes(teamId)) {
+    expandedTeamIds.value = [...expandedTeamIds.value, teamId]
+  }
+}
+
+const collapseTeam = (teamId: string) => {
+  expandedTeamIds.value = expandedTeamIds.value.filter((candidate) => candidate !== teamId)
+}
+
+const toggleTeam = async (teamId: string) => {
+  if (expandedTeamIds.value.includes(teamId)) {
+    collapseTeam(teamId)
+    return
+  }
+
+  expandTeam(teamId)
+  try {
+    await collaborationStore.ensureTeamProjects(teamId)
+  } catch {
+    // The navigation component renders the project bucket error state.
+  }
+}
+
+const retryTeams = async () => {
+  try {
+    if (!collaborationStore.currentUser) {
+      await collaborationStore.bootstrapCollaborationContext({ force: true })
+    } else {
+      await collaborationStore.refreshMyTeams()
+    }
+  } catch {
+    // The navigation component renders the teams error state.
+  }
+}
+
+const retryTeamProjects = async (teamId: string) => {
+  try {
+    await collaborationStore.ensureTeamProjects(teamId, { force: true })
+  } catch {
+    // The navigation component renders the project bucket error state.
+  }
+}
+
+const loadMoreTeamProjects = async (teamId: string) => {
+  try {
+    await collaborationStore.loadMoreTeamProjects(teamId)
+  } catch {
+    // The navigation component renders the project bucket error state.
+  }
+}
+
+const selectTeamProject = async (selection: { teamId: string; projectId: string }) => {
+  closeProjectActionMenu()
+  await router.push(buildTeamProjectRoute(selection.teamId, selection.projectId))
+  closeSidebar()
+}
+
+const syncExpandedTeamRoute = () => {
+  const context = taskProjectContext.value
+  if (context.type !== 'team-project') return
+  expandTeam(context.teamId)
+  void collaborationStore.ensureTeamProjects(context.teamId).catch(() => undefined)
 }
 
 const normalizeProjectColorValue = (color?: string | null) => {
@@ -1065,13 +1145,16 @@ const deleteProjectConfirmTitle = computed(() => {
   return `确认删除清单“${pendingDeleteProject.value.name}”？`
 })
 
-const loadUserInfo = async () => {
+const initializeCollaboration = async () => {
   try {
-    const res = await getUserMeApi()
-    const parsed = extractObjectPayload<CurrentUserInfo>(res)
-    currentUserInfo.value = parsed || {}
+    const snapshot = await collaborationStore.bootstrapCollaborationContext()
+    currentUserInfo.value = {
+      username: snapshot.currentUser.username,
+      account: snapshot.currentUser.account,
+    }
+    syncExpandedTeamRoute()
   } catch (error) {
-    console.error('获取用户信息失败', error)
+    console.error('初始化协作上下文失败', error)
   }
 }
 
@@ -1223,6 +1306,7 @@ const executeLogout = async () => {
   } catch {
     // force logout even when API request fails
   }
+  collaborationStore.clearCollaborationContext()
   clearAuthToken()
   router.push('/login')
 }
@@ -1239,6 +1323,13 @@ watch(
   },
 )
 
+watch(
+  () => route.query.teamId,
+  () => {
+    syncExpandedTeamRoute()
+  },
+)
+
 watch(showDeleteProjectConfirm, (next) => {
   if (!next) {
     pendingDeleteProject.value = null
@@ -1246,8 +1337,8 @@ watch(showDeleteProjectConfirm, (next) => {
 })
 
 onMounted(() => {
-  loadUserInfo()
-  loadProjects()
+  void initializeCollaboration()
+  void loadProjects()
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   onProjectListUpdated(handleProjectListUpdated)

@@ -9,17 +9,17 @@ const checks = [
   {
     file: taskListPath,
     label: 'Status update flow upserts both caches',
-    pattern: /await updateTaskApi\(\{ \.\.\.task, status: nextStatus \}\)\s*\n\s*upsertTaskInCaches\(task\)/m,
+    pattern: /await updateTaskApi\(\{ \.\.\.task, status: nextStatus \}\)\s*\n(?:\s*if \(canUsePersistentProjectTaskCache\.value\) \{\s*)?upsertTaskInCaches\(task\)/m,
   },
   {
     file: taskListPath,
     label: 'Priority update flow upserts both caches',
-    pattern: /await updateTaskApi\(\{ \.\.\.selectedTask\.value, priority: val \}\)\s*\n\s*upsertTaskInCaches\(selectedTask\.value\)/m,
+    pattern: /await updateTaskApi\(\{ \.\.\.selectedTask\.value, priority: val \}\)\s*\n(?:\s*if \(canUsePersistentProjectTaskCache\.value\) \{\s*)?upsertTaskInCaches\(selectedTask\.value\)/m,
   },
   {
     file: taskListPath,
     label: 'Delete flow removes from both caches',
-    pattern: /removeTaskFromCaches\(taskToDelete\)/m,
+    pattern: /(?:if \(canUsePersistentProjectTaskCache\.value\) \{\s*)?removeTaskFromCaches\(taskToDelete\)/m,
   },
   {
     file: taskListPath,

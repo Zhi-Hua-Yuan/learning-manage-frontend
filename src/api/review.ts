@@ -1,4 +1,7 @@
 import request from '../utils/request'
+import type { EntityId, WirePage } from '@/types/common'
+import type { SharedWeeklyReviewWire } from '@/types/review'
+import { omitUndefined, requireEntityId } from './guards'
 
 export interface ReviewPayload {
   year?: number
@@ -31,4 +34,16 @@ export const getReviewDetailApi = (id: string | number) => request.get(`/review/
 // 获取历史周总结列表
 export const fetchReviewHistory = () => {
   return request.get('/review/history')
+}
+
+export interface TeamSharedReviewParams {
+  teamId: EntityId
+  current?: number
+  size?: number
+}
+
+export const fetchTeamSharedReviewsApi = (params: TeamSharedReviewParams) => {
+  const teamId = requireEntityId(params.teamId, 'teamId')
+  const query = omitUndefined({ teamId, current: params.current, size: params.size })
+  return request.get<unknown, Promise<WirePage<SharedWeeklyReviewWire>>>('/review/team', { params: query })
 }

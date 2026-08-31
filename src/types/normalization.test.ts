@@ -82,9 +82,9 @@ describe('shared type normalizers', () => {
       id: '1000000000000000001', account: '', username: 'Alice', role: 'UNKNOWN',
     })
     expect(normalizeTeamWire({ id: 1, ownerId: 2, name: 'Team' })).toEqual({
-      id: '1', ownerId: '2', name: 'Team', description: '',
+      id: '1', ownerId: '2', name: 'Team', description: '', role: 'UNKNOWN',
     })
-    expect(normalizeTeamMemberWire({ teamId: 1, userId: 2, username: 'Bob', role: 'invalid' })).toMatchObject({
+    expect(normalizeTeamMemberWire({ userId: 2, username: 'Bob', role: 'invalid' }, 1)).toMatchObject({
       teamId: '1', userId: '2', role: 'UNKNOWN',
     })
   })

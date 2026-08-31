@@ -25,6 +25,16 @@ export const isApiRequestError = (error: unknown): error is ApiRequestError => {
   return error instanceof ApiRequestError
 }
 
+export type ApiErrorKind =
+  | 'AUTHENTICATION_REQUIRED'
+  | 'PERMISSION_DENIED'
+  | 'CONFLICT'
+  | 'VALIDATION'
+  | 'NOT_FOUND'
+  | 'SERVER'
+  | 'NETWORK'
+  | 'UNKNOWN'
+
 const request = axios.create({
   baseURL: '/api',
   timeout: 300000,
@@ -83,7 +93,7 @@ const isAuthBusinessError = (res: unknown) => {
   if (!res || typeof res !== 'object') return false
   const record = res as Record<string, unknown>
   const code = Number(record.code)
-  if (Number.isFinite(code) && (code === 401 || code === 40100 || code === 403)) return true
+  if (Number.isFinite(code) && (code === 401 || code === 40100)) return true
 
   const message = resolveBusinessMessage(res).toLowerCase()
   if (!message) return false
@@ -96,6 +106,17 @@ const isAuthBusinessError = (res: unknown) => {
     message.includes('unauthorized') ||
     message.includes('not login')
   )
+}
+
+export const classifyApiError = (error: unknown): ApiErrorKind => {
+  if (!isApiRequestError(error)) return error instanceof TypeError ? 'VALIDATION' : 'UNKNOWN'
+  if (error.code === 40300 || error.code === 40101 || error.httpStatus === 403) return 'PERMISSION_DENIED'
+  if (error.httpStatus === 401 || error.code === 401 || error.code === 40100) return 'AUTHENTICATION_REQUIRED'
+  if (error.httpStatus === 409 || error.code === 409 || error.code === 40900) return 'CONFLICT'
+  if (error.httpStatus === 404 || error.code === 404 || error.code === 40400) return 'NOT_FOUND'
+  if (error.httpStatus != null && error.httpStatus >= 500) return 'SERVER'
+  if (error.httpStatus != null && error.httpStatus >= 400) return 'VALIDATION'
+  return 'UNKNOWN'
 }
 
 const redirectToLogin = () => {
@@ -197,6 +218,12 @@ request.interceptors.response.use(
       const status = resolveHttpStatus(error.response?.status)
       const code = resolveBusinessCode(responseData)
       const message = resolveBusinessMessage(responseData)
+
+      if (code === 40300 || code === 40101) {
+        return Promise.reject(
+          createApiRequestError(message || '没有权限执行此操作', { code, httpStatus: status }),
+        )
+      }
 
       if (status === 401 || status === 403 || isAuthBusinessError(responseData)) {
         if (isPublicAuthPath(requestUrl)) {

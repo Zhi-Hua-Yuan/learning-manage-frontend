@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { CurrentUserWire } from '@/types/user'
 
 export interface LoginPayload {
   account: string
@@ -27,7 +28,7 @@ export const registerApi = (data: RegisterPayload) => request.post('/user/regist
 export const logoutApi = () => request.post('/user/logout')
 
 // 4. 获取当前登录用户信息
-export const getUserMeApi = () => request.get('/user/me')
+export const getUserMeApi = () => request.get<unknown, Promise<CurrentUserWire>>('/user/me')
 
 // 5. 修改个人信息
 export const updateUserInfoApi = (data: { username: string }) => request.post('/user/update', data)

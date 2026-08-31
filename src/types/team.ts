@@ -7,6 +7,7 @@ export interface TeamWire {
   ownerId?: EntityId
   name?: string
   description?: string
+  role?: unknown
   createTime?: string
   updateTime?: string
 }
@@ -16,14 +17,14 @@ export interface TeamContext {
   ownerId: string
   name: string
   description: string
+  role: TeamRole
 }
 
 export interface TeamMemberWire {
-  teamId?: EntityId
   userId?: EntityId
   username?: string
   role?: unknown
-  joinedAt?: string
+  joinTime?: string
 }
 
 export interface TeamMemberContext {

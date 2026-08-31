@@ -99,7 +99,7 @@ export interface ChangeTaskStatusPayload {
 }
 
 export interface TaskStatusResultWire {
-  taskId?: EntityId
+  changed?: boolean
   finalStatus?: unknown
   completedAt?: string | null
   idempotentReplay?: boolean

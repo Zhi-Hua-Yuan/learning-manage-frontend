@@ -96,12 +96,16 @@ export function normalizeTeamWire(team: TeamWire | null | undefined): TeamContex
     ownerId,
     name: typeof team.name === 'string' ? team.name : '',
     description: typeof team.description === 'string' ? team.description : '',
+    role: normalizeTeamRole(team.role),
   }
 }
 
-export function normalizeTeamMemberWire(member: TeamMemberWire | null | undefined): TeamMemberContext | null {
+export function normalizeTeamMemberWire(
+  member: TeamMemberWire | null | undefined,
+  teamIdValue: EntityId,
+): TeamMemberContext | null {
   if (!member) return null
-  const teamId = normalizeEntityId(member.teamId)
+  const teamId = normalizeEntityId(teamIdValue)
   const userId = normalizeEntityId(member.userId)
   if (!teamId || !userId) return null
 
@@ -110,7 +114,7 @@ export function normalizeTeamMemberWire(member: TeamMemberWire | null | undefine
     userId,
     username: typeof member.username === 'string' ? member.username : '',
     role: normalizeTeamRole(member.role),
-    joinedAt: typeof member.joinedAt === 'string' ? member.joinedAt : null,
+    joinedAt: typeof member.joinTime === 'string' ? member.joinTime : null,
   }
 }
 

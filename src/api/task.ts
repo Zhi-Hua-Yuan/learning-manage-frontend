@@ -1,6 +1,5 @@
 import request from '../utils/request'
-
-type EntityId = string | number
+import type { EntityId } from '@/types/common'
 
 export interface TaskListParams {
   projectId?: EntityId

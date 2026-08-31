@@ -1,6 +1,5 @@
 import request from '../utils/request'
-
-type EntityId = string | number
+import type { EntityId } from '@/types/common'
 
 export type ProjectListParams = Record<string, string | number | boolean | undefined>
 

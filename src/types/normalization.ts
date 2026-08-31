@@ -1,6 +1,10 @@
 import type { EntityId, NumericLike, PageResult, WirePage } from './common'
 import type { ProjectScope, ProjectWire } from './project'
-import type { SharedWeeklyReview, SharedWeeklyReviewWire } from './review'
+import type {
+  NormalizedReviewVisibilityScope,
+  SharedWeeklyReview,
+  SharedWeeklyReviewWire,
+} from './review'
 import type { AssignmentAction, AssignmentUserSummary, AssignmentUserSummaryWire, TaskAssignmentHistory, TaskAssignmentHistoryWire, TaskModel, TaskWire } from './task'
 import { DENY_ALL_TASK_CAPABILITIES, type TaskCapabilities } from './task'
 import type { TeamContext, TeamMemberContext, TeamMemberWire, TeamRole, TeamWire } from './team'
@@ -158,7 +162,7 @@ export function normalizeTaskWire(task: TaskWire | null | undefined): TaskModel 
   }
 }
 
-export function normalizeReviewVisibilityScope(value: unknown) {
+export function normalizeReviewVisibilityScope(value: unknown): NormalizedReviewVisibilityScope {
   return value === 'PRIVATE' || value === 'TEAM' ? value : 'UNKNOWN'
 }
 

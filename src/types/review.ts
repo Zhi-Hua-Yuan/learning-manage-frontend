@@ -1,6 +1,8 @@
 import type { EntityId } from './common'
 
-export type ReviewVisibilityScope = 'PRIVATE' | 'TEAM' | 'UNKNOWN'
+export type ReviewWriteVisibilityScope = 'PRIVATE' | 'TEAM'
+
+export type NormalizedReviewVisibilityScope = ReviewWriteVisibilityScope | 'UNKNOWN'
 
 export interface WeeklyReviewDetailWire {
   id?: EntityId
@@ -22,10 +24,8 @@ export interface WeeklyReviewDetailWire {
   updateTime?: string
 }
 
-export interface WeeklyReviewSavePayload {
-  year: number
-  weekNo: number
-  visibilityScope: ReviewVisibilityScope
+interface WeeklyReviewMutationFields {
+  visibilityScope: ReviewWriteVisibilityScope
   teamId: EntityId | null
   focusProjectId: EntityId | null
   reflection: string
@@ -34,7 +34,12 @@ export interface WeeklyReviewSavePayload {
   taskIds: EntityId[]
 }
 
-export interface WeeklyReviewUpdatePayload extends WeeklyReviewSavePayload {
+export interface WeeklyReviewSavePayload extends WeeklyReviewMutationFields {
+  year: number
+  weekNo: number
+}
+
+export interface WeeklyReviewUpdatePayload extends WeeklyReviewMutationFields {
   id: EntityId
 }
 

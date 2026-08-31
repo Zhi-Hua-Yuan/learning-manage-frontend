@@ -1,30 +1,87 @@
 import request from '../utils/request'
 import type { EntityId, WirePage } from '@/types/common'
-import type { SharedWeeklyReviewWire } from '@/types/review'
+import type {
+  SharedWeeklyReviewWire,
+  WeeklyReviewSavePayload,
+  WeeklyReviewUpdatePayload,
+} from '@/types/review'
 import { omitUndefined, requireEntityId } from './guards'
 
-export interface ReviewPayload {
+export interface LegacyPrivateReviewPayload {
   year?: number
   weekNo?: number
-  startDate?: string
-  endDate?: string
-  completedTaskCount?: number
-  focusProjectName?: string
   reflection?: string
 }
+
+export interface LegacyPrivateReviewUpdatePayload {
+  id: EntityId
+  reflection?: string
+}
+
+const toWeeklyReviewSaveBody = (
+  data: WeeklyReviewSavePayload,
+): WeeklyReviewSavePayload => ({
+  year: data.year,
+  weekNo: data.weekNo,
+  visibilityScope: data.visibilityScope,
+  teamId: data.teamId,
+  focusProjectId: data.focusProjectId,
+  reflection: data.reflection,
+  nextPlan: data.nextPlan,
+  sharedSummary: data.sharedSummary,
+  taskIds: data.taskIds,
+})
+
+const toWeeklyReviewUpdateBody = (
+  data: WeeklyReviewUpdatePayload,
+): WeeklyReviewUpdatePayload => ({
+  id: data.id,
+  visibilityScope: data.visibilityScope,
+  teamId: data.teamId,
+  focusProjectId: data.focusProjectId,
+  reflection: data.reflection,
+  nextPlan: data.nextPlan,
+  sharedSummary: data.sharedSummary,
+  taskIds: data.taskIds,
+})
 
 // 获取当前周总结草稿或已保存记录
 export const fetchCurrentReview = () => {
   return request.get('/review/current')
 }
 
-// 保存/更新周总结
-export const saveReviewApi = (data: ReviewPayload) => {
-  return request.post('/review/save', data)
+export const saveWeeklyReviewApi = (data: WeeklyReviewSavePayload) => {
+  return request.post<unknown, Promise<unknown>, WeeklyReviewSavePayload>(
+    '/review/save',
+    toWeeklyReviewSaveBody(data),
+  )
 }
 
-export const updateReviewApi = (data: ReviewPayload & { id?: string | number }) =>
-  request.post('/review/update', data)
+export const updateWeeklyReviewApi = (data: WeeklyReviewUpdatePayload) => {
+  return request.post<unknown, Promise<unknown>, WeeklyReviewUpdatePayload>(
+    '/review/update',
+    toWeeklyReviewUpdateBody(data),
+  )
+}
+
+/** @deprecated Migrate the stage-0 PRIVATE editor to saveWeeklyReviewApi in WP7-D. */
+export const saveReviewApi = (data: LegacyPrivateReviewPayload) => {
+  const body = omitUndefined({
+    year: data.year,
+    weekNo: data.weekNo,
+    reflection: data.reflection,
+  })
+  return request.post('/review/save', body)
+}
+
+/** @deprecated Migrate the stage-0 PRIVATE editor to updateWeeklyReviewApi in WP7-D. */
+export const updateReviewApi = (data: LegacyPrivateReviewUpdatePayload) => {
+  const body = omitUndefined({
+    id: requireEntityId(data.id, 'id'),
+    reflection: data.reflection,
+  })
+  return request.post('/review/update', body)
+}
 
 export const deleteReviewApi = (id: string | number) => request.post(`/review/delete/${id}`)
 

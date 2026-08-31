@@ -21,12 +21,19 @@ import request, { ApiRequestError, classifyApiError } from '@/utils/request'
 import { fetchTeamMembersApi, fetchMyTeamsApi } from './team'
 import { fetchTeamProjectsApi } from './project'
 import {
+  addTaskApi,
   assignTaskApi,
   changeTaskStatusApi,
   fetchTaskAssignmentHistoryApi,
   updateTaskContentApi,
 } from './task'
-import { fetchTeamSharedReviewsApi } from './review'
+import {
+  fetchTeamSharedReviewsApi,
+  saveReviewApi,
+  saveWeeklyReviewApi,
+  updateReviewApi,
+  updateWeeklyReviewApi,
+} from './review'
 import { clearAuthToken } from '@/utils/authToken'
 
 type CapturedRequest = {
@@ -96,6 +103,21 @@ describe('PR7 B2 API clients', () => {
     })
   })
 
+  it('preserves an explicit unassigned assignee when creating a task', async () => {
+    const read = mockSuccess(11)
+    await addTaskApi({
+      title: 'Prepare review',
+      projectId: '7',
+      assigneeUserId: null,
+    })
+    expect(parseBody(read()?.data)).toEqual({
+      title: 'Prepare review',
+      projectId: '7',
+      assigneeUserId: null,
+    })
+    expect(read()).toMatchObject({ method: 'POST', url: '/task/add' })
+  })
+
   it('preserves explicit null expected assignee in assignment requests', async () => {
     const read = mockSuccess({ changed: true })
     const payload = {
@@ -152,6 +174,90 @@ describe('PR7 B2 API clients', () => {
       method: 'GET',
       url: '/review/team',
       params: { teamId: '7', current: 1, size: 20 },
+    })
+  })
+
+  it('whitelists the canonical weekly-review save and update bodies', async () => {
+    const readSave = mockSuccess(true)
+    await saveWeeklyReviewApi({
+      year: 2026,
+      weekNo: 35,
+      visibilityScope: 'TEAM',
+      teamId: '7',
+      focusProjectId: '9',
+      reflection: 'Private reflection',
+      nextPlan: 'Next plan',
+      sharedSummary: 'Shared summary',
+      taskIds: ['11'],
+      completedTaskCount: 99,
+    } as Parameters<typeof saveWeeklyReviewApi>[0] & { completedTaskCount: number })
+    expect(parseBody(readSave()?.data)).toEqual({
+      year: 2026,
+      weekNo: 35,
+      visibilityScope: 'TEAM',
+      teamId: '7',
+      focusProjectId: '9',
+      reflection: 'Private reflection',
+      nextPlan: 'Next plan',
+      sharedSummary: 'Shared summary',
+      taskIds: ['11'],
+    })
+
+    const readUpdate = mockSuccess(true)
+    await updateWeeklyReviewApi({
+      id: '31',
+      visibilityScope: 'PRIVATE',
+      teamId: null,
+      focusProjectId: null,
+      reflection: 'Updated reflection',
+      nextPlan: 'Updated plan',
+      sharedSummary: '',
+      taskIds: [],
+      year: 2026,
+      weekNo: 35,
+    } as Parameters<typeof updateWeeklyReviewApi>[0] & { year: number; weekNo: number })
+    expect(parseBody(readUpdate()?.data)).toEqual({
+      id: '31',
+      visibilityScope: 'PRIVATE',
+      teamId: null,
+      focusProjectId: null,
+      reflection: 'Updated reflection',
+      nextPlan: 'Updated plan',
+      sharedSummary: '',
+      taskIds: [],
+    })
+  })
+
+  it('keeps the stage-0 review compatibility calls on a narrow whitelist', async () => {
+    const readSave = mockSuccess(true)
+    const legacySave = {
+      year: 2026,
+      weekNo: 35,
+      startDate: '2026-08-24',
+      endDate: '2026-08-30',
+      completedTaskCount: 4,
+      focusProjectName: 'Private project',
+      reflection: 'Legacy reflection',
+    }
+    await saveReviewApi(legacySave)
+    expect(parseBody(readSave()?.data)).toEqual({
+      year: 2026,
+      weekNo: 35,
+      reflection: 'Legacy reflection',
+    })
+
+    const readUpdate = mockSuccess(true)
+    const legacyUpdate = {
+      id: '31',
+      year: 2026,
+      weekNo: 35,
+      completedTaskCount: 4,
+      reflection: 'Legacy update',
+    }
+    await updateReviewApi(legacyUpdate)
+    expect(parseBody(readUpdate()?.data)).toEqual({
+      id: '31',
+      reflection: 'Legacy update',
     })
   })
 

@@ -58,7 +58,6 @@ export interface CreateTaskPayload {
   title: string
   projectId: EntityId
   description?: string
-  status?: number
   priority?: number
   dueDate?: string | null
   milestoneId?: EntityId | null
@@ -68,7 +67,6 @@ export interface CreateTaskPayload {
 export interface UpdateTaskContentPayload {
   id: EntityId
   title?: string
-  projectId?: EntityId
   description?: string
   priority?: number
   dueDate?: string | null

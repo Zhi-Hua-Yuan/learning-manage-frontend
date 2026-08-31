@@ -162,6 +162,10 @@ const closeMenu = (restoreFocus = true) => {
   if (restoreFocus) triggerRef.value?.focus()
 }
 
+defineExpose({
+  close: (restoreFocus = false) => closeMenu(restoreFocus),
+})
+
 const toggleMenu = () => {
   if (isOpen.value) closeMenu()
   else void openMenu()

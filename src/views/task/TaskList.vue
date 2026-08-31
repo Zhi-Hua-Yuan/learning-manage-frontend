@@ -77,6 +77,7 @@
         class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5"
       >
         <div
+          v-if="canCreateTaskInCurrentContext"
           ref="newTaskQuickCreateRef"
           class="card-base flex flex-col gap-2 bg-[var(--color-bg-surface)] p-3 sm:flex-row sm:items-center"
           @focusin="onNewTaskQuickCreateFocusIn"
@@ -92,8 +93,9 @@
               @focus="onNewTaskInputFocus"
               type="text"
               maxlength="50"
+              :disabled="isAddingTask"
               placeholder="输入任务标题（最多 50 字），按回车保存，Tab 选择所属阶段"
-              class="w-full min-w-0 bg-transparent text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
+              class="w-full min-w-0 bg-transparent text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)] disabled:cursor-wait disabled:opacity-60"
             />
             <button
               v-if="isInputFocused || isNewTaskFlagMenuOpen"
@@ -104,6 +106,7 @@
               aria-haspopup="listbox"
               :aria-controls="newTaskFlagMenuId"
               :aria-expanded="isNewTaskFlagMenuOpen ? 'true' : 'false'"
+              :disabled="isAddingTask"
               @mousedown.prevent="toggleNewTaskFlagMenu"
               @focus="onNewTaskFlagTriggerFocus"
               @keydown="onNewTaskFlagTriggerKeydown"
@@ -114,6 +117,33 @@
               <span class="max-w-24 truncate">{{ newTaskMilestoneLabel }}</span>
             </button>
           </div>
+
+          <div
+            v-if="!isTeamProjectContext"
+            class="inline-flex shrink-0 items-center gap-1 rounded-md bg-[var(--color-bg-surface-secondary)] px-2 py-1.5 text-xs text-[var(--color-text-secondary)]"
+            data-testid="new-task-personal-assignee"
+          >
+            <span>负责人</span>
+            <span class="max-w-28 truncate font-medium text-[var(--color-text-body)]">
+              {{ newTaskPersonalAssigneeLabel }}
+            </span>
+          </div>
+
+          <TaskAssigneePicker
+            v-else
+            :key="currentContextKey"
+            ref="newTaskAssigneePickerRef"
+            v-model="newTaskAssigneeUserId"
+            class="w-full shrink-0 sm:w-48"
+            :options="newTaskAssigneeOptions"
+            :loading="newTaskAssigneeLoading"
+            :error-message="newTaskAssigneeErrorMessage"
+            :disabled="isAddingTask"
+            trigger-label="选择任务负责人"
+            @open="onNewTaskAssigneePickerOpen"
+            @close="onNewTaskAssigneePickerClose"
+            @retry="onNewTaskAssigneePickerRetry"
+          />
 
           <!-- Flag Menu Popup - shows milestone/stage options -->
           <div
@@ -150,7 +180,15 @@
               </svg>
             </button>
           </div>
+        </div>
 
+        <div
+          v-else
+          class="card-base bg-[var(--color-bg-surface)] px-3 py-3 text-sm text-[var(--color-text-secondary)]"
+          data-testid="new-task-create-denied"
+          role="status"
+        >
+          {{ taskCreateDeniedMessage }}
         </div>
       </div>
 
@@ -1159,11 +1197,16 @@ import {
 } from '@/api/milestone'
 import { useToast } from '@/composables/useToast'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
+import {
+  useTaskAssigneeCandidates,
+  type TaskAssigneeCandidateContext,
+} from '@/composables/useTaskAssigneeCandidates'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { useToastStore } from '@/stores/toast'
 import TaskAssigneeEntry from '@/components/TaskAssigneeEntry.vue'
+import TaskAssigneePicker from '@/components/TaskAssigneePicker.vue'
 import {
   buildPersonalProjectRoute,
   parseTaskProjectContext,
@@ -1210,6 +1253,11 @@ import {
   type TaskAction,
 } from '@/utils/taskCapabilities'
 import { resolveTaskAssigneePresentation } from '@/utils/taskAssigneePresentation'
+import {
+  buildTaskQuickCreatePayload,
+  resolveTaskQuickCreateAccess,
+  type TaskQuickCreateContext,
+} from '@/utils/taskQuickCreate'
 import { classifyApiError } from '@/utils/request'
 import {
   createTaskStatusRequestId,
@@ -1592,6 +1640,46 @@ const selectedProject = computed<Project | undefined>(() => {
     color: project.color ?? undefined,
   }
 })
+const selectedTeamContext = computed(() => (
+  selectedTeamId.value ? collaborationStore.getTeam(selectedTeamId.value) : null
+))
+const taskQuickCreateContext = computed<TaskQuickCreateContext>(() => {
+  if (isAggregateView.value || !selectedProjectId.value) return { kind: 'unavailable' }
+
+  if (isTeamProjectContext.value) {
+    const team = selectedTeamContext.value
+    return team ? { kind: 'team', role: team.role } : { kind: 'unavailable' }
+  }
+
+  return collaborationStore.currentUser ? { kind: 'personal' } : { kind: 'unavailable' }
+})
+const taskCreateAccess = computed(() => resolveTaskQuickCreateAccess(taskQuickCreateContext.value))
+const canCreateTaskInCurrentContext = computed(() => taskCreateAccess.value.allowed)
+const taskCreateDeniedMessage = computed(() => (
+  taskCreateAccess.value.deniedMessage || '当前不能创建任务。'
+))
+const newTaskAssigneeContext = computed<TaskAssigneeCandidateContext>(() => {
+  if (isAggregateView.value || !selectedProjectId.value) return { kind: 'unavailable' }
+  if (isTeamProjectContext.value) {
+    return selectedTeamId.value
+      ? { kind: 'team', teamId: selectedTeamId.value }
+      : { kind: 'unavailable' }
+  }
+  return { kind: 'personal' }
+})
+const {
+  options: newTaskAssigneeOptions,
+  status: newTaskAssigneeStatus,
+  loading: newTaskAssigneeLoading,
+  errorMessage: newTaskAssigneeErrorMessage,
+  loadCandidates: loadNewTaskAssigneeCandidates,
+  retry: retryNewTaskAssigneeCandidates,
+  reset: resetNewTaskAssigneeCandidates,
+  isSelectableAssignee: isSelectableNewTaskAssignee,
+} = useTaskAssigneeCandidates({
+  context: newTaskAssigneeContext,
+  store: collaborationStore,
+})
 const selectedProjectColor = computed(() =>
   isAggregateView.value ? '' : normalizeProjectColorValue(selectedProject.value?.color),
 )
@@ -1652,6 +1740,9 @@ const shouldShowSlowState = computed(() => boardRenderPhase.value === 'slow')
 
 const newTaskTitle = ref('')
 const newTaskMilestoneId = ref('')
+const newTaskAssigneeUserId = ref<string | null>(null)
+const isNewTaskAssigneePickerOpen = ref(false)
+const isAddingTask = ref(false)
 const isAddingMilestone = ref(false)
 const newMilestoneName = ref('')
 const editingMilestoneId = ref('')
@@ -1679,6 +1770,7 @@ const newTaskQuickCreateRef = ref<HTMLElement | null>(null)
 const newTaskFlagTriggerRef = ref<HTMLButtonElement | null>(null)
 const newTaskFlagMenuRef = ref<HTMLElement | null>(null)
 const newTaskTitleInputRef = ref<HTMLInputElement | null>(null)
+const newTaskAssigneePickerRef = ref<{ close: (restoreFocus?: boolean) => void } | null>(null)
 const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const MIN_DETAIL_WIDTH = 320
@@ -3045,28 +3137,49 @@ const handleProjectListUpdated: EventListener = (event) => {
 }
 
 const addTask = async () => {
+  if (isAddingTask.value) return
   if (suppressNextInputEnter.value) {
     suppressNextInputEnter.value = false
     return
   }
   if (isNewTaskFlagMenuOpen.value) return
+  if (isNewTaskAssigneePickerOpen.value) return
+  if (!canCreateTaskInCurrentContext.value) {
+    toast.error(taskCreateDeniedMessage.value)
+    return
+  }
   if (!newTaskTitle.value.trim() || !selectedProjectId.value) return
 
+  const createContext = taskQuickCreateContext.value
+  if (createContext.kind === 'unavailable') return
+
+  if (
+    createContext.kind === 'team'
+    && newTaskAssigneeUserId.value !== null
+    && !isSelectableNewTaskAssignee(newTaskAssigneeUserId.value)
+  ) {
+    toast.error('负责人列表已发生变化，请重新选择。')
+    return
+  }
+
+  isAddingTask.value = true
   try {
     const finalTitle = newTaskTitle.value.trim().slice(0, TASK_TITLE_MAX_LENGTH)
-    await addTaskApi({
+    await addTaskApi(buildTaskQuickCreatePayload({
       title: finalTitle,
       projectId: selectedProjectId.value,
-      priority: 0,
-      dueDate: null,
-      milestoneId: newTaskMilestoneId.value || undefined,
-    })
+      milestoneId: newTaskMilestoneId.value || null,
+      context: createContext.kind,
+      assigneeUserId: newTaskAssigneeUserId.value,
+    }))
     markListReplanDirty()
     resetNewTaskDraft({ blurInput: true })
     isNewTaskMilestoneMenuOpen.value = false
     await loadTasks({ forceRefresh: true })
   } catch {
     toast.error('添加任务失败，请检查网络后重试。')
+  } finally {
+    isAddingTask.value = false
   }
 }
 
@@ -3192,6 +3305,10 @@ const newTaskMilestoneLabel = computed(() => {
   return matched?.name || '默认列表'
 })
 
+const newTaskPersonalAssigneeLabel = computed(() => (
+  newTaskAssigneeOptions.value[0]?.label || '当前用户'
+))
+
 const getNewTaskFlagOptionId = (index: number) => `new-task-flag-option-${index}`
 
 const isNewTaskMilestoneSelected = (value: string | null) => {
@@ -3245,6 +3362,8 @@ const deleteMilestoneConfirmTitle = computed(() => {
 const closeNewTaskQuickCreateMenus = () => {
   isNewTaskFlagMenuOpen.value = false
   shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+  isNewTaskAssigneePickerOpen.value = false
+  newTaskAssigneePickerRef.value?.close(false)
 }
 
 const collapseNewTaskQuickCreate = () => {
@@ -3255,9 +3374,11 @@ const collapseNewTaskQuickCreate = () => {
 const resetNewTaskDraft = (options: { blurInput?: boolean } = {}) => {
   newTaskTitle.value = ''
   newTaskMilestoneId.value = ''
+  newTaskAssigneeUserId.value = null
   newTaskActiveMilestoneIndex.value = 0
   suppressNextInputEnter.value = false
   shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+  resetNewTaskAssigneeCandidates()
   collapseNewTaskQuickCreate()
   if (options.blurInput) {
     newTaskTitleInputRef.value?.blur()
@@ -3289,6 +3410,8 @@ const moveNewTaskActiveMilestoneIndex = (direction: 1 | -1) => {
 }
 
 const openNewTaskFlagMenu = () => {
+  isNewTaskAssigneePickerOpen.value = false
+  newTaskAssigneePickerRef.value?.close(false)
   isNewTaskFlagMenuOpen.value = true
   syncNewTaskActiveMilestoneIndex()
 }
@@ -3344,6 +3467,27 @@ const onNewTaskInputEnter = () => {
 
 const onNewTaskInputTab = () => {
   shouldOpenNewTaskFlagMenuOnTriggerFocus.value = true
+}
+
+const onNewTaskAssigneePickerOpen = () => {
+  if (!isTeamProjectContext.value || !canCreateTaskInCurrentContext.value || isAddingTask.value) {
+    newTaskAssigneePickerRef.value?.close(false)
+    return
+  }
+
+  isNewTaskAssigneePickerOpen.value = true
+  isNewTaskFlagMenuOpen.value = false
+  shouldOpenNewTaskFlagMenuOnTriggerFocus.value = false
+  void loadNewTaskAssigneeCandidates()
+}
+
+const onNewTaskAssigneePickerClose = () => {
+  isNewTaskAssigneePickerOpen.value = false
+}
+
+const onNewTaskAssigneePickerRetry = () => {
+  if (!isTeamProjectContext.value || !canCreateTaskInCurrentContext.value || isAddingTask.value) return
+  void retryNewTaskAssigneeCandidates()
 }
 
 const onNewTaskFlagTriggerFocus = () => {
@@ -3836,6 +3980,31 @@ const groupedTasks = computed(() => {
   })
 
   return result
+})
+
+watch(newTaskAssigneeStatus, (status) => {
+  if (!isTeamProjectContext.value || newTaskAssigneeUserId.value === null) return
+
+  if (
+    status === 'error'
+    || status === 'unavailable'
+    || (status === 'ready' && !isSelectableNewTaskAssignee(newTaskAssigneeUserId.value))
+  ) {
+    newTaskAssigneeUserId.value = null
+  }
+})
+
+watch(
+  () => collaborationStore.currentUser?.id,
+  (currentActorId, previousActorId) => {
+    if (previousActorId !== undefined && currentActorId !== previousActorId) {
+      resetNewTaskDraft({ blurInput: true })
+    }
+  },
+)
+
+watch(canCreateTaskInCurrentContext, (allowed, wasAllowed) => {
+  if (wasAllowed && !allowed) resetNewTaskDraft({ blurInput: true })
 })
 
 watch(

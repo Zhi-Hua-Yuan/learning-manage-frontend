@@ -31,8 +31,8 @@ export interface ReorderProjectItem {
   orderNo: number
 }
 
-export const fetchProjectList = (params?: ProjectListParams) => {
-  return request.get('/project/list', { params })
+export const fetchProjectList = (params?: ProjectListParams): Promise<WirePage<ProjectWire>> => {
+  return request.get<unknown, Promise<WirePage<ProjectWire>>>('/project/list', { params }) as unknown as Promise<WirePage<ProjectWire>>
 }
 
 export const addProjectApi = (data: AddProjectPayload) => {

@@ -1,5 +1,5 @@
 import request from '../utils/request'
-import type { EntityId } from '@/types/common'
+import type { EntityId, WirePage } from '@/types/common'
 import type {
   AssignTaskPayload,
   ChangeTaskStatusPayload,
@@ -7,6 +7,7 @@ import type {
   TaskAssignmentHistoryPageWire,
   TaskAssignmentResultWire,
   TaskStatusResultWire,
+  TaskWire,
   UpdateTaskContentPayload,
 } from '@/types/task'
 import { omitUndefined, requireEntityId } from './guards'
@@ -20,8 +21,8 @@ export interface TaskListParams {
 }
 
 // 获取任务列表 (对应你后端的 GET /task/list)
-export const fetchTaskList = (params: TaskListParams) => {
-  return request.get('/task/list', { params })
+export const fetchTaskList = (params: TaskListParams): Promise<WirePage<TaskWire>> => {
+  return request.get<unknown, Promise<WirePage<TaskWire>>>('/task/list', { params }) as unknown as Promise<WirePage<TaskWire>>
 }
 
 // 新增任务 (对应你后端的 POST /task/add)

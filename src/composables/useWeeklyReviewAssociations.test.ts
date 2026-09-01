@@ -1,3 +1,4 @@
+import { watch } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { WirePage } from '@/types/common'
@@ -87,6 +88,35 @@ describe('useWeeklyReviewAssociations', () => {
     expect(fetchTasks).toHaveBeenCalledWith({ projectId: '1', current: 1, size: 100 })
     expect(associations.getProjectTasks('1').map((task) => task.id)).toEqual(['11', '12'])
     expect(associations.getProjectTasks('999')).toEqual([])
+  })
+
+  it('publishes new task-bucket records through the reactive proxy', async () => {
+    const fetchProjects = vi.fn(async () => ({
+      records: [projectWire(1, 'PERSONAL')],
+      current: 1,
+      size: 100,
+      total: 1,
+    }))
+    const fetchTasks = vi.fn(async () => ({
+      records: [taskWire(11, 1)],
+      current: 1,
+      size: 100,
+      total: 1,
+    }))
+    const associations = useWeeklyReviewAssociations({ fetchProjects, fetchTasks })
+    const observedLengths: number[] = []
+    const stop = watch(
+      () => associations.taskBucketsByProjectId['1']?.records.length ?? -1,
+      (length) => observedLengths.push(length),
+      { flush: 'sync' },
+    )
+
+    associations.setContext(privateContext)
+    await associations.ensureProjects()
+    await associations.ensureProjectTasks('1')
+
+    expect(observedLengths).toContain(1)
+    stop()
   })
 
   it('keeps project pagination deduplicated and loads the next task page explicitly', async () => {

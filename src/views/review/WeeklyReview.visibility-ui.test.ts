@@ -35,6 +35,9 @@ const collaborationStore = vi.hoisted(() => ({
   },
   bootstrapCollaborationContext: vi.fn(),
   refreshMyTeams: vi.fn(),
+  ensureTeamProjects: vi.fn(),
+  loadMoreTeamProjects: vi.fn(),
+  getTeamProjects: vi.fn(),
   getTeam: vi.fn(),
   pruneTeamContext: vi.fn(),
 }))
@@ -123,6 +126,9 @@ describe('WeeklyReview D2 visibility UI', () => {
     collaborationStore.getTeam.mockImplementation((id: string) => (
       collaborationStore.teams.find((team) => team.id === id) ?? null
     ))
+    collaborationStore.ensureTeamProjects.mockResolvedValue([])
+    collaborationStore.loadMoreTeamProjects.mockResolvedValue([])
+    collaborationStore.getTeamProjects.mockReturnValue([])
   })
 
   it('PR7-T-030/031 saves a new review PRIVATE with an explicit null team', async () => {

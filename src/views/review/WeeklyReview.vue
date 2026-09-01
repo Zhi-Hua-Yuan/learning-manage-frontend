@@ -63,6 +63,22 @@
           </div>
 
           <div class="card-base space-y-6 rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6">
+            <ReviewVisibilityFields
+              ref="visibilityFieldsRef"
+              :visibility-scope="reviewForm.visibilityScope"
+              :team-id="reviewForm.teamId"
+              :shared-summary="reviewForm.sharedSummary"
+              :teams="collaborationStore.teams"
+              :teams-loading="collaborationStore.teamsLoadState.status === 'loading'"
+              :teams-error="teamLoadError"
+              :issues="formIssues"
+              :disabled="isSaving"
+              @update:visibility-scope="handleVisibilityChange"
+              @update:team-id="handleTeamChange"
+              @update:shared-summary="handleSharedSummaryChange"
+              @retry-teams="loadCollaborationContext(true)"
+            />
+
             <div>
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-bold text-[var(--color-text-body)] flex items-center gap-2">
@@ -106,7 +122,7 @@
                 </button>
               </div>
               <textarea
-                v-model="currentReview.reflection"
+                v-model="reviewForm.reflection"
                 :disabled="isPolishing"
                 class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
                 placeholder="可选补充内容（如感受、问题与改进点）..."
@@ -116,7 +132,9 @@
             <div class="flex justify-end pt-2">
               <button
                 @click="openSaveModal"
+                :disabled="isSaving || reviewForm.visibilityScope === 'UNKNOWN'"
                 class="btn-primary flex items-center gap-2 rounded-2xl px-7 py-3 font-bold"
+                :class="isSaving || reviewForm.visibilityScope === 'UNKNOWN' ? 'cursor-not-allowed opacity-70' : ''"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -146,7 +164,7 @@
 
             <div
               v-for="item in historyReviews"
-              :key="item.id"
+              :key="item.id || `${item.year}-${item.weekNo}`"
               @click="item.id && viewDetail(item.id)"
               class="relative group cursor-pointer border-l-2 border-[var(--color-timeline-line)] py-2 pl-4 transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
             >
@@ -173,11 +191,13 @@
     <AppConfirmDialog
       v-model="showSaveConfirmModal"
       icon-name="save"
-      title="确认保存本周总结？"
-      message="保存后，您可以在历史记录中随时查看本次复盘内容。"
-      confirm-text="确认保存"
+      :title="saveConfirmTitle"
+      :message="saveConfirmMessage"
+      :confirm-text="saveConfirmText"
       cancel-text="取消"
+      :loading="isSaving"
       @confirm="executeSave"
+      @cancel="pendingMutation = null"
     />
 
     <div
@@ -272,10 +292,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import ReviewVisibilityFields from '@/components/review/ReviewVisibilityFields.vue'
 import { aiPolishApi } from '@/api/ai'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { fetchProjectList } from '@/api/project'
@@ -285,24 +306,36 @@ import {
   fetchCurrentReview,
   fetchReviewHistory,
   getReviewDetailApi,
-  updateReviewApi,
-  saveReviewApi,
+  saveWeeklyReviewApi,
+  updateWeeklyReviewApi,
 } from '@/api/review'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
+import { useCollaborationStore } from '@/stores/collaboration'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import {
+  normalizeCurrentWeeklyReviewWire,
+  normalizePersistedWeeklyReviewWire,
+} from '@/types/normalization'
+import type {
+  ReviewWriteVisibilityScope,
+  WeeklyReviewDetail,
+  WeeklyReviewSavePayload,
+  WeeklyReviewUpdatePayload,
+} from '@/types/review'
+import {
+  buildWeeklyReviewSavePayload,
+  buildWeeklyReviewUpdatePayload,
+  changeWeeklyReviewTargetTeam,
+  changeWeeklyReviewVisibility,
+  createDefaultWeeklyReviewForm,
+  createWeeklyReviewFormFromDetail,
+  invalidateWeeklyReviewTargetTeam,
+  type WeeklyReviewFormIssue,
+  type WeeklyReviewFormState,
+} from '@/utils/weeklyReviewForm'
+import { classifyApiError } from '@/utils/request'
 import { isTaskCompleted } from '@/utils/taskStatus'
-
-interface ReviewItem {
-  id?: string | number
-  year?: number
-  weekNo?: number
-  startDate?: string
-  endDate?: string
-  completedTaskCount?: number
-  focusProjectName?: string
-  reflection?: string
-}
 
 interface ProjectItem {
   id: string | number
@@ -344,6 +377,30 @@ interface SummaryCardView {
   hintClass: string
 }
 
+type PendingWeeklyReviewMutation =
+  | { mode: 'save'; payload: WeeklyReviewSavePayload; targetTeamName: string | null }
+  | { mode: 'update'; payload: WeeklyReviewUpdatePayload; targetTeamName: string | null }
+
+const createEmptyReviewDetail = (): WeeklyReviewDetail => ({
+  id: null,
+  authorUserId: null,
+  year: 0,
+  weekNo: 0,
+  startDate: null,
+  endDate: null,
+  completedTaskCount: 0,
+  visibilityScope: 'PRIVATE',
+  teamId: null,
+  focusProjectId: null,
+  focusProjectName: null,
+  sharedSummary: '',
+  reflection: '',
+  nextPlan: '',
+  taskIds: [],
+  createTime: null,
+  updateTime: null,
+})
+
 const SUMMARY_PAGE_SIZE = 100
 const MAX_PAGES_PER_PROJECT = 10
 const MAX_TOTAL_REQUESTS = 60
@@ -361,13 +418,19 @@ const router = useRouter()
 const toast = useToast()
 const undoDelete = useUndoDelete()
 const aiPendingRegistry = useAiPendingRegistryStore()
+const collaborationStore = useCollaborationStore()
 const { runAiRequest } = useAiPendingRequest()
 
-const currentReview = ref<ReviewItem>({})
-const historyReviews = ref<ReviewItem[]>([])
+const currentReview = ref<WeeklyReviewDetail>(createEmptyReviewDetail())
+const historyReviews = ref<WeeklyReviewDetail[]>([])
+const reviewForm = ref<WeeklyReviewFormState>(createDefaultWeeklyReviewForm(0, 0))
+const formIssues = ref<WeeklyReviewFormIssue[]>([])
+const pendingMutation = ref<PendingWeeklyReviewMutation | null>(null)
+const isSaving = ref(false)
+const visibilityFieldsRef = ref<InstanceType<typeof ReviewVisibilityFields> | null>(null)
 const isViewMounted = ref(false)
 const showDetailModal = ref(false)
-const selectedReview = ref<ReviewItem | null>(null)
+const selectedReview = ref<WeeklyReviewDetail | null>(null)
 const showSaveConfirmModal = ref(false)
 const showDeleteConfirmModal = ref(false)
 const summaryLoading = ref(false)
@@ -392,6 +455,58 @@ const summaryMetrics = ref<SummaryMetrics>({
 
 const weeklyPolishEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH])
 const isPolishing = computed(() => weeklyPolishEntry.value.status === 'pending')
+const teamLoadError = computed(() => (
+  collaborationStore.teamsLoadState.status === 'error'
+    ? collaborationStore.teamsLoadState.errorMessage || '团队加载失败，请稍后重试。'
+    : null
+))
+const saveConfirmTitle = computed(() => (
+  pendingMutation.value?.payload.visibilityScope === 'TEAM'
+    ? `确认向「${pendingMutation.value.targetTeamName || '所选团队'}」共享摘要？`
+    : '确认保存为私人复盘？'
+))
+const saveConfirmMessage = computed(() => (
+  pendingMutation.value?.payload.visibilityScope === 'TEAM'
+    ? '仅共享单独填写的摘要。本周复盘、下周计划和关联任务仍然只有你自己可见。'
+    : '本周复盘仅你自己可见，不会出现在团队动态中。'
+))
+const saveConfirmText = computed(() => (
+  pendingMutation.value?.payload.visibilityScope === 'TEAM'
+    ? '保存并共享摘要'
+    : '保存私人复盘'
+))
+
+const clearFormIssues = (...fields: WeeklyReviewFormIssue['field'][]) => {
+  const fieldSet = new Set(fields)
+  formIssues.value = formIssues.value.filter((issue) => !fieldSet.has(issue.field))
+}
+
+const loadCollaborationContext = async (force = false) => {
+  try {
+    await collaborationStore.bootstrapCollaborationContext({ force })
+  } catch (error) {
+    console.error('加载周复盘团队上下文失败', error)
+  }
+}
+
+const handleVisibilityChange = (scope: ReviewWriteVisibilityScope) => {
+  reviewForm.value = changeWeeklyReviewVisibility(reviewForm.value, scope)
+  clearFormIssues('visibilityScope', 'teamId', 'focusProjectId', 'taskIds')
+  if (scope === 'PRIVATE') clearFormIssues('sharedSummary')
+  if (scope === 'TEAM' && collaborationStore.teamsLoadState.status !== 'ready') {
+    void loadCollaborationContext()
+  }
+}
+
+const handleTeamChange = (teamId: string | null) => {
+  reviewForm.value = changeWeeklyReviewTargetTeam(reviewForm.value, teamId)
+  clearFormIssues('teamId', 'focusProjectId', 'taskIds')
+}
+
+const handleSharedSummaryChange = (sharedSummary: string) => {
+  reviewForm.value = { ...reviewForm.value, sharedSummary }
+  if (sharedSummary.trim()) clearFormIssues('sharedSummary')
+}
 
 const jumpToRelatedTasks = async () => {
   try {
@@ -774,11 +889,18 @@ const loadReviewData = async () => {
 const loadHistory = async () => {
   try {
     const currentRes = await fetchCurrentReview()
-    currentReview.value =
-      currentRes && typeof currentRes === 'object' ? (currentRes as ReviewItem) : {}
+    const normalizedCurrent = normalizeCurrentWeeklyReviewWire(currentRes)
+    if (!normalizedCurrent) throw new TypeError('Invalid current weekly review response')
+    currentReview.value = normalizedCurrent
+    reviewForm.value = createWeeklyReviewFormFromDetail(normalizedCurrent)
+    formIssues.value = []
 
     const historyRes = await fetchReviewHistory()
-    historyReviews.value = Array.isArray(historyRes) ? (historyRes as ReviewItem[]) : []
+    historyReviews.value = Array.isArray(historyRes)
+      ? historyRes
+        .map((review) => normalizePersistedWeeklyReviewWire(review))
+        .filter((review): review is WeeklyReviewDetail & { id: string } => review !== null)
+      : []
     await hydrateSummaryMetrics()
   } catch (error) {
     console.error('加载周报数据失败', error)
@@ -788,47 +910,103 @@ const loadHistory = async () => {
   }
 }
 
-const openSaveModal = () => {
+const focusFirstFormIssue = async () => {
+  const firstIssue = formIssues.value[0]
+  if (!firstIssue) return
+  await nextTick()
+  await visibilityFieldsRef.value?.focusIssue(firstIssue.field)
+}
+
+const openSaveModal = async () => {
+  if (reviewForm.value.visibilityScope === 'TEAM') {
+    if (collaborationStore.teamsLoadState.status !== 'ready') {
+      toast.error('团队信息尚未加载完成，请稍后重试或改为仅自己可见。')
+      void loadCollaborationContext()
+      return
+    }
+    if (!reviewForm.value.teamId || !collaborationStore.getTeam(reviewForm.value.teamId)) {
+      reviewForm.value = invalidateWeeklyReviewTargetTeam(reviewForm.value)
+    }
+  }
+
+  if (reviewForm.value.id) {
+    const result = buildWeeklyReviewUpdatePayload(reviewForm.value)
+    if (!result.ok) {
+      formIssues.value = result.issues
+      toast.error('请先修正周复盘表单中的问题。')
+      await focusFirstFormIssue()
+      return
+    }
+    pendingMutation.value = {
+      mode: 'update',
+      payload: result.payload,
+      targetTeamName: result.payload.teamId
+        ? collaborationStore.getTeam(result.payload.teamId)?.name ?? null
+        : null,
+    }
+  } else {
+    const result = buildWeeklyReviewSavePayload(reviewForm.value)
+    if (!result.ok) {
+      formIssues.value = result.issues
+      toast.error('请先修正周复盘表单中的问题。')
+      await focusFirstFormIssue()
+      return
+    }
+    pendingMutation.value = {
+      mode: 'save',
+      payload: result.payload,
+      targetTeamName: result.payload.teamId
+        ? collaborationStore.getTeam(result.payload.teamId)?.name ?? null
+        : null,
+    }
+  }
+
+  formIssues.value = []
   showSaveConfirmModal.value = true
 }
 
 const executeSave = async () => {
+  const mutation = pendingMutation.value
+  if (!mutation || isSaving.value) return
+  isSaving.value = true
   try {
-    const payload = {
-      year: currentReview.value.year,
-      weekNo: currentReview.value.weekNo,
-      startDate: currentReview.value.startDate,
-      endDate: currentReview.value.endDate,
-      completedTaskCount: currentReview.value.completedTaskCount,
-      focusProjectName: currentReview.value.focusProjectName,
-      reflection: currentReview.value.reflection,
-    }
-
-    if (currentReview.value.id) {
-      await updateReviewApi({ ...payload, id: currentReview.value.id })
+    if (mutation.mode === 'update') {
+      await updateWeeklyReviewApi(mutation.payload)
     } else {
-      await saveReviewApi(payload)
+      await saveWeeklyReviewApi(mutation.payload)
     }
 
     showSaveConfirmModal.value = false
+    pendingMutation.value = null
     toast.success('保存成功。')
     await loadHistory()
-  } catch {
+  } catch (error) {
+    const errorKind = classifyApiError(error)
+    if (
+      mutation.payload.visibilityScope === 'TEAM'
+      && (errorKind === 'PERMISSION_DENIED' || errorKind === 'NOT_FOUND')
+    ) {
+      const lostTeamId = mutation.payload.teamId
+      if (lostTeamId) collaborationStore.pruneTeamContext(lostTeamId)
+      reviewForm.value = invalidateWeeklyReviewTargetTeam(reviewForm.value)
+      formIssues.value = [{ field: 'teamId', code: 'TEAM_REQUIRED' }]
+      pendingMutation.value = null
+      showSaveConfirmModal.value = false
+      toast.error('当前团队已不可用，请重新选择团队或改为仅自己可见。')
+      await focusFirstFormIssue()
+      return
+    }
     toast.error('保存失败，请检查网络后重试。')
+  } finally {
+    isSaving.value = false
   }
 }
 
 const viewDetail = async (id: number | string) => {
   try {
     const res = await getReviewDetailApi(id)
-    const responseData =
-      res &&
-      typeof res === 'object' &&
-      'data' in (res as { data?: unknown }) &&
-      (res as { data?: unknown }).data &&
-      typeof (res as { data?: unknown }).data === 'object'
-        ? ((res as { data?: ReviewItem }).data ?? null)
-        : (res as ReviewItem)
+    const responseData = normalizePersistedWeeklyReviewWire(res)
+    if (!responseData) throw new TypeError('Invalid weekly review detail response')
     selectedReview.value = responseData
     showDetailModal.value = true
   } catch {
@@ -846,7 +1024,7 @@ const executeDelete = async () => {
 
   const reviewToDelete = { ...selectedReview.value }
   const reviewId = reviewToDelete.id
-  if (reviewId === undefined) return
+  if (!reviewId) return
   const reviewTitle = `${reviewToDelete.year}年第${reviewToDelete.weekNo}周总结`
   const snapshot = [...historyReviews.value]
   const removedIndex = snapshot.findIndex((item) => item.id === reviewId)
@@ -878,12 +1056,9 @@ const executeDelete = async () => {
 
 const handleEditReview = () => {
   if (!selectedReview.value) return
-  currentReview.value.id = selectedReview.value.id
-  currentReview.value.year = selectedReview.value.year
-  currentReview.value.weekNo = selectedReview.value.weekNo
-  currentReview.value.startDate = selectedReview.value.startDate
-  currentReview.value.endDate = selectedReview.value.endDate
-  currentReview.value.reflection = selectedReview.value.reflection
+  currentReview.value = { ...selectedReview.value, taskIds: [...selectedReview.value.taskIds] }
+  reviewForm.value = createWeeklyReviewFormFromDetail(selectedReview.value)
+  formIssues.value = []
   showDetailModal.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
   toast.success('已加载至编辑器，修改后点击保存即可。')
@@ -928,7 +1103,7 @@ const applyWeeklyPolishResponse = (payload: unknown) => {
   if (payload && typeof payload === 'object') {
     const response = payload as { review?: unknown }
     if (typeof response.review === 'string' && response.review.trim()) {
-      currentReview.value.reflection = response.review
+      reviewForm.value = { ...reviewForm.value, reflection: response.review }
       return true
     }
   }
@@ -938,17 +1113,17 @@ const applyWeeklyPolishResponse = (payload: unknown) => {
   try {
     const parsedData = JSON.parse(payload) as { review?: unknown }
     if (typeof parsedData.review === 'string' && parsedData.review.trim()) {
-      currentReview.value.reflection = parsedData.review
+      reviewForm.value = { ...reviewForm.value, reflection: parsedData.review }
       return true
     }
   } catch {
     console.error('JSON 解析失败, AI 返回的原始数据为:', payload)
-    currentReview.value.reflection = payload
+    reviewForm.value = { ...reviewForm.value, reflection: payload }
     toast.error('AI 返回格式异常，内容已填入复盘区，请手动调整。')
     return true
   }
 
-  currentReview.value.reflection = payload
+  reviewForm.value = { ...reviewForm.value, reflection: payload }
   return true
 }
 
@@ -963,7 +1138,7 @@ const consumePendingWeeklyPolish = () => {
 }
 
 const handleAiPolish = async () => {
-  const reflectionInput = currentReview.value.reflection?.trim() || ''
+  const reflectionInput = reviewForm.value.reflection.trim()
   const taskIds = weeklyCompletedTaskIds.value.length > 0 ? weeklyCompletedTaskIds.value : undefined
 
   const result = await runAiRequest({
@@ -991,8 +1166,30 @@ const handleAiPolish = async () => {
 
 onMounted(async () => {
   isViewMounted.value = true
+  void loadCollaborationContext()
   await loadReviewData()
 })
+
+watch(
+  [
+    () => collaborationStore.teamsLoadState.status,
+    () => collaborationStore.teams.map((team) => team.id).join(','),
+    () => reviewForm.value.visibilityScope,
+    () => reviewForm.value.teamId,
+  ],
+  ([status]) => {
+    if (
+      status !== 'ready'
+      || reviewForm.value.visibilityScope !== 'TEAM'
+      || !reviewForm.value.teamId
+      || collaborationStore.getTeam(reviewForm.value.teamId)
+    ) return
+
+    reviewForm.value = invalidateWeeklyReviewTargetTeam(reviewForm.value)
+    formIssues.value = [{ field: 'teamId', code: 'TEAM_REQUIRED' }]
+    toast.error('原共享团队已不可用，请重新选择团队或改为仅自己可见。')
+  },
+)
 
 watch(
   () => weeklyPolishEntry.value.status,

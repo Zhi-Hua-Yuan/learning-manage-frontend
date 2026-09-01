@@ -4,8 +4,11 @@ import {
   MAX_WEEKLY_REVIEW_TASKS,
   buildWeeklyReviewSavePayload,
   buildWeeklyReviewUpdatePayload,
+  changeWeeklyReviewTargetTeam,
+  changeWeeklyReviewVisibility,
   createDefaultWeeklyReviewForm,
   createWeeklyReviewFormFromDetail,
+  invalidateWeeklyReviewTargetTeam,
   validateWeeklyReviewForm,
 } from './weeklyReviewForm'
 
@@ -206,5 +209,105 @@ describe('weekly review form domain', () => {
       { field: 'year', code: 'INVALID_YEAR' },
       { field: 'weekNo', code: 'INVALID_WEEK' },
     ]))
+  })
+
+  it('clears scoped associations when entering TEAM and preserves private drafts', () => {
+    const original = {
+      ...createDefaultWeeklyReviewForm(2026, 36),
+      teamId: '7',
+      focusProjectId: '9',
+      taskIds: ['11', '12'],
+      reflection: 'Private reflection',
+      nextPlan: 'Private next plan',
+      sharedSummary: 'Shared draft',
+    }
+
+    const changed = changeWeeklyReviewVisibility(original, 'TEAM')
+    expect(changed).toMatchObject({
+      visibilityScope: 'TEAM',
+      teamId: null,
+      focusProjectId: null,
+      taskIds: [],
+      reflection: 'Private reflection',
+      nextPlan: 'Private next plan',
+      sharedSummary: 'Shared draft',
+    })
+    expect(original).toMatchObject({
+      visibilityScope: 'PRIVATE',
+      teamId: '7',
+      focusProjectId: '9',
+      taskIds: ['11', '12'],
+    })
+  })
+
+  it('clears the TEAM target when returning to PRIVATE but keeps the unpublished summary draft', () => {
+    const changed = changeWeeklyReviewVisibility({
+      ...createDefaultWeeklyReviewForm(2026, 36),
+      visibilityScope: 'TEAM',
+      teamId: '7',
+      focusProjectId: '9',
+      taskIds: ['11'],
+      sharedSummary: 'Keep locally',
+    }, 'PRIVATE')
+
+    expect(changed).toMatchObject({
+      visibilityScope: 'PRIVATE',
+      teamId: null,
+      focusProjectId: null,
+      taskIds: [],
+      sharedSummary: 'Keep locally',
+    })
+    expect(buildWeeklyReviewSavePayload(changed)).toMatchObject({
+      ok: true,
+      payload: { teamId: null, sharedSummary: '' },
+    })
+  })
+
+  it('clears associations only when the TEAM target actually changes', () => {
+    const original = {
+      ...createDefaultWeeklyReviewForm(2026, 36),
+      visibilityScope: 'TEAM' as const,
+      teamId: '7',
+      focusProjectId: '9',
+      taskIds: ['11'],
+    }
+
+    expect(changeWeeklyReviewTargetTeam(original, '8')).toMatchObject({
+      teamId: '8',
+      focusProjectId: null,
+      taskIds: [],
+    })
+    expect(changeWeeklyReviewTargetTeam(original, '7')).toMatchObject({
+      teamId: '7',
+      focusProjectId: '9',
+      taskIds: ['11'],
+    })
+  })
+
+  it('fails a lost TEAM target closed without discarding authored text', () => {
+    const invalidated = invalidateWeeklyReviewTargetTeam({
+      ...createDefaultWeeklyReviewForm(2026, 36),
+      visibilityScope: 'TEAM',
+      teamId: '7',
+      focusProjectId: '9',
+      taskIds: ['11'],
+      reflection: 'Private reflection',
+      nextPlan: 'Private next plan',
+      sharedSummary: 'Shared draft',
+    })
+
+    expect(invalidated).toMatchObject({
+      visibilityScope: 'TEAM',
+      teamId: null,
+      focusProjectId: null,
+      taskIds: [],
+      reflection: 'Private reflection',
+      nextPlan: 'Private next plan',
+      sharedSummary: 'Shared draft',
+    })
+    expect(validateWeeklyReviewForm(invalidated)).toContainEqual({
+      field: 'teamId',
+      code: 'TEAM_REQUIRED',
+    })
   })
 })

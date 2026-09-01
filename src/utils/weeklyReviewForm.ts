@@ -84,6 +84,48 @@ export function createWeeklyReviewFormFromDetail(detail: WeeklyReviewDetail): We
   }
 }
 
+export function changeWeeklyReviewVisibility(
+  form: WeeklyReviewFormState,
+  visibilityScope: Exclude<NormalizedReviewVisibilityScope, 'UNKNOWN'>,
+): WeeklyReviewFormState {
+  if (form.visibilityScope === visibilityScope) return { ...form, taskIds: [...form.taskIds] }
+
+  return {
+    ...form,
+    visibilityScope,
+    teamId: null,
+    focusProjectId: null,
+    taskIds: [],
+  }
+}
+
+export function changeWeeklyReviewTargetTeam(
+  form: WeeklyReviewFormState,
+  teamId: string | null,
+): WeeklyReviewFormState {
+  const normalizedTeamId = teamId === null ? null : normalizeEntityId(teamId)
+  const nextTeamId = normalizedTeamId ?? null
+  if (form.teamId === nextTeamId) return { ...form, taskIds: [...form.taskIds] }
+
+  return {
+    ...form,
+    teamId: nextTeamId,
+    focusProjectId: null,
+    taskIds: [],
+  }
+}
+
+export function invalidateWeeklyReviewTargetTeam(
+  form: WeeklyReviewFormState,
+): WeeklyReviewFormState {
+  return {
+    ...form,
+    teamId: null,
+    focusProjectId: null,
+    taskIds: [],
+  }
+}
+
 function uniqueTaskIds(taskIds: readonly string[]): { taskIds: string[]; hasInvalidId: boolean } {
   const normalized: string[] = []
   const seen = new Set<string>()

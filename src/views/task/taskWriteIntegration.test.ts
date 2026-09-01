@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import taskListSource from './TaskList.vue?raw'
+import taskStatusMutationSource from '@/composables/useTaskStatusMutation.ts?raw'
 
 const extractObjectArgumentCalls = (functionName: string) => {
   const calls: string[] = []
@@ -69,15 +70,14 @@ const expectOrderedMarkers = (source: string, markers: string[]) => {
 
 describe('TaskList write integration contract', () => {
   it('routes status changes through the dedicated endpoint and refreshes server facts', () => {
-    const calls = extractObjectArgumentCalls('changeTaskStatusApi')
-
-    expect(calls).toHaveLength(1)
-    expect(calls[0]).toContain('taskId: currentTask.id')
-    expect(calls[0]).toContain('targetStatus: nextStatus')
-    expect(calls[0]).toContain('expectedStatus: oldStatus')
-    expect(calls[0]).toContain('clientRequestId')
+    expect(taskStatusMutationSource).toContain('changeTaskStatusApi({')
+    expect(taskStatusMutationSource).toContain('taskId: command.taskId')
+    expect(taskStatusMutationSource).toContain('targetStatus: command.targetStatus')
+    expect(taskStatusMutationSource).toContain('expectedStatus: command.expectedStatus')
+    expect(taskStatusMutationSource).toContain('clientRequestId: command.clientRequestId')
+    expect(taskStatusMutationSource).toContain('createTaskStatusRequestId()')
     expect(taskListSource).toMatch(
-      /currentTask\.status = normalizeTaskStatusResult\(result\.finalStatus\)[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/,
+      /applyTaskStatusSnapshot\(state, outcome\.result\.finalStatus, outcome\.result\.completedAt\)[\s\S]*?loadTasks\(\{ forceRefresh: true \}\)/,
     )
     expect(taskListSource).not.toMatch(/\bupdateTaskApi\b/)
   })
@@ -104,9 +104,8 @@ describe('TaskList write integration contract', () => {
   it('guards every task mutation with the exact capability before side effects', () => {
     expectOrderedMarkers(extractFunctionBlock('setTaskStatus'), [
       "ensureTaskActionAllowed(task, 'changeStatus')",
-      'createTaskStatusRequestId()',
       'currentTask.status = nextStatus',
-      'changeTaskStatusApi({',
+      'submitNewTaskStatusMutation({',
     ])
     expectOrderedMarkers(extractFunctionBlock('selectPriority'), [
       "ensureTaskActionAllowed(selectedTask.value.id, 'reorganize')",

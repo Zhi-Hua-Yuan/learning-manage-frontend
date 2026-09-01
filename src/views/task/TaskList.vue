@@ -273,17 +273,15 @@
                   <button
                     type="button"
                     :data-testid="`task-status-toggle-${task.id}`"
-                    :disabled="!canPerformTaskAction(task, 'changeStatus')"
+                    :disabled="isTaskStatusActionDisabled(task)"
                     :aria-pressed="isTaskCompleted(task.status)"
                     :aria-label="
-                      canPerformTaskAction(task, 'changeStatus')
+                      !isTaskStatusActionDisabled(task)
                         ? `切换任务“${task.title}”状态`
-                        : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                        : resolveTaskStatusActionTitle(task)
                     "
                     :title="
-                      canPerformTaskAction(task, 'changeStatus')
-                        ? '切换任务状态'
-                        : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                      resolveTaskStatusActionTitle(task)
                     "
                     class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     :class="
@@ -466,17 +464,15 @@
                   <button
                     type="button"
                     :data-testid="`task-status-toggle-${task.id}`"
-                    :disabled="!canPerformTaskAction(task, 'changeStatus')"
+                    :disabled="isTaskStatusActionDisabled(task)"
                     :aria-pressed="isTaskCompleted(task.status)"
                     :aria-label="
-                      canPerformTaskAction(task, 'changeStatus')
+                      !isTaskStatusActionDisabled(task)
                         ? `切换任务“${task.title}”状态`
-                        : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                        : resolveTaskStatusActionTitle(task)
                     "
                     :title="
-                      canPerformTaskAction(task, 'changeStatus')
-                        ? '切换任务状态'
-                        : TASK_ACTION_DENIED_MESSAGE.changeStatus
+                      resolveTaskStatusActionTitle(task)
                     "
                     class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     :class="
@@ -726,6 +722,14 @@
               {{ selectedDeleteUi.deniedMessage }}
             </span>
           </div>
+
+          <TaskStatusRecoveryNotice
+            v-if="selectedTaskStatusMutation"
+            :phase="selectedTaskStatusMutation.phase"
+            :message="selectedTaskStatusMutation.errorMessage"
+            @retry="retrySelectedTaskStatusRequest"
+            @refresh="refreshSelectedTaskStatusFacts"
+          />
 
           <div class="space-y-1">
             <textarea
@@ -1450,8 +1454,10 @@
                 v-for="option in completionQualityOptions"
                 :key="option.status"
                 type="button"
+                :data-testid="`task-completion-quality-${option.status}`"
                 class="completion-option focus-ring rounded-xl px-2 py-3 transition-all"
                 :class="option.toneClass"
+                :disabled="pendingCompletionTask ? isTaskStatusActionDisabled(pendingCompletionTask) : true"
                 @click="confirmCompletionQuality(option.status)"
               >
                 <span class="block text-3xl leading-none">{{ option.emoji }}</span>
@@ -1499,7 +1505,6 @@ import {
 import { fetchProjectList } from '@/api/project'
 import {
   addTaskApi,
-  changeTaskStatusApi,
   deleteTaskApi,
   fetchTaskList,
   updateTaskContentApi,
@@ -1529,7 +1534,13 @@ import TaskAssigneeEntry from '@/components/TaskAssigneeEntry.vue'
 import TaskAssigneePicker from '@/components/TaskAssigneePicker.vue'
 import TaskAssignmentDialog from '@/components/TaskAssignmentDialog.vue'
 import TaskAssignmentHistoryDrawer from '@/components/TaskAssignmentHistoryDrawer.vue'
+import TaskStatusRecoveryNotice from '@/components/TaskStatusRecoveryNotice.vue'
 import { useTaskAssignmentHistory } from '@/composables/useTaskAssignmentHistory'
+import {
+  useTaskStatusMutation,
+  type TaskStatusMutationOutcome,
+  type TaskStatusMutationState,
+} from '@/composables/useTaskStatusMutation'
 import {
   buildPersonalProjectRoute,
   parseTaskProjectContext,
@@ -1584,7 +1595,6 @@ import {
   type TaskQuickCreateContext,
 } from '@/utils/taskQuickCreate'
 import { classifyApiError } from '@/utils/request'
-import { createTaskStatusRequestId, normalizeTaskStatusResult } from '@/utils/taskWrite'
 
 interface TodayAiOrderMeta {
   rank: number
@@ -1980,6 +1990,20 @@ const {
   loadMore: loadMoreTaskAssignmentHistoryRecords,
   reset: resetTaskAssignmentHistory,
 } = useTaskAssignmentHistory()
+const {
+  getState: getTaskStatusMutationState,
+  isBlocked: isTaskStatusMutationBlocked,
+  submitNew: submitNewTaskStatusMutation,
+  retryUncertain: retryUncertainTaskStatusMutation,
+  beginFactReconciliation: beginTaskStatusFactReconciliation,
+  restoreUncertain: restoreUncertainTaskStatusMutation,
+  markCommittedRefreshError: markTaskStatusCommittedRefreshError,
+  markFactRefreshError: markTaskStatusFactRefreshError,
+  beginFactRefreshRetry: beginTaskStatusFactRefreshRetry,
+  claimChangedSideEffect: claimTaskStatusChangedSideEffect,
+  complete: completeTaskStatusMutation,
+  resetAll: resetAllTaskStatusMutations,
+} = useTaskStatusMutation()
 const isTaskAssignmentHistoryDrawerOpen = ref(false)
 const taskAssignmentHistoryDrawerRef = ref<InstanceType<typeof TaskAssignmentHistoryDrawer> | null>(
   null,
@@ -3279,6 +3303,26 @@ const ensureTaskActionAllowed = (
   return null
 }
 
+const isTaskStatusActionDisabled = (task: TaskModel) => (
+  !canPerformTaskAction(task, 'changeStatus') || isTaskStatusMutationBlocked(task.id)
+)
+
+const resolveTaskStatusActionTitle = (task: TaskModel) => {
+  if (!canPerformTaskAction(task, 'changeStatus')) {
+    return TASK_ACTION_DENIED_MESSAGE.changeStatus
+  }
+  const mutation = getTaskStatusMutationState(task.id)
+  if (!mutation) return '切换任务状态'
+  if (mutation.phase === 'submitting') return '任务状态正在提交'
+  if (mutation.phase === 'uncertain') return '上一次状态结果尚未确认，请打开任务详情恢复'
+  if (mutation.phase === 'committed-refresh-error') return '状态已提交，请重新加载最新任务'
+  return '正在核对最新任务状态'
+}
+
+const selectedTaskStatusMutation = computed<TaskStatusMutationState | null>(() => (
+  selectedTask.value ? getTaskStatusMutationState(selectedTask.value.id) : null
+))
+
 const failClosedTaskCapabilities = (taskId: string) => {
   taskList.value = taskList.value.map((task) =>
     task.id === taskId ? { ...task, capabilities: DENY_ALL_TASK_CAPABILITIES } : task,
@@ -3655,37 +3699,174 @@ const addTask = async () => {
   }
 }
 
+const applyTaskStatusSnapshot = (
+  state: TaskStatusMutationState,
+  status: number,
+  completedAt: string | null,
+) => {
+  if (state.command.contextKey !== currentContextKey.value) return
+  const currentTask = findTaskById(taskList.value, state.command.taskId)
+  if (!currentTask) return
+  currentTask.status = status
+  currentTask.completedAt = completedAt
+}
+
+const reconcileTaskStatusFacts = async (
+  state: TaskStatusMutationState,
+  options: { committed: boolean; failureMessage: string },
+) => {
+  const outcome = await loadTasks({ forceRefresh: true })
+  if (state.command.contextKey !== currentContextKey.value) {
+    completeTaskStatusMutation(state.command.taskId)
+    return false
+  }
+
+  if (outcome.status !== 'ok') {
+    failClosedTaskCapabilities(state.command.taskId)
+    if (options.committed) {
+      markTaskStatusCommittedRefreshError(state.command.taskId, options.failureMessage)
+    } else {
+      markTaskStatusFactRefreshError(state.command.taskId, options.failureMessage)
+    }
+    toast.warning(options.failureMessage)
+    return false
+  }
+
+  const refreshedTask = findTaskById(taskList.value, state.command.taskId)
+  completeTaskStatusMutation(state.command.taskId)
+  if (!refreshedTask) {
+    if (selectedTask.value?.id === state.command.taskId) closeDetail()
+    toast.warning('任务已不存在或当前不可访问。')
+    return false
+  }
+  return true
+}
+
+const handleTaskStatusMutationOutcome = async (outcome: TaskStatusMutationOutcome) => {
+  if (outcome.kind === 'ignored' || outcome.kind === 'stale') return false
+
+  const { state } = outcome
+  const { command } = state
+  if (outcome.kind === 'success') {
+    applyTaskStatusSnapshot(state, outcome.result.finalStatus, outcome.result.completedAt)
+    if (claimTaskStatusChangedSideEffect(command.taskId)) markListReplanDirty()
+    return reconcileTaskStatusFacts(state, {
+      committed: true,
+      failureMessage: '任务状态已提交，但最新任务信息加载失败，请重新加载后再操作。',
+    })
+  }
+
+  applyTaskStatusSnapshot(state, command.expectedStatus, command.previousCompletedAt)
+
+  if (
+    outcome.errorKind === 'NETWORK'
+    || outcome.errorKind === 'SERVER'
+    || outcome.errorKind === 'UNKNOWN'
+  ) {
+    toast.warning(state.errorMessage || '任务状态结果尚未确认，请重试原请求或刷新最新状态。')
+    return false
+  }
+
+  if (outcome.errorKind === 'AUTHENTICATION_REQUIRED') {
+    completeTaskStatusMutation(command.taskId)
+    return false
+  }
+
+  if (outcome.errorKind === 'PERMISSION_DENIED') {
+    failClosedTaskCapabilities(command.taskId)
+  }
+
+  const safeMessage = outcome.errorKind === 'CONFLICT'
+    ? '任务状态已被其他操作修改，已刷新最新状态。'
+    : outcome.errorKind === 'PERMISSION_DENIED'
+      ? '任务状态权限已发生变化，已刷新最新权限。'
+      : outcome.errorKind === 'NOT_FOUND'
+        ? '任务已不存在或当前不可访问。'
+        : '状态变更请求无法应用，已刷新最新任务。'
+  const refreshed = await reconcileTaskStatusFacts(state, {
+    committed: false,
+    failureMessage: '最新任务状态加载失败，请重新加载后再操作。',
+  })
+  if (refreshed) toast.warning(safeMessage)
+  return false
+}
+
 const setTaskStatus = async (task: TaskModel, nextStatus: number) => {
   const currentTask = ensureTaskActionAllowed(task, 'changeStatus')
-  if (!currentTask) return
+  if (!currentTask) return false
+  if (isTaskStatusMutationBlocked(currentTask.id)) {
+    toast.warning('该任务的上一次状态变更尚未确认，请先恢复最新状态。')
+    return false
+  }
 
-  const oldStatus = currentTask.status
-  const clientRequestId = createTaskStatusRequestId()
+  const previousStatus = currentTask.status
+  const previousCompletedAt = currentTask.completedAt
   currentTask.status = nextStatus
-  try {
-    const result = await changeTaskStatusApi({
-      taskId: currentTask.id,
-      targetStatus: nextStatus,
-      expectedStatus: oldStatus,
-      clientRequestId,
-    })
-    currentTask.status = normalizeTaskStatusResult(result.finalStatus)
-    if (result.completedAt !== undefined) {
-      currentTask.completedAt = result.completedAt
+  const outcome = await submitNewTaskStatusMutation({
+    taskId: currentTask.id,
+    projectId: currentTask.projectId,
+    contextKey: currentContextKey.value,
+    expectedStatus: previousStatus,
+    targetStatus: nextStatus,
+    previousCompletedAt,
+  })
+  return handleTaskStatusMutationOutcome(outcome)
+}
+
+const retrySelectedTaskStatusRequest = async () => {
+  const taskId = selectedTask.value?.id
+  if (!taskId) return
+  const state = getTaskStatusMutationState(taskId)
+  if (!state || state.phase !== 'uncertain') return
+
+  applyTaskStatusSnapshot(state, state.command.targetStatus, state.command.previousCompletedAt)
+  const outcome = await retryUncertainTaskStatusMutation(taskId)
+  await handleTaskStatusMutationOutcome(outcome)
+}
+
+const refreshSelectedTaskStatusFacts = async () => {
+  const taskId = selectedTask.value?.id
+  if (!taskId) return
+  const currentState = getTaskStatusMutationState(taskId)
+  if (!currentState) return
+  const previousPhase = currentState.phase
+  const state = previousPhase === 'uncertain'
+    ? beginTaskStatusFactReconciliation(taskId)
+    : beginTaskStatusFactRefreshRetry(taskId)
+  if (!state) return
+
+  const outcome = await loadTasks({ forceRefresh: true })
+  if (state.command.contextKey !== currentContextKey.value) {
+    completeTaskStatusMutation(taskId)
+    return
+  }
+  if (outcome.status !== 'ok') {
+    failClosedTaskCapabilities(taskId)
+    if (previousPhase === 'uncertain') {
+      restoreUncertainTaskStatusMutation(
+        taskId,
+        '最新任务状态加载失败，仍可重试原请求或再次刷新。',
+      )
+    } else {
+      markTaskStatusFactRefreshError(taskId, '最新任务状态加载失败，请重新加载后再操作。')
     }
-    await loadTasks({ forceRefresh: true })
-    if (result.changed) markListReplanDirty()
-  } catch (error) {
-    currentTask.status = oldStatus
-    const permissionRecovered = await handleTaskMutationFailure(
-      error,
-      currentTask.id,
-      '更新状态失败，请检查网络后重试。',
-    )
-    if (!permissionRecovered) {
-      await loadTasks({ forceRefresh: true })
-    }
-    throw new Error('update-task-status-failed')
+    toast.warning('最新任务状态加载失败，请稍后重试。')
+    return
+  }
+
+  const refreshedTask = findTaskById(taskList.value, taskId)
+  if (
+    previousPhase === 'uncertain'
+    && refreshedTask?.status === state.command.targetStatus
+    && state.command.expectedStatus !== state.command.targetStatus
+  ) {
+    markListReplanDirty()
+    toast.info('任务状态已经生效，已同步最新状态。')
+  }
+  completeTaskStatusMutation(taskId)
+  if (!refreshedTask) {
+    closeDetail()
+    toast.warning('任务已不存在或当前不可访问。')
   }
 }
 
@@ -4998,6 +5179,7 @@ watch(
       resetNewTaskDraft({ blurInput: true })
       closeTaskAssignmentDialog(false)
       closeTaskAssignmentHistoryDrawer(false)
+      resetAllTaskStatusMutations()
     }
   },
 )
@@ -5031,6 +5213,7 @@ watch(
     closeListReplanPreviewDialog()
     resetNewTaskDraft({ blurInput: true })
     closeTaskAssignmentHistoryDrawer(false)
+    resetAllTaskStatusMutations()
 
     if (previousListId && !prevTeamId) {
       clearListReplanPreviewState({
@@ -5176,6 +5359,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  resetAllTaskStatusMutations()
   isTaskViewMounted.value = false
   closeTodayAiReasonDialog()
   closeListReplanPreviewDialog()

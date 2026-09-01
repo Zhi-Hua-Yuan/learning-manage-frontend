@@ -112,6 +112,13 @@ export interface TaskStatusResultWire {
   idempotentReplay?: boolean
 }
 
+export interface TaskStatusResult {
+  changed: boolean
+  finalStatus: number
+  completedAt: string | null
+  idempotentReplay: boolean
+}
+
 export type AssignmentAction =
   | 'INITIAL_ASSIGN'
   | 'ASSIGN'

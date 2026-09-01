@@ -5,12 +5,28 @@ const rootDir = process.cwd()
 const taskListPath = path.join(rootDir, 'src', 'views', 'task', 'TaskList.vue')
 const taskCachePath = path.join(rootDir, 'src', 'utils', 'taskCache.ts')
 const taskApiPath = path.join(rootDir, 'src', 'api', 'task.ts')
+const taskStatusMutationPath = path.join(
+  rootDir,
+  'src',
+  'composables',
+  'useTaskStatusMutation.ts',
+)
 
 const checks = [
   {
+    file: taskStatusMutationPath,
+    label: 'Status mutation uses the dedicated endpoint with the frozen idempotent command',
+    pattern: /await changeTaskStatusApi\(\{[\s\S]*?taskId: command\.taskId[\s\S]*?targetStatus: command\.targetStatus[\s\S]*?expectedStatus: command\.expectedStatus[\s\S]*?clientRequestId: command\.clientRequestId[\s\S]*?\}\)/m,
+  },
+  {
     file: taskListPath,
-    label: 'Status update flow uses the dedicated endpoint and refreshes facts',
-    pattern: /await changeTaskStatusApi\(\{[\s\S]*?taskId: currentTask\.id[\s\S]*?\}\)\s*\n\s*currentTask\.status = normalizeTaskStatusResult\(result\.finalStatus\)\s*\n[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/m,
+    label: 'Status update flow applies the normalized result before reconciliation',
+    pattern: /applyTaskStatusSnapshot\(state, outcome\.result\.finalStatus, outcome\.result\.completedAt\)[\s\S]*?reconcileTaskStatusFacts\(state,/m,
+  },
+  {
+    file: taskListPath,
+    label: 'Status reconciliation refreshes server facts',
+    pattern: /const reconcileTaskStatusFacts[\s\S]*?await loadTasks\(\{ forceRefresh: true \}\)/m,
   },
   {
     file: taskListPath,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createTaskStatusRequestId,
+  normalizeTaskStatusChangeResult,
   normalizeTaskStatusResult,
 } from './taskWrite'
 
@@ -21,5 +22,34 @@ describe('task write helpers', () => {
     expect(() => normalizeTaskStatusResult(undefined)).toThrow(TypeError)
     expect(() => normalizeTaskStatusResult('2')).toThrow(TypeError)
     expect(() => normalizeTaskStatusResult(4)).toThrow(TypeError)
+  })
+
+  it('normalizes a complete status result without losing idempotency facts', () => {
+    expect(normalizeTaskStatusChangeResult({
+      changed: true,
+      finalStatus: 2,
+      completedAt: '2026-09-01T12:00:00',
+      idempotentReplay: true,
+    })).toEqual({
+      changed: true,
+      finalStatus: 2,
+      completedAt: '2026-09-01T12:00:00',
+      idempotentReplay: true,
+    })
+  })
+
+  it('rejects partial or malformed status results', () => {
+    expect(() => normalizeTaskStatusChangeResult(undefined)).toThrow(TypeError)
+    expect(() => normalizeTaskStatusChangeResult({
+      changed: true,
+      finalStatus: 2,
+      completedAt: null,
+    })).toThrow(TypeError)
+    expect(() => normalizeTaskStatusChangeResult({
+      changed: true,
+      finalStatus: 2,
+      completedAt: 123 as never,
+      idempotentReplay: false,
+    })).toThrow(TypeError)
   })
 })

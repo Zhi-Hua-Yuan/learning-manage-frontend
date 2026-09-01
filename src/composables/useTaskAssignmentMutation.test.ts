@@ -75,7 +75,7 @@ describe('useTaskAssignmentMutation', () => {
     await first
   })
 
-  it('blocks malformed or contradictory success results', async () => {
+  it('treats malformed or contradictory success results as uncertain', async () => {
     vi.mocked(assignTaskApi).mockResolvedValue(result({ assigneeUserId: 3 }))
     const mutation = useTaskAssignmentMutation()
 
@@ -86,7 +86,8 @@ describe('useTaskAssignmentMutation', () => {
     })
 
     expect(outcome).toEqual({ kind: 'error', errorKind: 'UNKNOWN' })
-    expect(mutation.phase.value).toBe('blocked')
+    expect(mutation.phase.value).toBe('uncertain-reconciling')
+    expect(mutation.recoverySource.value).toBe('UNCERTAIN')
     expect(mutation.errorMessage.value).toContain('无法确认')
   })
 
@@ -114,7 +115,7 @@ describe('useTaskAssignmentMutation', () => {
     })
   })
 
-  it('keeps validation retryable but blocks conflicts', async () => {
+  it('keeps validation retryable but routes conflicts through explicit recovery', async () => {
     const mutation = useTaskAssignmentMutation()
     vi.mocked(assignTaskApi).mockRejectedValueOnce(new ApiRequestError('invalid', { code: 40000 }))
 
@@ -136,7 +137,41 @@ describe('useTaskAssignmentMutation', () => {
     })
 
     expect(conflict).toEqual({ kind: 'error', errorKind: 'CONFLICT' })
-    expect(mutation.phase.value).toBe('blocked')
+    expect(mutation.phase.value).toBe('conflict-reconciling')
+    expect(mutation.recoverySource.value).toBe('CONFLICT')
+    expect(mutation.busy.value).toBe(true)
+
+    expect(mutation.requireReconfirmation()).toBe(true)
+    expect(mutation.phase.value).toBe('reconfirm-required')
+    expect(await mutation.submit({
+      taskId: '101',
+      assigneeUserId: '2',
+      expectedAssigneeUserId: '3',
+    })).toEqual({ kind: 'ignored' })
+    expect(assignTaskApi).toHaveBeenCalledTimes(2)
+
+    expect(mutation.beginExplicitReconfirm()).toBe(true)
+    expect(mutation.phase.value).toBe('idle')
+  })
+
+  it('keeps network and server outcomes blocked until fact reconciliation succeeds', async () => {
+    const mutation = useTaskAssignmentMutation()
+    vi.mocked(assignTaskApi).mockRejectedValueOnce(new ApiRequestError('network'))
+
+    const outcome = await mutation.submit({
+      taskId: '101',
+      assigneeUserId: '2',
+      expectedAssigneeUserId: '1',
+    })
+
+    expect(outcome).toEqual({ kind: 'error', errorKind: 'NETWORK' })
+    expect(mutation.phase.value).toBe('uncertain-reconciling')
+    expect(mutation.recoverySource.value).toBe('UNCERTAIN')
+    expect(mutation.markRecoveryError()).toBe(true)
+    expect(mutation.phase.value).toBe('recovery-error')
+    expect(mutation.beginRecoveryRetry()).toBe(true)
+    expect(mutation.phase.value).toBe('uncertain-reconciling')
+    expect(assignTaskApi).toHaveBeenCalledTimes(1)
   })
 
   it('discards a response after the surrounding task context resets', async () => {

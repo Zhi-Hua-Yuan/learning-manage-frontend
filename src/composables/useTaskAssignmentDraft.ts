@@ -16,6 +16,7 @@ export interface TaskAssignmentDraft {
   taskId: string
   projectId: string
   contextKey: string
+  initialExpectedAssigneeUserId: string | null
   expectedAssigneeUserId: string | null
   targetAssigneeUserId: string | null
   reason: string
@@ -41,6 +42,7 @@ export const useTaskAssignmentDraft = () => {
       taskId: input.taskId,
       projectId: input.projectId,
       contextKey: input.contextKey,
+      initialExpectedAssigneeUserId: input.currentAssigneeUserId,
       expectedAssigneeUserId: input.currentAssigneeUserId,
       targetAssigneeUserId: input.currentAssigneeUserId,
       reason: '',
@@ -61,6 +63,11 @@ export const useTaskAssignmentDraft = () => {
     draft.value.reason = value
   }
 
+  const rebaseExpectedAssigneeUserId = (value: string | null) => {
+    if (!draft.value) return
+    draft.value.expectedAssigneeUserId = value
+  }
+
   const invalidateUnlessCurrent = (contextKey: string, taskId: string | null) => {
     const currentDraft = draft.value
     if (!currentDraft) return false
@@ -78,6 +85,7 @@ export const useTaskAssignmentDraft = () => {
     close,
     setTargetAssigneeUserId,
     setReason,
+    rebaseExpectedAssigneeUserId,
     invalidateUnlessCurrent,
   }
 }

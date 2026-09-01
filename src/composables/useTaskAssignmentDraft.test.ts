@@ -16,6 +16,7 @@ describe('useTaskAssignmentDraft', () => {
     assignment.setReason('  handoff  ')
 
     expect(assignment.draft.value).toMatchObject({
+      initialExpectedAssigneeUserId: '1',
       expectedAssigneeUserId: '1',
       targetAssigneeUserId: '2',
       reason: '  handoff  ',
@@ -23,6 +24,28 @@ describe('useTaskAssignmentDraft', () => {
     expect(assignment.operation.value).toBe('REASSIGN')
     expect(assignment.reasonResult.value).toMatchObject({ valid: true, value: 'handoff' })
     expect(assignment.canConfirm.value).toBe(true)
+  })
+
+  it('rebases only the CAS expected assignee while preserving the original snapshot and draft', () => {
+    const assignment = useTaskAssignmentDraft()
+    assignment.open({
+      taskId: '10',
+      projectId: '20',
+      contextKey: 'project:team:30:20',
+      currentAssigneeUserId: '1',
+    })
+    assignment.setTargetAssigneeUserId('3')
+    assignment.setReason('  keep this reason  ')
+
+    assignment.rebaseExpectedAssigneeUserId('2')
+
+    expect(assignment.draft.value).toMatchObject({
+      initialExpectedAssigneeUserId: '1',
+      expectedAssigneeUserId: '2',
+      targetAssigneeUserId: '3',
+      reason: '  keep this reason  ',
+    })
+    expect(assignment.operation.value).toBe('REASSIGN')
   })
 
   it('fails closed for no-op and invalid reason drafts', () => {

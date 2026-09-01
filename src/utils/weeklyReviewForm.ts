@@ -54,6 +54,12 @@ export type WeeklyReviewFormBuildResult<T> =
   | { ok: true; payload: T }
   | { ok: false; issues: WeeklyReviewFormIssue[] }
 
+export type WeeklyReviewSelectionFailure = 'INVALID_ID' | 'TASK_LIMIT_REACHED'
+
+export type WeeklyReviewSelectionResult =
+  | { ok: true; form: WeeklyReviewFormState; changed: boolean }
+  | { ok: false; form: WeeklyReviewFormState; reason: WeeklyReviewSelectionFailure }
+
 export function createDefaultWeeklyReviewForm(year: number, weekNo: number): WeeklyReviewFormState {
   return {
     id: null,
@@ -124,6 +130,72 @@ export function invalidateWeeklyReviewTargetTeam(
     focusProjectId: null,
     taskIds: [],
   }
+}
+
+export function changeWeeklyReviewFocusProject(
+  form: WeeklyReviewFormState,
+  projectId: string | number | null,
+): WeeklyReviewSelectionResult {
+  const normalizedProjectId = projectId === null ? null : normalizeEntityId(projectId)
+  if (projectId !== null && !normalizedProjectId) {
+    return { ok: false, form: cloneWeeklyReviewForm(form), reason: 'INVALID_ID' }
+  }
+
+  if (form.focusProjectId === normalizedProjectId) {
+    return { ok: true, form: cloneWeeklyReviewForm(form), changed: false }
+  }
+
+  return {
+    ok: true,
+    changed: true,
+    form: {
+      ...form,
+      focusProjectId: normalizedProjectId,
+      taskIds: [...form.taskIds],
+    },
+  }
+}
+
+export function selectWeeklyReviewTask(
+  form: WeeklyReviewFormState,
+  taskId: string | number,
+): WeeklyReviewSelectionResult {
+  const normalizedTaskId = normalizeEntityId(taskId)
+  if (!normalizedTaskId) {
+    return { ok: false, form: cloneWeeklyReviewForm(form), reason: 'INVALID_ID' }
+  }
+  if (form.taskIds.some((value) => normalizeEntityId(value) === normalizedTaskId)) {
+    return { ok: true, form: cloneWeeklyReviewForm(form), changed: false }
+  }
+  if (uniqueTaskIds(form.taskIds).taskIds.length >= MAX_WEEKLY_REVIEW_TASKS) {
+    return { ok: false, form: cloneWeeklyReviewForm(form), reason: 'TASK_LIMIT_REACHED' }
+  }
+
+  return {
+    ok: true,
+    changed: true,
+    form: { ...form, taskIds: [...form.taskIds, normalizedTaskId] },
+  }
+}
+
+export function unselectWeeklyReviewTask(
+  form: WeeklyReviewFormState,
+  taskId: string | number,
+): WeeklyReviewSelectionResult {
+  const normalizedTaskId = normalizeEntityId(taskId)
+  if (!normalizedTaskId) {
+    return { ok: false, form: cloneWeeklyReviewForm(form), reason: 'INVALID_ID' }
+  }
+  const nextTaskIds = form.taskIds.filter((value) => normalizeEntityId(value) !== normalizedTaskId)
+  return {
+    ok: true,
+    changed: nextTaskIds.length !== form.taskIds.length,
+    form: { ...form, taskIds: nextTaskIds },
+  }
+}
+
+function cloneWeeklyReviewForm(form: WeeklyReviewFormState): WeeklyReviewFormState {
+  return { ...form, taskIds: [...form.taskIds] }
 }
 
 function uniqueTaskIds(taskIds: readonly string[]): { taskIds: string[]; hasInvalidId: boolean } {

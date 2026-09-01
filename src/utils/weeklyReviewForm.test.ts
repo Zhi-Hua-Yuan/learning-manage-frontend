@@ -4,11 +4,14 @@ import {
   MAX_WEEKLY_REVIEW_TASKS,
   buildWeeklyReviewSavePayload,
   buildWeeklyReviewUpdatePayload,
+  changeWeeklyReviewFocusProject,
   changeWeeklyReviewTargetTeam,
   changeWeeklyReviewVisibility,
   createDefaultWeeklyReviewForm,
   createWeeklyReviewFormFromDetail,
   invalidateWeeklyReviewTargetTeam,
+  selectWeeklyReviewTask,
+  unselectWeeklyReviewTask,
   validateWeeklyReviewForm,
 } from './weeklyReviewForm'
 
@@ -209,6 +212,54 @@ describe('weekly review form domain', () => {
       { field: 'year', code: 'INVALID_YEAR' },
       { field: 'weekNo', code: 'INVALID_WEEK' },
     ]))
+  })
+
+  it('changes the focus project immutably without changing task associations', () => {
+    const form = {
+      ...createDefaultWeeklyReviewForm(2026, 36),
+      focusProjectId: '9',
+      taskIds: ['11', '12'],
+    }
+
+    const result = changeWeeklyReviewFocusProject(form, 10)
+
+    expect(result).toEqual({
+      ok: true,
+      changed: true,
+      form: { ...form, focusProjectId: '10', taskIds: ['11', '12'] },
+    })
+    expect(form).toEqual({
+      ...createDefaultWeeklyReviewForm(2026, 36),
+      focusProjectId: '9',
+      taskIds: ['11', '12'],
+    })
+  })
+
+  it('selects tasks idempotently and allows removing a task at the 500-item limit', () => {
+    const form = {
+      ...createDefaultWeeklyReviewForm(2026, 36),
+      taskIds: Array.from({ length: MAX_WEEKLY_REVIEW_TASKS }, (_, index) => String(index + 1)),
+    }
+
+    const duplicate = selectWeeklyReviewTask(form, '1')
+    const rejected = selectWeeklyReviewTask(form, '501')
+    const removed = unselectWeeklyReviewTask(form, '1')
+
+    expect(duplicate).toMatchObject({ ok: true, changed: false })
+    expect(rejected).toMatchObject({ ok: false, reason: 'TASK_LIMIT_REACHED' })
+    expect(rejected.form.taskIds).toHaveLength(MAX_WEEKLY_REVIEW_TASKS)
+    expect(removed).toMatchObject({ ok: true, changed: true })
+    expect(removed.form.taskIds).toHaveLength(MAX_WEEKLY_REVIEW_TASKS - 1)
+    expect(form.taskIds).toHaveLength(MAX_WEEKLY_REVIEW_TASKS)
+  })
+
+  it('rejects malformed selection IDs without mutating the form', () => {
+    const form = createDefaultWeeklyReviewForm(2026, 36)
+
+    expect(selectWeeklyReviewTask(form, '0')).toMatchObject({ ok: false, reason: 'INVALID_ID' })
+    expect(changeWeeklyReviewFocusProject(form, 'not-an-id')).toMatchObject({ ok: false, reason: 'INVALID_ID' })
+    expect(form.taskIds).toEqual([])
+    expect(form.focusProjectId).toBeNull()
   })
 
   it('clears scoped associations when entering TEAM and preserves private drafts', () => {

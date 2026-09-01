@@ -102,9 +102,16 @@ export const useTaskAssignmentMutation = () => {
     errorMessage.value = null
   }
 
-  const markCommittedRefreshError = () => {
+  const markCommittedRefreshError = (message = '负责人变更已提交，但最新任务状态加载失败，请重新加载后再操作。') => {
     phase.value = 'committed-refresh-error'
-    errorMessage.value = '负责人变更已提交，但最新任务状态加载失败，请重新加载后再操作。'
+    errorMessage.value = message
+  }
+
+  const beginCommittedRefreshRetry = () => {
+    if (phase.value !== 'committed-refresh-error') return false
+    phase.value = 'refreshing'
+    errorMessage.value = null
+    return true
   }
 
   const block = (message: string) => {
@@ -126,6 +133,7 @@ export const useTaskAssignmentMutation = () => {
     submit,
     complete,
     markCommittedRefreshError,
+    beginCommittedRefreshRetry,
     block,
     reset,
   }

@@ -158,4 +158,18 @@ describe('useTaskAssignmentMutation', () => {
     await expect(pending).resolves.toEqual({ kind: 'stale' })
     expect(mutation.phase.value).toBe('idle')
   })
+
+  it('retries only the committed fact refresh without reopening submission', () => {
+    const mutation = useTaskAssignmentMutation()
+
+    mutation.markCommittedRefreshError()
+    expect(mutation.phase.value).toBe('committed-refresh-error')
+    expect(mutation.blocked.value).toBe(true)
+
+    expect(mutation.beginCommittedRefreshRetry()).toBe(true)
+    expect(mutation.phase.value).toBe('refreshing')
+    expect(mutation.busy.value).toBe(true)
+    expect(mutation.beginCommittedRefreshRetry()).toBe(false)
+    expect(assignTaskApi).not.toHaveBeenCalled()
+  })
 })

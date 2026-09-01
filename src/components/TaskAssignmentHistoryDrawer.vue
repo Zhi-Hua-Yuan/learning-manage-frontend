@@ -50,7 +50,7 @@
 
         <div class="min-h-0 flex-1 overflow-y-auto p-4" aria-live="polite">
           <div
-            v-if="phase === 'loading' || phase === 'refreshing'"
+            v-if="phase === 'loading' || (phase === 'refreshing' && records.length === 0)"
             class="space-y-3"
             data-testid="task-assignment-history-loading"
             role="status"
@@ -126,7 +126,34 @@
             </div>
           </div>
 
-          <ol v-else class="relative space-y-3" data-testid="task-assignment-history-list">
+          <template v-else>
+            <div
+              v-if="phase === 'refreshing'"
+              class="mb-3 rounded-xl bg-[var(--color-bg-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-secondary)]"
+              data-testid="task-assignment-history-refreshing"
+              role="status"
+            >
+              正在刷新负责人历史…
+            </div>
+
+            <div
+              v-if="phase === 'error'"
+              class="mb-3 rounded-xl border border-[var(--color-danger-soft)] bg-[var(--color-danger-soft)] px-3 py-3"
+              data-testid="task-assignment-history-refresh-error"
+              role="alert"
+            >
+              <p class="text-xs text-[var(--color-danger)]">{{ errorMessage || '负责人历史刷新失败。' }}</p>
+              <button
+                type="button"
+                class="btn-secondary mt-2 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                data-testid="task-assignment-history-refresh-retry"
+                @click="emit('retry')"
+              >
+                重试刷新
+              </button>
+            </div>
+
+          <ol class="relative space-y-3" data-testid="task-assignment-history-list">
             <li
               v-for="record in records"
               :key="record.id"
@@ -171,6 +198,7 @@
               </p>
             </li>
           </ol>
+          </template>
 
           <div
             v-if="phase === 'load-more-error'"
@@ -197,7 +225,7 @@
           class="shrink-0 border-t border-[var(--color-divider-muted)] p-4"
         >
           <button
-            v-if="hasMore && phase !== 'load-more-error'"
+            v-if="hasMore && (phase === 'ready' || phase === 'loading-more')"
             type="button"
             class="btn-secondary w-full rounded-lg px-3 py-2.5 text-sm font-semibold"
             :disabled="phase === 'loading-more'"
@@ -208,7 +236,7 @@
             {{ phase === 'loading-more' ? '加载中…' : '加载更多' }}
           </button>
           <p
-            v-else-if="records.length > 0 && phase !== 'load-more-error'"
+            v-else-if="records.length > 0 && phase === 'ready'"
             class="text-center text-xs text-[var(--color-text-tertiary)]"
           >
             已显示全部负责人变更记录

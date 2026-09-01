@@ -88,6 +88,16 @@ describe('TaskAssignmentHistoryDrawer', () => {
     ).toContain('网络异常')
   })
 
+  it('keeps records visible while refreshing or recovering a refresh failure', () => {
+    const refreshing = mountDrawer({ phase: 'refreshing' })
+    expect(refreshing.find('[data-testid="task-assignment-history-refreshing"]').exists()).toBe(true)
+    expect(refreshing.find('[data-testid="task-assignment-history-item"]').exists()).toBe(true)
+
+    const failed = mountDrawer({ phase: 'error', errorMessage: '刷新失败' })
+    expect(failed.find('[data-testid="task-assignment-history-refresh-error"]').exists()).toBe(true)
+    expect(failed.find('[data-testid="task-assignment-history-item"]').exists()).toBe(true)
+  })
+
   it('emits close, retry and load-more events', async () => {
     const wrapper = mountDrawer({ hasMore: true, total: 2 })
 

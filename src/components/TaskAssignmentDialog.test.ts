@@ -147,4 +147,42 @@ describe('TaskAssignmentDialog', () => {
     expect(wrapper.get('[data-testid="task-assignment-recover"]').text()).toBe('重新加载中…')
     expect(wrapper.get('[data-testid="task-assignment-recover"]').attributes('disabled')).toBeDefined()
   })
+
+  it('renders conflict facts and emits only an explicit reconfirmation', async () => {
+    const wrapper = mountDialog({
+      currentAssignee: { ...currentAssignee, userId: '3', label: '最新成员' },
+      targetAssigneeUserId: '2',
+      reason: '  preserved reason  ',
+      submissionBlocked: true,
+      recoveryMode: 'reconfirm',
+      recoverySource: 'CONFLICT',
+      initialAssigneeLabel: '成员一',
+    })
+
+    expect(wrapper.find('[data-testid="task-assignment-confirm"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="task-assignment-initial-assignee"]').text()).toBe('成员一')
+    expect(wrapper.get('[data-testid="task-assignment-latest-assignee"]').text()).toBe('最新成员')
+    expect(wrapper.get('[data-testid="task-assignment-recovery-target"]').text()).toBe('成员二')
+
+    await wrapper.get('[data-testid="task-assignment-reconfirm"]').trigger('click')
+    expect(wrapper.emitted('confirm')).toBeUndefined()
+    expect(wrapper.emitted('reconfirm')?.[0]).toEqual([{
+      targetAssigneeUserId: '2',
+      reason: 'preserved reason',
+    }])
+  })
+
+  it('offers fact reconciliation without exposing a submit action after recovery fails', async () => {
+    const wrapper = mountDialog({
+      targetAssigneeUserId: '2',
+      submissionBlocked: true,
+      recoveryMode: 'recovery-error',
+      recoverySource: 'UNCERTAIN',
+    })
+
+    expect(wrapper.find('[data-testid="task-assignment-confirm"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="task-assignment-reconfirm"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="task-assignment-reconcile-retry"]').trigger('click')
+    expect(wrapper.emitted('recover')).toHaveLength(1)
+  })
 })

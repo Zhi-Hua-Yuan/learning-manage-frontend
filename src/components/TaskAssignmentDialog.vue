@@ -54,6 +54,33 @@
           </p>
         </div>
 
+        <div
+          v-if="recoveryMode !== 'none'"
+          class="mt-4 rounded-xl bg-[var(--color-warning-soft)] px-3 py-3 text-sm text-[var(--color-text-body)]"
+          role="status"
+          data-testid="task-assignment-recovery"
+        >
+          <p class="font-semibold text-[var(--color-warning)]">
+            {{ recoveryTitle }}
+          </p>
+          <template v-if="recoveryMode === 'reconfirm'">
+            <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+              <dt class="text-[var(--color-text-tertiary)]">原负责人</dt>
+              <dd data-testid="task-assignment-initial-assignee">{{ initialAssigneeLabel || '未分配' }}</dd>
+              <dt class="text-[var(--color-text-tertiary)]">最新负责人</dt>
+              <dd data-testid="task-assignment-latest-assignee">{{ currentAssignee.label }}</dd>
+              <dt class="text-[var(--color-text-tertiary)]">你的目标</dt>
+              <dd data-testid="task-assignment-recovery-target">{{ targetLabel }}</dd>
+            </dl>
+            <p class="mt-2 text-xs text-[var(--color-text-secondary)]">
+              请基于最新负责人再次确认，本页面不会自动重试。
+            </p>
+          </template>
+          <p v-else class="mt-1 text-xs text-[var(--color-text-secondary)]">
+            {{ recoveryDescription }}
+          </p>
+        </div>
+
         <div class="mt-5">
           <label class="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">目标负责人</label>
           <TaskAssigneePicker
@@ -135,7 +162,29 @@
             {{ busy ? '重新加载中…' : recoveryLabel }}
           </button>
           <button
-            v-else
+            v-else-if="recoveryMode === 'recovery-error'"
+            type="button"
+            class="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
+            :disabled="busy"
+            :class="busy ? 'cursor-not-allowed opacity-70' : ''"
+            data-testid="task-assignment-reconcile-retry"
+            @click="recover"
+          >
+            {{ busy ? '正在核对…' : '重新核对最新状态' }}
+          </button>
+          <button
+            v-else-if="recoveryMode === 'reconfirm'"
+            type="button"
+            class="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
+            :disabled="reconfirmDisabled"
+            :class="reconfirmDisabled ? 'cursor-not-allowed opacity-70' : ''"
+            data-testid="task-assignment-reconfirm"
+            @click="reconfirm"
+          >
+            基于最新负责人再次确认
+          </button>
+          <button
+            v-else-if="recoveryMode === 'none'"
             type="button"
             class="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
             :disabled="confirmDisabled"
@@ -177,6 +226,9 @@ const props = withDefaults(defineProps<{
   submissionErrorMessage?: string | null
   recoveryRequired?: boolean
   recoveryLabel?: string
+  recoveryMode?: 'none' | 'reconciling' | 'reconfirm' | 'recovery-error'
+  recoverySource?: 'CONFLICT' | 'UNCERTAIN' | null
+  initialAssigneeLabel?: string | null
 }>(), {
   candidatesLoading: false,
   candidatesErrorMessage: null,
@@ -185,6 +237,9 @@ const props = withDefaults(defineProps<{
   submissionErrorMessage: null,
   recoveryRequired: false,
   recoveryLabel: '重新加载最新任务',
+  recoveryMode: 'none',
+  recoverySource: null,
+  initialAssigneeLabel: null,
 })
 
 const emit = defineEmits<{
@@ -192,6 +247,7 @@ const emit = defineEmits<{
   'update:reason': [value: string]
   retry: []
   recover: []
+  reconfirm: [{ targetAssigneeUserId: string | null; reason?: string }]
   cancel: []
   confirm: [{ targetAssigneeUserId: string | null; reason?: string }]
 }>()
@@ -241,6 +297,30 @@ const confirmDisabled = computed(() => (
   || !reasonResult.value.valid
   || !targetSelectable.value
 ))
+const reconfirmDisabled = computed(() => (
+  props.busy
+  || props.candidatesLoading
+  || Boolean(props.candidatesErrorMessage)
+  || operation.value === 'NO_CHANGE'
+  || !reasonResult.value.valid
+  || !targetSelectable.value
+))
+const recoveryTitle = computed(() => {
+  if (props.recoveryMode === 'reconfirm') {
+    return props.recoverySource === 'CONFLICT'
+      ? '任务负责人已被其他操作修改'
+      : '已核对最新负责人状态'
+  }
+  if (props.recoveryMode === 'recovery-error') return '最新负责人状态暂时无法确认'
+  return props.recoverySource === 'CONFLICT'
+    ? '正在核对冲突后的最新负责人…'
+    : '正在核对请求是否已经生效…'
+})
+const recoveryDescription = computed(() => (
+  props.recoveryMode === 'recovery-error'
+    ? '请先重新核对任务事实；在核对完成前不会再次提交负责人变更。'
+    : '目标负责人和变更原因已保留，请稍候。'
+))
 
 const onReasonInput = (event: Event) => {
   emit('update:reason', (event.target as HTMLTextAreaElement).value)
@@ -259,7 +339,18 @@ const confirm = () => {
 }
 
 const recover = () => {
-  if (!props.busy && props.recoveryRequired) emit('recover')
+  if (
+    !props.busy
+    && (props.recoveryRequired || props.recoveryMode === 'recovery-error')
+  ) emit('recover')
+}
+
+const reconfirm = () => {
+  if (reconfirmDisabled.value || !reasonResult.value.valid) return
+  emit('reconfirm', {
+    targetAssigneeUserId: props.targetAssigneeUserId,
+    reason: reasonResult.value.value,
+  })
 }
 
 const getFocusableElements = () => Array.from(

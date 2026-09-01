@@ -1101,10 +1101,14 @@
       :submission-blocked="taskAssignmentMutationBlocked"
       :submission-error-message="taskAssignmentMutationErrorMessage"
       :recovery-required="taskAssignmentMutationPhase === 'committed-refresh-error'"
+      :recovery-mode="taskAssignmentRecoveryMode"
+      :recovery-source="taskAssignmentRecoverySource"
+      :initial-assignee-label="taskAssignmentInitialAssigneeLabel"
       @update:target-assignee-user-id="setTaskAssignmentTarget"
       @update:reason="setTaskAssignmentReason"
       @retry="retryTaskAssignmentCandidates"
-      @recover="retryCommittedTaskAssignmentRefresh"
+      @recover="recoverTaskAssignment"
+      @reconfirm="reconfirmTaskAssignment"
       @cancel="closeTaskAssignmentDialog"
       @confirm="submitTaskAssignment"
     />
@@ -1225,7 +1229,10 @@ import {
   type TaskAssigneeCandidateContext,
 } from '@/composables/useTaskAssigneeCandidates'
 import { useTaskAssignmentDraft } from '@/composables/useTaskAssignmentDraft'
-import { useTaskAssignmentMutation } from '@/composables/useTaskAssignmentMutation'
+import {
+  useTaskAssignmentMutation,
+  type TaskAssignmentRecoverySource,
+} from '@/composables/useTaskAssignmentMutation'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useCollaborationStore } from '@/stores/collaboration'
@@ -1379,6 +1386,7 @@ interface PendingTaskAssignmentRefresh {
 
 type DisplayPhase = 'loading' | 'slow' | 'ready' | 'error'
 type LoadOutcomeStatus = 'ok' | 'stale' | 'error'
+type TaskAssignmentRecoveryMode = 'none' | 'reconciling' | 'reconfirm' | 'recovery-error'
 
 interface LoadOutcome {
   status: LoadOutcomeStatus
@@ -1654,18 +1662,24 @@ const {
   close: closeTaskAssignmentDraft,
   setTargetAssigneeUserId: setTaskAssignmentTarget,
   setReason: setTaskAssignmentReason,
+  rebaseExpectedAssigneeUserId: rebaseTaskAssignmentExpectedAssignee,
   invalidateUnlessCurrent: invalidateTaskAssignmentDraft,
 } = useTaskAssignmentDraft()
 const {
   phase: taskAssignmentMutationPhase,
   errorMessage: taskAssignmentMutationErrorMessage,
+  recoverySource: taskAssignmentRecoverySource,
   busy: taskAssignmentMutationBusy,
   blocked: taskAssignmentMutationBlocked,
   submit: submitTaskAssignmentMutation,
   complete: completeTaskAssignmentMutation,
   markCommittedRefreshError: markTaskAssignmentCommittedRefreshError,
   beginCommittedRefreshRetry: beginCommittedTaskAssignmentRefreshRetry,
-  block: blockTaskAssignmentMutation,
+  beginFailureRecovery: beginTaskAssignmentFailureRecovery,
+  requireReconfirmation: requireTaskAssignmentReconfirmation,
+  markRecoveryError: markTaskAssignmentRecoveryError,
+  beginRecoveryRetry: beginTaskAssignmentRecoveryRetry,
+  beginExplicitReconfirm: beginExplicitTaskAssignmentReconfirm,
   reset: resetTaskAssignmentMutation,
 } = useTaskAssignmentMutation()
 const taskAssignmentChangedRevision = ref(0)
@@ -1824,6 +1838,26 @@ const {
 } = useTaskAssigneeCandidates({
   context: taskAssignmentCandidateContext,
   store: collaborationStore,
+})
+const taskAssignmentRecoveryMode = computed<TaskAssignmentRecoveryMode>(() => {
+  if (
+    taskAssignmentMutationPhase.value === 'conflict-reconciling'
+    || taskAssignmentMutationPhase.value === 'uncertain-reconciling'
+  ) return 'reconciling'
+  if (taskAssignmentMutationPhase.value === 'reconfirm-required') return 'reconfirm'
+  if (taskAssignmentMutationPhase.value === 'recovery-error') return 'recovery-error'
+  return 'none'
+})
+const taskAssignmentRecoveryActive = computed(() => taskAssignmentRecoveryMode.value !== 'none')
+const taskAssignmentInitialAssigneeLabel = computed(() => {
+  const userId = taskAssignmentDraft.value?.initialExpectedAssigneeUserId ?? null
+  if (userId === null) return '未分配'
+  const option = taskAssignmentAssigneeOptions.value.find((candidate) => candidate.value === userId)
+  if (option) return option.label
+  if (collaborationStore.currentUser?.id === userId) {
+    return collaborationStore.currentUser.username?.trim() || `用户 #${userId}`
+  }
+  return `用户 #${userId}`
 })
 const boardRenderPhase = computed<DisplayPhase>(() => {
   if (!isCurrentDisplayContext(currentContextKey.value)) {
@@ -3827,6 +3861,120 @@ const retryCommittedTaskAssignmentRefresh = async () => {
   await reconcileCommittedTaskAssignment(snapshot)
 }
 
+const isCurrentTaskAssignmentRecovery = (
+  taskId: string,
+  contextKey: string,
+) => (
+  taskAssignmentDraft.value?.taskId === taskId
+  && taskAssignmentDraft.value.contextKey === contextKey
+  && currentContextKey.value === contextKey
+)
+
+const abandonStaleTaskAssignmentRecovery = () => {
+  completeTaskAssignmentMutation()
+  dismissTaskAssignmentDialog(false)
+}
+
+const reconcileFailedTaskAssignment = async (
+  source: TaskAssignmentRecoverySource,
+) => {
+  const draft = taskAssignmentDraft.value
+  if (!draft) {
+    completeTaskAssignmentMutation()
+    return false
+  }
+
+  const taskId = draft.taskId
+  const projectId = draft.projectId
+  const contextKey = draft.contextKey
+  const targetAssigneeUserId = draft.targetAssigneeUserId
+
+  removeProjectTaskCaches(projectId)
+  resetTaskAssignmentCandidates()
+  failClosedTaskCapabilities(taskId)
+
+  const refreshOutcome = await loadTasks({ forceRefresh: true })
+  if (!isCurrentTaskAssignmentRecovery(taskId, contextKey)) {
+    abandonStaleTaskAssignmentRecovery()
+    return false
+  }
+
+  if (refreshOutcome.status !== 'ok') {
+    markTaskAssignmentRecoveryError('最新负责人状态加载失败，请重新核对后再操作。')
+    toast.warning('最新负责人状态暂时无法确认，未再次提交负责人变更。')
+    return false
+  }
+
+  const refreshedTask = findTaskById(taskList.value, taskId)
+  if (!refreshedTask) {
+    completeTaskAssignmentMutation()
+    dismissTaskAssignmentDialog(false)
+    toast.warning('任务已不存在或当前不可访问。')
+    return false
+  }
+
+  if (!refreshedTask.capabilities.canAssign) {
+    completeTaskAssignmentMutation()
+    dismissTaskAssignmentDialog(false)
+    toast.warning('负责人变更权限已发生变化，已刷新最新任务权限。')
+    return false
+  }
+
+  rebaseTaskAssignmentExpectedAssignee(refreshedTask.assigneeUserId)
+  const candidatesReady = await loadTaskAssignmentCandidates()
+  if (!isCurrentTaskAssignmentRecovery(taskId, contextKey)) {
+    abandonStaleTaskAssignmentRecovery()
+    return false
+  }
+
+  if (!candidatesReady) {
+    markTaskAssignmentRecoveryError('最新团队成员加载失败，请重新核对后再操作。')
+    toast.warning('最新团队成员暂时无法确认，未再次提交负责人变更。')
+    return false
+  }
+
+  if (refreshedTask.assigneeUserId === targetAssigneeUserId) {
+    completeTaskAssignmentMutation()
+    taskAssignmentChangedRevision.value += 1
+    dismissTaskAssignmentDialog()
+    toast.info(
+      source === 'CONFLICT'
+        ? '当前负责人已是所选目标，已同步最新状态。'
+        : '已核对，当前负责人已是所选目标。',
+    )
+    return true
+  }
+
+  const message = source === 'CONFLICT'
+    ? '任务负责人已被其他操作修改，请基于最新负责人再次确认。'
+    : '已核对最新负责人，请确认后再重新提交。'
+  requireTaskAssignmentReconfirmation(message)
+  toast.warning(message)
+  return true
+}
+
+const retryFailedTaskAssignmentRecovery = async () => {
+  const source = taskAssignmentRecoverySource.value
+  if (!source || !beginTaskAssignmentRecoveryRetry()) return
+  await reconcileFailedTaskAssignment(source)
+}
+
+const recoverTaskAssignment = async () => {
+  if (taskAssignmentMutationPhase.value === 'committed-refresh-error') {
+    await retryCommittedTaskAssignmentRefresh()
+    return
+  }
+  await retryFailedTaskAssignmentRecovery()
+}
+
+const reconfirmTaskAssignment = async (payload: {
+  targetAssigneeUserId: string | null
+  reason?: string
+}) => {
+  if (!beginExplicitTaskAssignmentReconfirm()) return
+  await submitTaskAssignment(payload)
+}
+
 const submitTaskAssignment = async (payload: {
   targetAssigneeUserId: string | null
   reason?: string
@@ -3847,8 +3995,8 @@ const submitTaskAssignment = async (payload: {
     return
   }
   if (latestTask.assigneeUserId !== draft.expectedAssigneeUserId) {
-    blockTaskAssignmentMutation('任务负责人已经发生变化，请关闭后重新打开并核对最新状态。')
-    toast.warning('任务负责人已经发生变化，请重新核对后再确认。')
+    beginTaskAssignmentFailureRecovery('CONFLICT')
+    await reconcileFailedTaskAssignment('CONFLICT')
     return
   }
   if (taskAssignmentCandidatesStatus.value !== 'ready') {
@@ -3908,9 +4056,19 @@ const submitTaskAssignment = async (payload: {
       return
     }
 
-    removeProjectTaskCaches(draft.projectId)
-    resetTaskAssignmentCandidates()
-    await loadTasks({ forceRefresh: true })
+    if (
+      outcome.errorKind === 'CONFLICT'
+      || outcome.errorKind === 'NETWORK'
+      || outcome.errorKind === 'SERVER'
+      || outcome.errorKind === 'UNKNOWN'
+    ) {
+      const source: TaskAssignmentRecoverySource = outcome.errorKind === 'CONFLICT'
+        ? 'CONFLICT'
+        : 'UNCERTAIN'
+      await reconcileFailedTaskAssignment(source)
+      return
+    }
+
     toast.warning(taskAssignmentMutationErrorMessage.value || '负责人状态无法确认，请重新核对。')
     return
   }
@@ -4331,6 +4489,10 @@ watch(taskAssignmentCandidatesStatus, (status) => {
     draft.targetAssigneeUserId !== draft.expectedAssigneeUserId
     && !isSelectableTaskAssignmentAssignee(draft.targetAssigneeUserId)
   ) {
+    if (taskAssignmentRecoveryActive.value) {
+      toast.warning('原目标负责人已不在最新成员列表中，请重新选择。')
+      return
+    }
     setTaskAssignmentTarget(draft.expectedAssigneeUserId)
     toast.warning('负责人列表已发生变化，请重新选择。')
   }
@@ -4341,8 +4503,13 @@ watch(
   ([contextKey, taskId]) => {
     const pendingRefresh = pendingTaskAssignmentRefresh.value
     if (
-      pendingRefresh
-      && pendingRefresh.contextKey === contextKey
+      (
+        pendingRefresh?.contextKey === contextKey
+        || (
+          taskAssignmentRecoveryActive.value
+          && taskAssignmentDraft.value?.contextKey === contextKey
+        )
+      )
       && taskId === null
     ) {
       return
@@ -4457,7 +4624,7 @@ watch(
     }
   },
   (next, previous) => {
-    if (!next && pendingTaskAssignmentRefresh.value) {
+    if (!next && (pendingTaskAssignmentRefresh.value || taskAssignmentRecoveryActive.value)) {
       return
     }
     if (!next || !previous || next.id !== previous.id) {
@@ -4476,7 +4643,7 @@ watch(
       isMilestoneMenuOpen.value = false
     }
     if (previous.canAssign && !next.canAssign) {
-      if (!pendingTaskAssignmentRefresh.value) {
+      if (!pendingTaskAssignmentRefresh.value && !taskAssignmentRecoveryActive.value) {
         closeTaskAssignmentDialog(false)
       }
     }

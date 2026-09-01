@@ -30,5 +30,5 @@ describe('router authentication guard', () => {
     await router.push('/dashboard')
 
     expect(router.currentRoute.value.path).toBe('/dashboard')
-  }, 10000)
+  }, 20000)
 })

@@ -2,6 +2,7 @@ import request from '../utils/request'
 import type { EntityId, WirePage } from '@/types/common'
 import type {
   SharedWeeklyReviewWire,
+  WeeklyReviewDetailWire,
   WeeklyReviewSavePayload,
   WeeklyReviewUpdatePayload,
 } from '@/types/review'
@@ -47,7 +48,7 @@ const toWeeklyReviewUpdateBody = (
 
 // 获取当前周总结草稿或已保存记录
 export const fetchCurrentReview = () => {
-  return request.get('/review/current')
+  return request.get<unknown, Promise<WeeklyReviewDetailWire>>('/review/current')
 }
 
 export const saveWeeklyReviewApi = (data: WeeklyReviewSavePayload) => {
@@ -86,11 +87,14 @@ export const updateReviewApi = (data: LegacyPrivateReviewUpdatePayload) => {
 export const deleteReviewApi = (id: string | number) => request.post(`/review/delete/${id}`)
 
 // 根据 ID 获取周总结详情
-export const getReviewDetailApi = (id: string | number) => request.get(`/review/${id}`)
+export const getReviewDetailApi = (rawId: EntityId) => {
+  const id = requireEntityId(rawId, 'id')
+  return request.get<unknown, Promise<WeeklyReviewDetailWire>>(`/review/${id}`)
+}
 
 // 获取历史周总结列表
 export const fetchReviewHistory = () => {
-  return request.get('/review/history')
+  return request.get<unknown, Promise<WeeklyReviewDetailWire[]>>('/review/history')
 }
 
 export interface TeamSharedReviewParams {

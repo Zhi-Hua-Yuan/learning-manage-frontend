@@ -5,7 +5,7 @@ export type ReviewWriteVisibilityScope = 'PRIVATE' | 'TEAM'
 export type NormalizedReviewVisibilityScope = ReviewWriteVisibilityScope | 'UNKNOWN'
 
 export interface WeeklyReviewDetailWire {
-  id?: EntityId
+  id?: EntityId | null
   year?: number
   weekNo?: number
   visibilityScope?: unknown
@@ -14,7 +14,7 @@ export interface WeeklyReviewDetailWire {
   reflection?: string | null
   nextPlan?: string | null
   sharedSummary?: string | null
-  taskIds?: EntityId[]
+  taskIds?: EntityId[] | null
   startDate?: string
   endDate?: string
   completedTaskCount?: number
@@ -23,6 +23,28 @@ export interface WeeklyReviewDetailWire {
   createTime?: string
   updateTime?: string
 }
+
+export interface WeeklyReviewDetail {
+  id: string | null
+  authorUserId: string | null
+  year: number
+  weekNo: number
+  startDate: string | null
+  endDate: string | null
+  completedTaskCount: number
+  visibilityScope: NormalizedReviewVisibilityScope
+  teamId: string | null
+  focusProjectId: string | null
+  focusProjectName: string | null
+  sharedSummary: string
+  reflection: string
+  nextPlan: string
+  taskIds: string[]
+  createTime: string | null
+  updateTime: string | null
+}
+
+export type PersistedWeeklyReviewDetail = WeeklyReviewDetail & { id: string }
 
 interface WeeklyReviewMutationFields {
   visibilityScope: ReviewWriteVisibilityScope

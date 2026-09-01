@@ -3,9 +3,11 @@ import { DENY_ALL_TASK_CAPABILITIES } from './task'
 import {
   normalizeEntityId,
   normalizeCurrentUserWire,
+  normalizeCurrentWeeklyReviewWire,
   normalizeNumeric,
   normalizePage,
   normalizeProjectWire,
+  normalizePersistedWeeklyReviewWire,
   normalizeSharedWeeklyReviewWire,
   normalizeTaskAssignmentResult,
   normalizeTaskWire,
@@ -186,5 +188,88 @@ describe('shared type normalizers', () => {
     expect(result).not.toHaveProperty('reflection')
     expect(result).not.toHaveProperty('nextPlan')
     expect(result).not.toHaveProperty('taskIds')
+  })
+
+  it('normalizes a complete author review without losing precise IDs', () => {
+    const wire = {
+      id: '900719925474099312345',
+      authorUserId: 2,
+      year: 2026,
+      weekNo: 36,
+      startDate: '2026-08-31',
+      endDate: '2026-09-06',
+      completedTaskCount: 4,
+      visibilityScope: 'TEAM',
+      teamId: 7,
+      focusProjectId: 9,
+      focusProjectName: 'Roadmap',
+      sharedSummary: 'Shared summary',
+      reflection: 'Private reflection',
+      nextPlan: 'Private next plan',
+      taskIds: [11, '12', 11, 'bad-id'],
+      createTime: '2026-09-01T08:00:00',
+      updateTime: '2026-09-01T09:00:00',
+    }
+
+    expect(normalizePersistedWeeklyReviewWire(wire)).toEqual({
+      id: '900719925474099312345',
+      authorUserId: '2',
+      year: 2026,
+      weekNo: 36,
+      startDate: '2026-08-31',
+      endDate: '2026-09-06',
+      completedTaskCount: 4,
+      visibilityScope: 'TEAM',
+      teamId: '7',
+      focusProjectId: '9',
+      focusProjectName: 'Roadmap',
+      sharedSummary: 'Shared summary',
+      reflection: 'Private reflection',
+      nextPlan: 'Private next plan',
+      taskIds: ['11', '12'],
+      createTime: '2026-09-01T08:00:00',
+      updateTime: '2026-09-01T09:00:00',
+    })
+    expect(wire.taskIds).toEqual([11, '12', 11, 'bad-id'])
+  })
+
+  it('keeps an unsaved author draft usable and fails closed on unknown visibility', () => {
+    expect(normalizeCurrentWeeklyReviewWire({
+      id: null,
+      year: -1,
+      weekNo: 'bad',
+      completedTaskCount: -2,
+      visibilityScope: 'ORGANIZATION',
+      taskIds: null,
+    } as never)).toEqual(expect.objectContaining({
+      id: null,
+      year: 0,
+      weekNo: 0,
+      completedTaskCount: 0,
+      visibilityScope: 'UNKNOWN',
+      taskIds: [],
+      reflection: '',
+      nextPlan: '',
+      sharedSummary: '',
+    }))
+    expect(normalizeCurrentWeeklyReviewWire({ id: 'invalid-id' })).toBeNull()
+    expect(normalizeCurrentWeeklyReviewWire({ id: null, authorUserId: 0 })).toBeNull()
+    expect(normalizeCurrentWeeklyReviewWire(null)).toBeNull()
+  })
+
+  it('does not silently truncate an oversized author task association list', () => {
+    const taskIds = Array.from({ length: 501 }, (_, index) => String(index + 1))
+    expect(normalizePersistedWeeklyReviewWire({ id: '1', taskIds })?.taskIds).toHaveLength(501)
+  })
+
+  it('distinguishes current drafts from persisted author reviews by ID contract', () => {
+    expect(normalizeCurrentWeeklyReviewWire({ id: null })).toEqual(expect.objectContaining({ id: null }))
+    expect(normalizeCurrentWeeklyReviewWire({ id: '31' })).toEqual(expect.objectContaining({ id: '31' }))
+    expect(normalizeCurrentWeeklyReviewWire({})).toBeNull()
+
+    expect(normalizePersistedWeeklyReviewWire({ id: '31' })).toEqual(expect.objectContaining({ id: '31' }))
+    expect(normalizePersistedWeeklyReviewWire({ id: null })).toBeNull()
+    expect(normalizePersistedWeeklyReviewWire({})).toBeNull()
+    expect(normalizePersistedWeeklyReviewWire({ id: 'invalid-id' })).toBeNull()
   })
 })

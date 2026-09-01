@@ -1031,32 +1031,35 @@ const summaryNoticeToneClass = computed(() => {
 })
 
 const loadReviewData = async () => {
-  await loadHistory()
+  await loadAuthorReviewContext()
   consumePendingWeeklyPolish()
 }
 
-const loadHistory = async () => {
+const loadAuthorReviewContext = async (): Promise<boolean> => {
   try {
     const currentRes = await fetchCurrentReview()
     const normalizedCurrent = normalizeCurrentWeeklyReviewWire(currentRes)
     if (!normalizedCurrent) throw new TypeError('Invalid current weekly review response')
-    currentReview.value = normalizedCurrent
-    reviewForm.value = createWeeklyReviewFormFromDetail(normalizedCurrent)
-    formIssues.value = []
-    void activateAssociationContext()
 
     const historyRes = await fetchReviewHistory()
-    historyReviews.value = Array.isArray(historyRes)
-      ? historyRes
-        .map((review) => normalizePersistedWeeklyReviewWire(review))
-        .filter((review): review is WeeklyReviewDetail & { id: string } => review !== null)
-      : []
+    if (!Array.isArray(historyRes)) throw new TypeError('Invalid weekly review history response')
+    const normalizedHistory = historyRes
+      .map((review) => normalizePersistedWeeklyReviewWire(review))
+      .filter((review): review is WeeklyReviewDetail & { id: string } => review !== null)
+
+    currentReview.value = normalizedCurrent
+    reviewForm.value = createWeeklyReviewFormFromDetail(normalizedCurrent)
+    historyReviews.value = normalizedHistory
+    formIssues.value = []
+    void activateAssociationContext()
     await hydrateSummaryMetrics()
+    return true
   } catch (error) {
     console.error('加载周报数据失败', error)
     summaryLoading.value = false
     summaryReady.value = false
     summaryError.value = '周报数据加载失败，请稍后重试。'
+    return false
   }
 }
 
@@ -1129,8 +1132,12 @@ const executeSave = async () => {
 
     showSaveConfirmModal.value = false
     pendingMutation.value = null
-    toast.success('保存成功。')
-    await loadHistory()
+    const refreshed = await loadAuthorReviewContext()
+    if (refreshed) {
+      toast.success('保存成功。')
+    } else {
+      toast.warning('保存已完成，但最新内容加载失败，请刷新页面后确认。', 5000)
+    }
   } catch (error) {
     const errorKind = classifyApiError(error)
     if (
@@ -1193,7 +1200,7 @@ const executeDelete = async () => {
       await deleteReviewApi(reviewId)
     },
     onCommitSuccess: async () => {
-      await loadHistory()
+      await loadAuthorReviewContext()
     },
     onRollback: async () => {
       if (!historyReviews.value.some((item) => item.id === reviewId)) {

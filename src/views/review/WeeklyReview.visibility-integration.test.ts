@@ -56,6 +56,26 @@ describe('WeeklyReview D2 visibility integration contract', () => {
     expect(executeSave).not.toContain('currentReview.value.focusProjectName')
   })
 
+  it('separates mutation success from the authoritative author-context refresh', () => {
+    const executeSave = extractFunctionBlock('executeSave')
+    const loadAuthorReviewContext = extractFunctionBlock('loadAuthorReviewContext')
+
+    expect(loadAuthorReviewContext).toContain('normalizeCurrentWeeklyReviewWire(currentRes)')
+    expect(loadAuthorReviewContext).toContain('normalizePersistedWeeklyReviewWire(review)')
+    expect(loadAuthorReviewContext).toContain("throw new TypeError('Invalid weekly review history response')")
+    expect(loadAuthorReviewContext).toContain('currentReview.value = normalizedCurrent')
+    expect(loadAuthorReviewContext).toContain('reviewForm.value = createWeeklyReviewFormFromDetail(normalizedCurrent)')
+    expect(loadAuthorReviewContext).toContain('historyReviews.value = normalizedHistory')
+    expect(loadAuthorReviewContext).toContain('return true')
+    expect(loadAuthorReviewContext).toContain('return false')
+
+    expect(executeSave).toContain('const refreshed = await loadAuthorReviewContext()')
+    expect(executeSave).toContain("toast.success('保存成功。')")
+    expect(executeSave).toContain("toast.warning('保存已完成，但最新内容加载失败，请刷新页面后确认。', 5000)")
+    expect(executeSave.indexOf('await updateWeeklyReviewApi(mutation.payload)'))
+      .toBeLessThan(executeSave.indexOf('await loadAuthorReviewContext()'))
+  })
+
   it('fails a lost TEAM target closed while preserving the author form', () => {
     const executeSave = extractFunctionBlock('executeSave')
 

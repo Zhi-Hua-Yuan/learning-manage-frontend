@@ -2,8 +2,11 @@ import type { EntityId, NumericLike, PageResult, WirePage } from './common'
 import type { ProjectScope, ProjectWire } from './project'
 import type {
   NormalizedReviewVisibilityScope,
+  PersistedWeeklyReviewDetail,
   SharedWeeklyReview,
   SharedWeeklyReviewWire,
+  WeeklyReviewDetail,
+  WeeklyReviewDetailWire,
 } from './review'
 import type {
   AssignmentAction,
@@ -219,6 +222,59 @@ export function normalizeTaskAssignmentResult(
 
 export function normalizeReviewVisibilityScope(value: unknown): NormalizedReviewVisibilityScope {
   return value === 'PRIVATE' || value === 'TEAM' ? value : 'UNKNOWN'
+}
+
+function normalizeWeeklyReviewDetailFields(review: WeeklyReviewDetailWire): WeeklyReviewDetail | null {
+  const id = normalizeOptionalEntityId(review.id)
+  const authorUserId = normalizeOptionalEntityId(review.authorUserId)
+  if ((review.id != null && !id) || (review.authorUserId != null && !authorUserId)) return null
+
+  const taskIds: string[] = []
+  const seenTaskIds = new Set<string>()
+  for (const value of Array.isArray(review.taskIds) ? review.taskIds : []) {
+    const taskId = normalizeEntityId(value)
+    if (!taskId || seenTaskIds.has(taskId)) continue
+    seenTaskIds.add(taskId)
+    taskIds.push(taskId)
+  }
+
+  return {
+    id,
+    authorUserId,
+    year: normalizeNumeric(review.year, 0, 0),
+    weekNo: normalizeNumeric(review.weekNo, 0, 0),
+    startDate: typeof review.startDate === 'string' ? review.startDate : null,
+    endDate: typeof review.endDate === 'string' ? review.endDate : null,
+    completedTaskCount: normalizeNumeric(review.completedTaskCount, 0, 0),
+    visibilityScope: normalizeReviewVisibilityScope(review.visibilityScope),
+    teamId: normalizeOptionalEntityId(review.teamId),
+    focusProjectId: normalizeOptionalEntityId(review.focusProjectId),
+    focusProjectName: typeof review.focusProjectName === 'string' ? review.focusProjectName : null,
+    sharedSummary: typeof review.sharedSummary === 'string' ? review.sharedSummary : '',
+    reflection: typeof review.reflection === 'string' ? review.reflection : '',
+    nextPlan: typeof review.nextPlan === 'string' ? review.nextPlan : '',
+    taskIds,
+    createTime: typeof review.createTime === 'string' ? review.createTime : null,
+    updateTime: typeof review.updateTime === 'string' ? review.updateTime : null,
+  }
+}
+
+export function normalizeCurrentWeeklyReviewWire(
+  review: WeeklyReviewDetailWire | null | undefined,
+): WeeklyReviewDetail | null {
+  if (!review || !Object.prototype.hasOwnProperty.call(review, 'id')) return null
+  if (review.id !== null && !normalizeEntityId(review.id)) return null
+  return normalizeWeeklyReviewDetailFields(review)
+}
+
+export function normalizePersistedWeeklyReviewWire(
+  review: WeeklyReviewDetailWire | null | undefined,
+): PersistedWeeklyReviewDetail | null {
+  if (!review) return null
+  const id = normalizeEntityId(review.id)
+  if (!id) return null
+  const normalized = normalizeWeeklyReviewDetailFields(review)
+  return normalized ? { ...normalized, id } : null
 }
 
 export function normalizeAssignmentAction(value: unknown): AssignmentAction | 'UNKNOWN' {

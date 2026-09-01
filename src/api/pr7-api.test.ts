@@ -28,7 +28,10 @@ import {
   updateTaskContentApi,
 } from './task'
 import {
+  fetchCurrentReview,
+  fetchReviewHistory,
   fetchTeamSharedReviewsApi,
+  getReviewDetailApi,
   saveReviewApi,
   saveWeeklyReviewApi,
   updateReviewApi,
@@ -175,6 +178,26 @@ describe('PR7 B2 API clients', () => {
       url: '/review/team',
       params: { teamId: '7', current: 1, size: 20 },
     })
+  })
+
+  it('uses typed author review read routes and validates detail IDs', async () => {
+    const readCurrent = mockSuccess({ id: null, visibilityScope: 'PRIVATE' })
+    await expect(fetchCurrentReview()).resolves.toMatchObject({ visibilityScope: 'PRIVATE' })
+    expect(readCurrent()).toMatchObject({ method: 'GET', url: '/review/current' })
+
+    const readHistory = mockSuccess([{ id: 31, visibilityScope: 'PRIVATE' }])
+    await expect(fetchReviewHistory()).resolves.toHaveLength(1)
+    expect(readHistory()).toMatchObject({ method: 'GET', url: '/review/history' })
+
+    const readDetail = mockSuccess({ id: '900719925474099312345' })
+    await expect(getReviewDetailApi('900719925474099312345')).resolves.toMatchObject({
+      id: '900719925474099312345',
+    })
+    expect(readDetail()).toMatchObject({
+      method: 'GET',
+      url: '/review/900719925474099312345',
+    })
+    expect(() => getReviewDetailApi('invalid-id')).toThrow(TypeError)
   })
 
   it('whitelists the canonical weekly-review save and update bodies', async () => {

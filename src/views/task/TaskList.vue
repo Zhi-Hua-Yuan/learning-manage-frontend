@@ -1972,6 +1972,7 @@ const {
   records: taskAssignmentHistoryRecords,
   total: taskAssignmentHistoryTotal,
   phase: taskAssignmentHistoryPhase,
+  busy: taskAssignmentHistoryBusy,
   errorMessage: taskAssignmentHistoryErrorMessage,
   hasMore: taskAssignmentHistoryHasMore,
   open: openTaskAssignmentHistory,
@@ -1984,6 +1985,10 @@ const taskAssignmentHistoryDrawerRef = ref<InstanceType<typeof TaskAssignmentHis
   null,
 )
 const taskAssignmentChangedRevision = ref(0)
+const taskAssignmentChangedTaskId = ref<string | null>(null)
+const pendingAssignmentHistoryRefreshRevision = ref(0)
+const appliedAssignmentHistoryRefreshRevision = ref(0)
+const assignmentHistoryAutoRefreshRunning = ref(false)
 const pendingTaskAssignmentRefresh = ref<PendingTaskAssignmentRefresh | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
@@ -4099,11 +4104,76 @@ const handleTaskAssignmentHistoryOutcome = async (
   }
 }
 
+const emitTaskAssignmentChanged = (taskId: string) => {
+  taskAssignmentChangedTaskId.value = taskId
+  taskAssignmentChangedRevision.value += 1
+}
+
+const drainAssignmentHistoryAutoRefresh = async () => {
+  if (assignmentHistoryAutoRefreshRunning.value) return
+
+  assignmentHistoryAutoRefreshRunning.value = true
+  try {
+    while (
+      pendingAssignmentHistoryRefreshRevision.value > appliedAssignmentHistoryRefreshRevision.value
+    ) {
+      const revision = pendingAssignmentHistoryRefreshRevision.value
+      const taskId = taskAssignmentChangedTaskId.value
+
+      if (
+        !taskId
+        || !isTaskAssignmentHistoryDrawerOpen.value
+        || taskAssignmentHistoryTaskId.value !== taskId
+        || selectedTask.value?.id !== taskId
+      ) {
+        appliedAssignmentHistoryRefreshRevision.value = revision
+        break
+      }
+
+      const outcome = await refreshTaskAssignmentHistory()
+      if (outcome.kind === 'ignored') {
+        // A first-page or load-more request is still running. The busy watcher
+        // will drain this revision once that request settles.
+        break
+      }
+
+      appliedAssignmentHistoryRefreshRevision.value = revision
+      await handleTaskAssignmentHistoryOutcome(outcome, taskId)
+
+      // Errors are surfaced by the drawer and must be retried explicitly.
+      // A stale response also means the task/context changed underneath us.
+      if (outcome.kind === 'error' || outcome.kind === 'stale') break
+    }
+  } finally {
+    assignmentHistoryAutoRefreshRunning.value = false
+  }
+}
+
+const scheduleAssignmentHistoryAutoRefresh = (
+  revision: number,
+  taskId: string | null,
+) => {
+  if (
+    !taskId
+    || !isTaskAssignmentHistoryDrawerOpen.value
+    || taskAssignmentHistoryTaskId.value !== taskId
+    || selectedTask.value?.id !== taskId
+  ) return
+
+  pendingAssignmentHistoryRefreshRevision.value = Math.max(
+    pendingAssignmentHistoryRefreshRevision.value,
+    revision,
+  )
+  void drainAssignmentHistoryAutoRefresh()
+}
+
 const closeTaskAssignmentHistoryDrawer = (restoreFocus = true) => {
   const wasOpen = isTaskAssignmentHistoryDrawerOpen.value
   const taskId = taskAssignmentHistoryTaskId.value
   isTaskAssignmentHistoryDrawerOpen.value = false
   resetTaskAssignmentHistory()
+  pendingAssignmentHistoryRefreshRevision.value = appliedAssignmentHistoryRefreshRevision.value
+  taskAssignmentChangedTaskId.value = null
 
   if (wasOpen && restoreFocus && taskId && selectedTask.value?.id === taskId) {
     void nextTick(() => taskAssigneeEntryRef.value?.focusHistoryButton())
@@ -4249,7 +4319,7 @@ const reconcileCommittedTaskAssignment = async (snapshot: PendingTaskAssignmentR
   completeTaskAssignmentMutation()
   if (snapshot.result.changed && !snapshot.changedEventEmitted) {
     snapshot.changedEventEmitted = true
-    taskAssignmentChangedRevision.value += 1
+    emitTaskAssignmentChanged(snapshot.taskId)
   }
   if (pendingTaskAssignmentRefresh.value === snapshot) {
     pendingTaskAssignmentRefresh.value = null
@@ -4338,7 +4408,7 @@ const reconcileFailedTaskAssignment = async (source: TaskAssignmentRecoverySourc
 
   if (refreshedTask.assigneeUserId === targetAssigneeUserId) {
     completeTaskAssignmentMutation()
-    taskAssignmentChangedRevision.value += 1
+    emitTaskAssignmentChanged(taskId)
     dismissTaskAssignmentDialog()
     toast.info(
       source === 'CONFLICT'
@@ -5007,6 +5077,14 @@ watch(
     syncDetailEditorHeights()
   },
 )
+
+watch(taskAssignmentChangedRevision, (revision) => {
+  scheduleAssignmentHistoryAutoRefresh(revision, taskAssignmentChangedTaskId.value)
+})
+
+watch(taskAssignmentHistoryBusy, (busy) => {
+  if (!busy) void drainAssignmentHistoryAutoRefresh()
+})
 
 watch(
   () => {

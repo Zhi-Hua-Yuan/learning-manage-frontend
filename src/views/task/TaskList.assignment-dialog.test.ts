@@ -779,4 +779,163 @@ describe('TaskList assignment dialog integration', () => {
     )
     expect(vm.selectedTask?.id).toBe('2')
   })
+
+  it('refreshes the open history drawer after a committed assignment change', async () => {
+    taskApi.fetchTaskAssignmentHistoryApi
+      .mockResolvedValueOnce({
+        records: [],
+        current: 1,
+        size: 50,
+        total: 0,
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            id: 12,
+            taskId: 1,
+            action: 'REASSIGN',
+            fromAssignee: { userId: 1, username: '所有者' },
+            toAssignee: { userId: 2, username: '成员二' },
+            assignedBy: { userId: 1, username: '所有者' },
+            reason: '已完成交接',
+            createTime: '2026-09-01T12:00:00',
+          },
+        ],
+        current: 1,
+        size: 50,
+        total: 1,
+      })
+    const wrapper = await mountTaskList()
+    await wrapper.get('[data-testid="task-assignee-history"]').trigger('click')
+    await vi.waitFor(() =>
+      expect(taskApi.fetchTaskAssignmentHistoryApi).toHaveBeenCalledTimes(1),
+    )
+
+    await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')
+    const dialog = await vi.waitFor(() => wrapper.get('[data-testid="task-assignment-dialog"]'))
+    await dialog.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
+    const member = await vi.waitFor(() => {
+      const candidate = dialog
+        .findAll('[role="option"]')
+        .find((option) => option.text().includes('成员二'))
+      if (!candidate) throw new Error('missing assignment candidate')
+      return candidate
+    })
+    await member.trigger('click')
+    taskApi.fetchTaskList.mockResolvedValue({
+      data: {
+        records: [
+          {
+            ...task(false),
+            assigneeUserId: '2',
+            assignedByUserId: '1',
+            assignedAt: '2026-09-01T12:00:00',
+          },
+        ],
+        current: 1,
+        size: 100,
+        total: 1,
+      },
+    })
+    await dialog.get('[data-testid="task-assignment-confirm"]').trigger('click')
+
+    await vi.waitFor(() =>
+      expect(taskApi.fetchTaskAssignmentHistoryApi).toHaveBeenCalledTimes(2),
+    )
+    expect(taskApi.fetchTaskAssignmentHistoryApi).toHaveBeenLastCalledWith('1', {
+      current: 1,
+      size: 50,
+    })
+    expect(wrapper.get('[data-testid="task-assignment-history-item"]').text()).toContain(
+      '转派负责人',
+    )
+  })
+
+  it('does not refresh history for an idempotent assignment result', async () => {
+    taskApi.fetchTaskAssignmentHistoryApi.mockResolvedValue({
+      records: [],
+      current: 1,
+      size: 50,
+      total: 0,
+    })
+    taskApi.assignTaskApi.mockResolvedValue({
+      taskId: 1,
+      changed: false,
+      previousAssigneeUserId: 2,
+      assigneeUserId: 2,
+      assignedByUserId: 1,
+      assignedAt: '2026-09-01T12:00:00',
+    })
+    const wrapper = await mountTaskList()
+    await wrapper.get('[data-testid="task-assignee-history"]').trigger('click')
+    await vi.waitFor(() =>
+      expect(taskApi.fetchTaskAssignmentHistoryApi).toHaveBeenCalledTimes(1),
+    )
+
+    await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')
+    const dialog = await vi.waitFor(() => wrapper.get('[data-testid="task-assignment-dialog"]'))
+    await dialog.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
+    const member = await vi.waitFor(() => {
+      const candidate = dialog
+        .findAll('[role="option"]')
+        .find((option) => option.text().includes('成员二'))
+      if (!candidate) throw new Error('missing assignment candidate')
+      return candidate
+    })
+    await member.trigger('click')
+    taskApi.fetchTaskList.mockResolvedValue({
+      data: { records: [{ ...task(true), assigneeUserId: '2' }], current: 1, size: 100, total: 1 },
+    })
+    await dialog.get('[data-testid="task-assignment-confirm"]').trigger('click')
+
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-testid="task-assignment-dialog"]').exists()).toBe(false),
+    )
+    expect(taskApi.fetchTaskAssignmentHistoryApi).toHaveBeenCalledTimes(1)
+  })
+
+  it('drains a queued history refresh after the initial history request settles', async () => {
+    let resolveInitial!: (value: unknown) => void
+    const initialRequest = new Promise((resolve) => {
+      resolveInitial = resolve
+    })
+    taskApi.fetchTaskAssignmentHistoryApi
+      .mockReturnValueOnce(initialRequest as never)
+      .mockResolvedValueOnce({
+        records: [
+          {
+            id: 13,
+            taskId: 1,
+            action: 'ASSIGN',
+            fromAssignee: null,
+            toAssignee: { userId: 2, username: '成员二' },
+            assignedBy: { userId: 1, username: '所有者' },
+            reason: null,
+            createTime: '2026-09-01T12:00:00',
+          },
+        ],
+        current: 1,
+        size: 50,
+        total: 1,
+      })
+    const wrapper = await mountTaskList()
+    const openHistory = wrapper.get('[data-testid="task-assignee-history"]').trigger('click')
+    await vi.waitFor(() =>
+      expect(taskApi.fetchTaskAssignmentHistoryApi).toHaveBeenCalledTimes(1),
+    )
+
+    const vm = wrapper.vm as unknown as {
+      emitTaskAssignmentChanged: (taskId: string) => void
+    }
+    vm.emitTaskAssignmentChanged('1')
+    resolveInitial({ records: [], current: 1, size: 50, total: 0 })
+    await openHistory
+
+    await vi.waitFor(() =>
+      expect(taskApi.fetchTaskAssignmentHistoryApi).toHaveBeenCalledTimes(2),
+    )
+    expect(wrapper.get('[data-testid="task-assignment-history-item"]').text()).toContain(
+      '分配负责人',
+    )
+  })
 })

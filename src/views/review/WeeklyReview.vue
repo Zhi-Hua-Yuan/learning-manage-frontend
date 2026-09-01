@@ -79,6 +79,30 @@
               @retry-teams="loadCollaborationContext(true)"
             />
 
+            <ReviewAssociationPicker
+              ref="associationPickerRef"
+              :visibility-scope="reviewForm.visibilityScope"
+              :team-id="reviewForm.teamId"
+              :focus-project-id="reviewForm.focusProjectId"
+              :task-ids="reviewForm.taskIds"
+              :projects="associationProjects"
+              :project-load-state="associationProjectLoadState"
+              :project-has-more="associationProjectHasMore"
+              :active-task-project-id="activeTaskProjectId"
+              :task-buckets-by-project-id="associationTaskBuckets"
+              :access-message="associationAccessMessage"
+              :issues="formIssues"
+              :disabled="isSaving"
+              @update:focus-project-id="handleFocusProjectChange"
+              @select-task="handleTaskSelect"
+              @unselect-task="handleTaskUnselect"
+              @open-task-project="handleOpenTaskProject"
+              @load-more-projects="handleLoadMoreAssociationProjects"
+              @load-more-project-tasks="handleLoadMoreAssociationTasks"
+              @retry-projects="handleRetryAssociationProjects"
+              @retry-project-tasks="handleRetryAssociationTasks"
+            />
+
             <div>
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-bold text-[var(--color-text-body)] flex items-center gap-2">
@@ -296,9 +320,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import ReviewAssociationPicker from '@/components/review/ReviewAssociationPicker.vue'
 import ReviewVisibilityFields from '@/components/review/ReviewVisibilityFields.vue'
 import { aiPolishApi } from '@/api/ai'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
+import { useWeeklyReviewAssociations } from '@/composables/useWeeklyReviewAssociations'
 import { fetchProjectList } from '@/api/project'
 import { fetchTaskList } from '@/api/task'
 import {
@@ -326,13 +352,16 @@ import type {
 import {
   buildWeeklyReviewSavePayload,
   buildWeeklyReviewUpdatePayload,
+  changeWeeklyReviewFocusProject,
   changeWeeklyReviewTargetTeam,
   changeWeeklyReviewVisibility,
   createDefaultWeeklyReviewForm,
   createWeeklyReviewFormFromDetail,
   invalidateWeeklyReviewTargetTeam,
+  selectWeeklyReviewTask,
   type WeeklyReviewFormIssue,
   type WeeklyReviewFormState,
+  unselectWeeklyReviewTask,
 } from '@/utils/weeklyReviewForm'
 import { classifyApiError } from '@/utils/request'
 import { isTaskCompleted } from '@/utils/taskStatus'
@@ -419,6 +448,7 @@ const toast = useToast()
 const undoDelete = useUndoDelete()
 const aiPendingRegistry = useAiPendingRegistryStore()
 const collaborationStore = useCollaborationStore()
+const reviewAssociations = useWeeklyReviewAssociations()
 const { runAiRequest } = useAiPendingRequest()
 
 const currentReview = ref<WeeklyReviewDetail>(createEmptyReviewDetail())
@@ -428,6 +458,13 @@ const formIssues = ref<WeeklyReviewFormIssue[]>([])
 const pendingMutation = ref<PendingWeeklyReviewMutation | null>(null)
 const isSaving = ref(false)
 const visibilityFieldsRef = ref<InstanceType<typeof ReviewVisibilityFields> | null>(null)
+const associationPickerRef = ref<InstanceType<typeof ReviewAssociationPicker> | null>(null)
+const activeTaskProjectId = ref<string | null>(null)
+const associationAccessMessage = ref<string | null>(null)
+const associationProjects = reviewAssociations.projects
+const associationProjectLoadState = reviewAssociations.projectLoadState
+const associationProjectHasMore = reviewAssociations.projectHasMore
+const associationTaskBuckets = reviewAssociations.taskBucketsByProjectId
 const isViewMounted = ref(false)
 const showDetailModal = ref(false)
 const selectedReview = ref<WeeklyReviewDetail | null>(null)
@@ -489,6 +526,46 @@ const loadCollaborationContext = async (force = false) => {
   }
 }
 
+const associationReviewKey = () => (
+  reviewForm.value.id
+    ? `review:${reviewForm.value.id}`
+    : `draft:${reviewForm.value.year}-${reviewForm.value.weekNo}`
+)
+
+const resetAssociationContext = () => {
+  if (reviewAssociations.activeContext.value) reviewAssociations.resetContext()
+  activeTaskProjectId.value = null
+  associationAccessMessage.value = null
+}
+
+const activateAssociationContext = async (force = false) => {
+  const scope = reviewForm.value.visibilityScope
+  if (scope === 'UNKNOWN' || (scope === 'TEAM' && !reviewForm.value.teamId)) {
+    resetAssociationContext()
+    return
+  }
+
+  const context = {
+    reviewKey: associationReviewKey(),
+    visibilityScope: scope,
+    teamId: scope === 'TEAM' ? reviewForm.value.teamId : null,
+  } as const
+  const desiredKey = `${context.reviewKey}:${context.visibilityScope}:${context.teamId ?? '-'}`
+
+  if (reviewAssociations.contextKey.value !== desiredKey) {
+    reviewAssociations.setContext(context)
+    activeTaskProjectId.value = null
+  }
+
+  associationAccessMessage.value = null
+  reviewAssociations.clearAccessSignal()
+  try {
+    await reviewAssociations.ensureProjects({ force })
+  } catch (error) {
+    console.error('加载周复盘关联项目失败', error)
+  }
+}
+
 const handleVisibilityChange = (scope: ReviewWriteVisibilityScope) => {
   reviewForm.value = changeWeeklyReviewVisibility(reviewForm.value, scope)
   clearFormIssues('visibilityScope', 'teamId', 'focusProjectId', 'taskIds')
@@ -496,16 +573,88 @@ const handleVisibilityChange = (scope: ReviewWriteVisibilityScope) => {
   if (scope === 'TEAM' && collaborationStore.teamsLoadState.status !== 'ready') {
     void loadCollaborationContext()
   }
+  void activateAssociationContext()
 }
 
 const handleTeamChange = (teamId: string | null) => {
   reviewForm.value = changeWeeklyReviewTargetTeam(reviewForm.value, teamId)
   clearFormIssues('teamId', 'focusProjectId', 'taskIds')
+  void activateAssociationContext()
 }
 
 const handleSharedSummaryChange = (sharedSummary: string) => {
   reviewForm.value = { ...reviewForm.value, sharedSummary }
   if (sharedSummary.trim()) clearFormIssues('sharedSummary')
+}
+
+const handleFocusProjectChange = (projectId: string | null) => {
+  const result = changeWeeklyReviewFocusProject(reviewForm.value, projectId)
+  if (!result.ok) {
+    formIssues.value = [
+      ...formIssues.value.filter((issue) => issue.field !== 'focusProjectId'),
+      { field: 'focusProjectId', code: 'INVALID_FOCUS_PROJECT_ID' },
+    ]
+    return
+  }
+  reviewForm.value = result.form
+  clearFormIssues('focusProjectId')
+}
+
+const handleTaskSelect = (taskId: string) => {
+  const result = selectWeeklyReviewTask(reviewForm.value, taskId)
+  if (!result.ok) {
+    const code = result.reason === 'TASK_LIMIT_REACHED'
+      ? 'TASK_LIMIT_EXCEEDED'
+      : 'INVALID_TASK_ID'
+    formIssues.value = [
+      ...formIssues.value.filter((issue) => issue.field !== 'taskIds'),
+      { field: 'taskIds', code },
+    ]
+    return
+  }
+  reviewForm.value = result.form
+  clearFormIssues('taskIds')
+}
+
+const handleTaskUnselect = (taskId: string) => {
+  const result = unselectWeeklyReviewTask(reviewForm.value, taskId)
+  if (!result.ok) return
+  reviewForm.value = result.form
+  clearFormIssues('taskIds')
+}
+
+const handleOpenTaskProject = (projectId: string | null) => {
+  activeTaskProjectId.value = projectId
+  if (!projectId) return
+  void reviewAssociations.ensureProjectTasks(projectId).catch((error) => {
+    console.error('加载周复盘关联任务失败', error)
+  })
+}
+
+const handleLoadMoreAssociationProjects = () => {
+  void reviewAssociations.loadMoreProjects().catch((error) => {
+    console.error('加载更多周复盘关联项目失败', error)
+  })
+}
+
+const handleLoadMoreAssociationTasks = (projectId: string) => {
+  void reviewAssociations.loadMoreProjectTasks(projectId).catch((error) => {
+    console.error('加载更多周复盘关联任务失败', error)
+  })
+}
+
+const handleRetryAssociationProjects = () => {
+  associationAccessMessage.value = null
+  reviewAssociations.clearAccessSignal()
+  void activateAssociationContext(true)
+}
+
+const handleRetryAssociationTasks = (projectId: string) => {
+  associationAccessMessage.value = null
+  reviewAssociations.clearAccessSignal()
+  void reviewAssociations.retryProjectTasks(projectId).catch((error) => {
+    console.error('重新加载周复盘关联任务失败', error)
+  })
 }
 
 const jumpToRelatedTasks = async () => {
@@ -894,6 +1043,7 @@ const loadHistory = async () => {
     currentReview.value = normalizedCurrent
     reviewForm.value = createWeeklyReviewFormFromDetail(normalizedCurrent)
     formIssues.value = []
+    void activateAssociationContext()
 
     const historyRes = await fetchReviewHistory()
     historyReviews.value = Array.isArray(historyRes)
@@ -914,7 +1064,8 @@ const focusFirstFormIssue = async () => {
   const firstIssue = formIssues.value[0]
   if (!firstIssue) return
   await nextTick()
-  await visibilityFieldsRef.value?.focusIssue(firstIssue.field)
+  if (visibilityFieldsRef.value?.focusIssue(firstIssue.field)) return
+  associationPickerRef.value?.focusIssue(firstIssue.field)
 }
 
 const openSaveModal = async () => {
@@ -989,6 +1140,7 @@ const executeSave = async () => {
       const lostTeamId = mutation.payload.teamId
       if (lostTeamId) collaborationStore.pruneTeamContext(lostTeamId)
       reviewForm.value = invalidateWeeklyReviewTargetTeam(reviewForm.value)
+      resetAssociationContext()
       formIssues.value = [{ field: 'teamId', code: 'TEAM_REQUIRED' }]
       pendingMutation.value = null
       showSaveConfirmModal.value = false
@@ -1186,8 +1338,32 @@ watch(
     ) return
 
     reviewForm.value = invalidateWeeklyReviewTargetTeam(reviewForm.value)
+    resetAssociationContext()
     formIssues.value = [{ field: 'teamId', code: 'TEAM_REQUIRED' }]
     toast.error('原共享团队已不可用，请重新选择团队或改为仅自己可见。')
+  },
+)
+
+watch(
+  reviewAssociations.accessSignal,
+  (signal) => {
+    if (!signal) return
+    if (
+      signal.kind === 'PROJECT_ACCESS_LOST'
+      && reviewForm.value.visibilityScope === 'TEAM'
+      && reviewForm.value.teamId
+      && !collaborationStore.getTeam(reviewForm.value.teamId)
+    ) {
+      reviewForm.value = invalidateWeeklyReviewTargetTeam(reviewForm.value)
+      resetAssociationContext()
+      formIssues.value = [{ field: 'teamId', code: 'TEAM_REQUIRED' }]
+      toast.error('当前团队已不可用，请重新选择团队或改为仅自己可见。')
+      return
+    }
+
+    associationAccessMessage.value = signal.kind === 'PROJECT_ACCESS_LOST'
+      ? '关联项目权限已变化，请重试加载或重新打开本复盘。'
+      : '部分任务权限已变化，请重试加载；已保存关联以后端最新详情为准。'
   },
 )
 
@@ -1202,5 +1378,6 @@ watch(
 
 onBeforeUnmount(() => {
   isViewMounted.value = false
+  reviewAssociations.resetContext()
 })
 </script>

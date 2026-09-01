@@ -362,7 +362,7 @@ export function useWeeklyReviewAssociations(
     if (!force && !loadNext && existing?.loadState.status === 'ready') return existing.records
     if (!force && taskPromises.has(projectId)) return taskPromises.get(projectId) as Promise<TaskModel[]>
 
-    const bucket = existing ?? createTaskBucket(projectId, pageSize)
+    let bucket = existing ?? createTaskBucket(projectId, pageSize)
     if (force) {
       bucket.records = []
       bucket.current = 0
@@ -370,6 +370,7 @@ export function useWeeklyReviewAssociations(
       bucket.hasMore = false
     }
     taskBucketsByProjectId[projectId] = bucket
+    bucket = taskBucketsByProjectId[projectId]
     const taskRevision = (taskRequestRevisions.get(projectId) ?? 0) + 1
     taskRequestRevisions.set(projectId, taskRevision)
     const request = { ...snapshot(), taskRevision }
@@ -433,6 +434,10 @@ export function useWeeklyReviewAssociations(
 
   const retryProjectTasks = (projectId: string | number) => ensureProjectTasks(projectId, { force: true })
 
+  const clearAccessSignal = () => {
+    accessSignal.value = null
+  }
+
   return {
     activeContext,
     contextRevision,
@@ -453,5 +458,6 @@ export function useWeeklyReviewAssociations(
     loadMoreProjectTasks,
     retryProjectTasks,
     getProjectTasks,
+    clearAccessSignal,
   }
 }

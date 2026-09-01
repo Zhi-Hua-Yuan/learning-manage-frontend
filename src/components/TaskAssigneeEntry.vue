@@ -33,25 +33,37 @@
     >
       已不在团队
     </span>
-    <button
-      v-if="assignAllowed"
-      ref="changeButtonRef"
-      type="button"
-      class="focus-ring shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--color-primary)]"
-      aria-label="变更任务负责人"
-      data-testid="task-assignee-change"
-      @click="emit('request-change')"
-    >
-      变更
-    </button>
-    <span
-      v-else
-      class="shrink-0 text-xs text-[var(--color-text-tertiary)]"
-      :title="assignDeniedMessage || '当前任务不可变更负责人。'"
-      data-testid="task-assignee-locked"
-    >
-      仅查看
-    </span>
+    <div class="flex shrink-0 items-center gap-1">
+      <button
+        ref="historyButtonRef"
+        type="button"
+        class="focus-ring rounded-lg px-2 py-1 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-primary)]"
+        aria-label="查看负责人变更历史"
+        data-testid="task-assignee-history"
+        @click="emit('request-history')"
+      >
+        历史
+      </button>
+      <button
+        v-if="assignAllowed"
+        ref="changeButtonRef"
+        type="button"
+        class="focus-ring shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--color-primary)]"
+        aria-label="变更任务负责人"
+        data-testid="task-assignee-change"
+        @click="emit('request-change')"
+      >
+        变更
+      </button>
+      <span
+        v-else
+        class="shrink-0 text-xs text-[var(--color-text-tertiary)]"
+        :title="assignDeniedMessage || '当前任务不可变更负责人。'"
+        data-testid="task-assignee-locked"
+      >
+        仅查看
+      </span>
+    </div>
   </div>
 </template>
 
@@ -67,11 +79,14 @@ defineProps<{
 
 const emit = defineEmits<{
   'request-change': []
+  'request-history': []
 }>()
 
 const changeButtonRef = ref<HTMLButtonElement | null>(null)
+const historyButtonRef = ref<HTMLButtonElement | null>(null)
 
 defineExpose({
   focusChangeButton: () => changeButtonRef.value?.focus(),
+  focusHistoryButton: () => historyButtonRef.value?.focus(),
 })
 </script>

@@ -1100,9 +1100,11 @@
       :busy="taskAssignmentMutationBusy"
       :submission-blocked="taskAssignmentMutationBlocked"
       :submission-error-message="taskAssignmentMutationErrorMessage"
+      :recovery-required="taskAssignmentMutationPhase === 'committed-refresh-error'"
       @update:target-assignee-user-id="setTaskAssignmentTarget"
       @update:reason="setTaskAssignmentReason"
       @retry="retryTaskAssignmentCandidates"
+      @recover="retryCommittedTaskAssignmentRefresh"
       @cancel="closeTaskAssignmentDialog"
       @confirm="submitTaskAssignment"
     />
@@ -1269,7 +1271,11 @@ import {
   TASK_STATUS_DONE_STANDARD,
   TASK_STATUS_TODO,
 } from '@/utils/taskStatus'
-import { DENY_ALL_TASK_CAPABILITIES, type TaskModel } from '@/types/task'
+import {
+  DENY_ALL_TASK_CAPABILITIES,
+  type TaskAssignmentResult,
+  type TaskModel,
+} from '@/types/task'
 import { findTaskById, normalizeTaskRecords } from '@/utils/taskCollection'
 import {
   canPerformTaskAction,
@@ -1359,6 +1365,16 @@ interface CalendarCell {
 
 interface LoadOptions {
   forceRefresh?: boolean
+}
+
+interface PendingTaskAssignmentRefresh {
+  taskId: string
+  projectId: string
+  contextKey: string
+  operation: TaskAssignmentOperation
+  result: TaskAssignmentResult
+  cacheInvalidated: boolean
+  changedEventEmitted: boolean
 }
 
 type DisplayPhase = 'loading' | 'slow' | 'ready' | 'error'
@@ -1641,16 +1657,19 @@ const {
   invalidateUnlessCurrent: invalidateTaskAssignmentDraft,
 } = useTaskAssignmentDraft()
 const {
+  phase: taskAssignmentMutationPhase,
   errorMessage: taskAssignmentMutationErrorMessage,
   busy: taskAssignmentMutationBusy,
   blocked: taskAssignmentMutationBlocked,
   submit: submitTaskAssignmentMutation,
   complete: completeTaskAssignmentMutation,
   markCommittedRefreshError: markTaskAssignmentCommittedRefreshError,
+  beginCommittedRefreshRetry: beginCommittedTaskAssignmentRefreshRetry,
   block: blockTaskAssignmentMutation,
   reset: resetTaskAssignmentMutation,
 } = useTaskAssignmentMutation()
 const taskAssignmentChangedRevision = ref(0)
+const pendingTaskAssignmentRefresh = ref<PendingTaskAssignmentRefresh | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
 const isTodayView = computed(() => route.query.view === 'today')
@@ -3677,14 +3696,23 @@ const closeDueDatePicker = () => {
   isDueDatePickerOpen.value = false
 }
 
-const closeTaskAssignmentDialog = (restoreFocus = true) => {
+const dismissTaskAssignmentDialog = (restoreFocus = true) => {
   const wasOpen = Boolean(taskAssignmentDraft.value)
-  resetTaskAssignmentMutation()
   closeTaskAssignmentDraft()
   resetTaskAssignmentCandidates()
   if (wasOpen && restoreFocus) {
     void nextTick(() => taskAssigneeEntryRef.value?.focusChangeButton())
   }
+}
+
+const resetTaskAssignmentInteraction = (restoreFocus = true) => {
+  resetTaskAssignmentMutation()
+  pendingTaskAssignmentRefresh.value = null
+  dismissTaskAssignmentDialog(restoreFocus)
+}
+
+const closeTaskAssignmentDialog = (restoreFocus = true) => {
+  resetTaskAssignmentInteraction(restoreFocus)
 }
 
 const openTaskAssignmentDialog = () => {
@@ -3715,6 +3743,88 @@ const getTaskAssignmentSuccessMessage = (operation: TaskAssignmentOperation) => 
   if (operation === 'REASSIGN') return '负责人已转派。'
   if (operation === 'UNASSIGN') return '已解除任务负责人。'
   return '负责人已同步。'
+}
+
+const getCommittedTaskAssignmentRefreshErrorMessage = (changed: boolean) => (
+  changed
+    ? '负责人变更已提交，但最新任务状态加载失败，请重新加载后再操作。'
+    : '负责人状态已确认，但最新任务状态加载失败，请重新加载后再操作。'
+)
+
+const reconcileCommittedTaskAssignment = async (
+  snapshot: PendingTaskAssignmentRefresh,
+) => {
+  if (snapshot.result.changed && !snapshot.cacheInvalidated) {
+    removeProjectTaskCaches(snapshot.projectId)
+    snapshot.cacheInvalidated = true
+  }
+
+  if (
+    snapshot.contextKey !== currentContextKey.value
+    || selectedTask.value?.id !== snapshot.taskId
+  ) {
+    completeTaskAssignmentMutation()
+    if (pendingTaskAssignmentRefresh.value === snapshot) {
+      pendingTaskAssignmentRefresh.value = null
+    }
+    dismissTaskAssignmentDialog(false)
+    return false
+  }
+
+  const refreshOutcome = await loadTasks({ forceRefresh: true })
+  if (snapshot.contextKey !== currentContextKey.value) {
+    completeTaskAssignmentMutation()
+    if (pendingTaskAssignmentRefresh.value === snapshot) {
+      pendingTaskAssignmentRefresh.value = null
+    }
+    dismissTaskAssignmentDialog(false)
+    return false
+  }
+
+  if (selectedTask.value && selectedTask.value.id !== snapshot.taskId) {
+    completeTaskAssignmentMutation()
+    if (pendingTaskAssignmentRefresh.value === snapshot) {
+      pendingTaskAssignmentRefresh.value = null
+    }
+    dismissTaskAssignmentDialog(false)
+    return false
+  }
+
+  const refreshedTask = findTaskById(taskList.value, snapshot.taskId)
+  if (
+    refreshOutcome.status !== 'ok'
+    || !refreshedTask
+    || refreshedTask.assigneeUserId !== snapshot.result.assigneeUserId
+  ) {
+    const message = getCommittedTaskAssignmentRefreshErrorMessage(snapshot.result.changed)
+    markTaskAssignmentCommittedRefreshError(message)
+    failClosedTaskCapabilities(snapshot.taskId)
+    toast.warning(message)
+    return false
+  }
+
+  completeTaskAssignmentMutation()
+  if (snapshot.result.changed && !snapshot.changedEventEmitted) {
+    snapshot.changedEventEmitted = true
+    taskAssignmentChangedRevision.value += 1
+  }
+  if (pendingTaskAssignmentRefresh.value === snapshot) {
+    pendingTaskAssignmentRefresh.value = null
+  }
+  dismissTaskAssignmentDialog()
+
+  if (snapshot.result.changed) {
+    toast.success(getTaskAssignmentSuccessMessage(snapshot.operation))
+  } else {
+    toast.info('负责人未发生变化，已同步最新任务状态。')
+  }
+  return true
+}
+
+const retryCommittedTaskAssignmentRefresh = async () => {
+  const snapshot = pendingTaskAssignmentRefresh.value
+  if (!snapshot || !beginCommittedTaskAssignmentRefreshRetry()) return
+  await reconcileCommittedTaskAssignment(snapshot)
 }
 
 const submitTaskAssignment = async (payload: {
@@ -3805,42 +3915,16 @@ const submitTaskAssignment = async (payload: {
     return
   }
 
-  if (outcome.result.changed) {
-    removeProjectTaskCaches(draft.projectId)
+  pendingTaskAssignmentRefresh.value = {
+    taskId: draft.taskId,
+    projectId: draft.projectId,
+    contextKey: draft.contextKey,
+    operation,
+    result: outcome.result,
+    cacheInvalidated: false,
+    changedEventEmitted: false,
   }
-
-  if (
-    draft.contextKey !== currentContextKey.value
-    || selectedTask.value?.id !== draft.taskId
-  ) {
-    completeTaskAssignmentMutation()
-    return
-  }
-
-  const refreshOutcome = await loadTasks({ forceRefresh: true })
-  const refreshedTask = findTaskById(taskList.value, draft.taskId)
-  if (
-    refreshOutcome.status !== 'ok'
-    || !refreshedTask
-    || refreshedTask.assigneeUserId !== outcome.result.assigneeUserId
-  ) {
-    markTaskAssignmentCommittedRefreshError()
-    failClosedTaskCapabilities(draft.taskId)
-    closeTaskAssignmentDialog(false)
-    toast.warning('负责人变更已提交，但最新任务状态加载失败，请重新加载后再操作。')
-    return
-  }
-
-  completeTaskAssignmentMutation()
-  if (outcome.result.changed) {
-    taskAssignmentChangedRevision.value += 1
-    closeTaskAssignmentDialog()
-    toast.success(getTaskAssignmentSuccessMessage(operation))
-    return
-  }
-
-  closeTaskAssignmentDialog()
-  toast.info('负责人未发生变化，已同步最新任务状态。')
+  await reconcileCommittedTaskAssignment(pendingTaskAssignmentRefresh.value)
 }
 
 const closeTaskScopedInteractions = () => {
@@ -4255,8 +4339,20 @@ watch(taskAssignmentCandidatesStatus, (status) => {
 watch(
   [currentContextKey, () => selectedTask.value?.id ?? null],
   ([contextKey, taskId]) => {
+    const pendingRefresh = pendingTaskAssignmentRefresh.value
+    if (
+      pendingRefresh
+      && pendingRefresh.contextKey === contextKey
+      && taskId === null
+    ) {
+      return
+    }
     if (invalidateTaskAssignmentDraft(contextKey, taskId)) {
       resetTaskAssignmentCandidates()
+      if (!taskAssignmentMutationBusy.value) {
+        resetTaskAssignmentMutation()
+        pendingTaskAssignmentRefresh.value = null
+      }
     }
   },
   { flush: 'sync' },
@@ -4361,6 +4457,9 @@ watch(
     }
   },
   (next, previous) => {
+    if (!next && pendingTaskAssignmentRefresh.value) {
+      return
+    }
     if (!next || !previous || next.id !== previous.id) {
       closeTaskScopedInteractions()
       return
@@ -4377,7 +4476,9 @@ watch(
       isMilestoneMenuOpen.value = false
     }
     if (previous.canAssign && !next.canAssign) {
-      closeTaskAssignmentDialog(false)
+      if (!pendingTaskAssignmentRefresh.value) {
+        closeTaskAssignmentDialog(false)
+      }
     }
     if (previous.canDelete && !next.canDelete) {
       showDeleteTaskConfirm.value = false

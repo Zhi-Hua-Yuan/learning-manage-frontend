@@ -128,4 +128,23 @@ describe('TaskAssignmentDialog', () => {
     expect(wrapper.get('[data-testid="task-assignment-confirm"]').text()).toBe('处理中…')
     wrapper.unmount()
   })
+
+  it('replaces assignment confirmation with a refresh-only recovery action', async () => {
+    const wrapper = mountDialog({
+      targetAssigneeUserId: '2',
+      submissionBlocked: true,
+      submissionErrorMessage: '负责人变更已提交，但最新任务状态加载失败。',
+      recoveryRequired: true,
+    })
+
+    expect(wrapper.find('[data-testid="task-assignment-confirm"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="task-assignment-recover"]').text()).toBe('重新加载最新任务')
+
+    await wrapper.get('[data-testid="task-assignment-recover"]').trigger('click')
+    expect(wrapper.emitted('recover')).toHaveLength(1)
+
+    await wrapper.setProps({ busy: true })
+    expect(wrapper.get('[data-testid="task-assignment-recover"]').text()).toBe('重新加载中…')
+    expect(wrapper.get('[data-testid="task-assignment-recover"]').attributes('disabled')).toBeDefined()
+  })
 })

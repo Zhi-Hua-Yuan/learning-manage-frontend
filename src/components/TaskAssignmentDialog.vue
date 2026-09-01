@@ -124,6 +124,18 @@
             取消
           </button>
           <button
+            v-if="recoveryRequired"
+            type="button"
+            class="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
+            :disabled="busy"
+            :class="busy ? 'cursor-not-allowed opacity-70' : ''"
+            data-testid="task-assignment-recover"
+            @click="recover"
+          >
+            {{ busy ? '重新加载中…' : recoveryLabel }}
+          </button>
+          <button
+            v-else
             type="button"
             class="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
             :disabled="confirmDisabled"
@@ -163,18 +175,23 @@ const props = withDefaults(defineProps<{
   busy?: boolean
   submissionBlocked?: boolean
   submissionErrorMessage?: string | null
+  recoveryRequired?: boolean
+  recoveryLabel?: string
 }>(), {
   candidatesLoading: false,
   candidatesErrorMessage: null,
   busy: false,
   submissionBlocked: false,
   submissionErrorMessage: null,
+  recoveryRequired: false,
+  recoveryLabel: '重新加载最新任务',
 })
 
 const emit = defineEmits<{
   'update:targetAssigneeUserId': [value: string | null]
   'update:reason': [value: string]
   retry: []
+  recover: []
   cancel: []
   confirm: [{ targetAssigneeUserId: string | null; reason?: string }]
 }>()
@@ -239,6 +256,10 @@ const confirm = () => {
     targetAssigneeUserId: props.targetAssigneeUserId,
     reason: reasonResult.value.value,
   })
+}
+
+const recover = () => {
+  if (!props.busy && props.recoveryRequired) emit('recover')
 }
 
 const getFocusableElements = () => Array.from(

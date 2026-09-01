@@ -202,6 +202,7 @@ describe('TaskList assignment dialog integration', () => {
   it('invalidates caches and replaces the opened task with fresh assignee capabilities', async () => {
     const removeCaches = vi.spyOn(taskCache, 'removeProjectTaskCaches')
     const wrapper = await mountTaskList()
+    const previousSelectedTask = (wrapper.vm as unknown as { selectedTask: ReturnType<typeof task> }).selectedTask
     await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')
     const dialog = await vi.waitFor(() => wrapper.get('[data-testid="task-assignment-dialog"]'))
     await dialog.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
@@ -227,6 +228,9 @@ describe('TaskList assignment dialog integration', () => {
       taskAssignmentChangedRevision: number
     }
     await vi.waitFor(() => expect(vm.selectedTask.assigneeUserId).toBe('2'))
+    expect(vm.selectedTask).not.toBe(previousSelectedTask)
+    expect(vm.selectedTask.assignedByUserId).toBe('1')
+    expect(vm.selectedTask.assignedAt).toBe('2026-09-01T12:00:00')
     expect(vm.selectedTask.capabilities.canAssign).toBe(false)
     expect(vm.taskAssignmentChangedRevision).toBe(1)
     expect(removeCaches).toHaveBeenCalledWith('1')
@@ -324,7 +328,7 @@ describe('TaskList assignment dialog integration', () => {
     expect(taskApi.fetchTaskList.mock.calls.length).toBeGreaterThan(callsBeforeSubmit)
   })
 
-  it('fails closed when the assignment commits but fresh task facts cannot be loaded', async () => {
+  it('fails closed and retries only the fact refresh after the assignment commits', async () => {
     const wrapper = await mountTaskList()
     await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')
     const dialog = await vi.waitFor(() => wrapper.get('[data-testid="task-assignment-dialog"]'))
@@ -339,9 +343,53 @@ describe('TaskList assignment dialog integration', () => {
 
     await dialog.get('[data-testid="task-assignment-confirm"]').trigger('click')
 
-    const vm = wrapper.vm as unknown as { selectedTask: ReturnType<typeof task> }
-    await vi.waitFor(() => expect(wrapper.find('[data-testid="task-assignment-dialog"]').exists()).toBe(false))
+    const vm = wrapper.vm as unknown as {
+      selectedTask: ReturnType<typeof task>
+      taskAssignmentChangedRevision: number
+      taskAssignmentMutationPhase: string
+    }
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="task-assignment-recover"]')))
     expect(vm.selectedTask.capabilities.canAssign).toBe(false)
+    expect(vm.taskAssignmentMutationPhase).toBe('committed-refresh-error')
+    expect(taskApi.assignTaskApi).toHaveBeenCalledTimes(1)
+
+    taskApi.fetchTaskList.mockResolvedValue({
+      data: { records: [{
+        ...task(false),
+        assigneeUserId: '2',
+        assignedByUserId: '1',
+        assignedAt: '2026-09-01T12:00:00',
+      }], current: 1, size: 100, total: 1 },
+    })
+    await wrapper.get('[data-testid="task-assignment-recover"]').trigger('click')
+
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="task-assignment-dialog"]').exists()).toBe(false))
+    expect(taskApi.assignTaskApi).toHaveBeenCalledTimes(1)
+    expect(vm.selectedTask.assigneeUserId).toBe('2')
+    expect(vm.taskAssignmentChangedRevision).toBe(1)
+  })
+
+  it('keeps refresh-only recovery when the committed task is temporarily missing', async () => {
+    const wrapper = await mountTaskList()
+    await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')
+    const dialog = await vi.waitFor(() => wrapper.get('[data-testid="task-assignment-dialog"]'))
+    await dialog.get('[data-testid="task-assignee-picker-trigger"]').trigger('click')
+    const member = await vi.waitFor(() => {
+      const candidate = dialog.findAll('[role="option"]').find((option) => option.text().includes('成员二'))
+      if (!candidate) throw new Error('missing assignment candidate')
+      return candidate
+    })
+    await member.trigger('click')
+    taskApi.fetchTaskList.mockResolvedValue({
+      data: { records: [], current: 1, size: 100, total: 0 },
+    })
+
+    await dialog.get('[data-testid="task-assignment-confirm"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="task-assignment-recover"]')))
+    expect(taskApi.assignTaskApi).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-testid="task-assignment-recover"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="task-assignment-recover"]')))
     expect(taskApi.assignTaskApi).toHaveBeenCalledTimes(1)
   })
 

@@ -4,7 +4,9 @@
       <div
         class="flex h-14 items-center justify-between gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-0 sm:px-5"
       >
-        <div class="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
+        <div
+          class="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl"
+        >
           <AppIcon
             v-if="isAggregateView"
             name="calendar"
@@ -33,15 +35,35 @@
           :aria-label="unifiedAiButtonHint"
           @click="handleUnifiedAiAction"
         >
-          <svg v-if="isUnifiedAiActionBusy" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" class="opacity-25" />
-            <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <svg
+            v-if="isUnifiedAiActionBusy"
+            class="h-5 w-5 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="9"
+              stroke="currentColor"
+              stroke-width="2"
+              class="opacity-25"
+            />
+            <path
+              d="M21 12a9 9 0 0 0-9-9"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
           </svg>
           <AppIcon v-else name="sparkles" class="h-5 w-5" />
         </button>
 
         <div
-          v-if="shouldRenderBoardData && !isAggregateView && selectedProjectId && taskList.length > 0"
+          v-if="
+            shouldRenderBoardData && !isAggregateView && selectedProjectId && taskList.length > 0
+          "
           class="ml-auto flex items-center gap-2"
         >
           <button
@@ -54,15 +76,37 @@
             :aria-label="unifiedAiButtonHint"
             @click="handleUnifiedAiAction"
           >
-            <svg v-if="isUnifiedAiActionBusy" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" class="opacity-25" />
-              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <svg
+              v-if="isUnifiedAiActionBusy"
+              class="h-5 w-5 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                stroke-width="2"
+                class="opacity-25"
+              />
+              <path
+                d="M21 12a9 9 0 0 0-9-9"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
             </svg>
             <AppIcon v-else name="sparkles" class="h-5 w-5" />
           </button>
           <div class="flex w-40 items-center gap-3 sm:w-56">
-            <span class="mono text-xs text-[var(--color-text-secondary)]">完成度 {{ projectProgress }}%</span>
-            <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]">
+            <span class="mono text-xs text-[var(--color-text-secondary)]"
+              >完成度 {{ projectProgress }}%</span
+            >
+            <div
+              class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]"
+            >
               <div
                 class="h-full bg-[var(--color-success)] transition-all duration-500"
                 :style="{ width: projectProgress + '%' }"
@@ -112,7 +156,12 @@
               @keydown="onNewTaskFlagTriggerKeydown"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"
+                ></path>
               </svg>
               <span class="max-w-24 truncate">{{ newTaskMilestoneLabel }}</span>
             </button>
@@ -166,7 +215,9 @@
               @click="selectNewTaskMilestone(option.value)"
               @mousemove="setNewTaskActiveMilestoneIndex(optionIndex)"
               class="interactive-row flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-              :class="optionIndex === newTaskActiveMilestoneIndex ? 'bg-[var(--color-menu-hover)]' : ''"
+              :class="
+                optionIndex === newTaskActiveMilestoneIndex ? 'bg-[var(--color-menu-hover)]' : ''
+              "
             >
               <span class="truncate text-[var(--color-text-body)]">{{ option.label }}</span>
               <svg
@@ -176,7 +227,12 @@
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                ></path>
               </svg>
             </button>
           </div>
@@ -196,299 +252,317 @@
         <div :key="boardTransitionKey" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
           <div v-if="shouldRenderBoardData" class="space-y-4">
             <section v-if="groupedTasks.unassigned.length > 0" class="space-y-2">
-            <div class="flex items-center gap-3 px-1">
-              <h3 class="text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
-                {{ mainTaskSectionTitle }}
-              </h3>
-            </div>
-            <div class="space-y-2">
-              <div
-                v-for="task in groupedTasks.unassigned"
-                :key="task.id"
-                @click="selectTask(task)"
-                class="card-base group flex cursor-pointer items-center gap-3 bg-[var(--color-bg-surface)] px-3 py-3"
-                :class="
-                  selectedTask?.id === task.id
-                    ? 'bg-[var(--color-task-selected-bg)] ring-2 ring-[var(--color-task-selected-ring)] ring-offset-1 ring-offset-[var(--color-task-selected-offset)]'
-                    : ''
-                "
-                :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
-              >
-                <button
-                  type="button"
-                  :data-testid="`task-status-toggle-${task.id}`"
-                  :disabled="!canPerformTaskAction(task, 'changeStatus')"
-                  :aria-pressed="isTaskCompleted(task.status)"
-                  :aria-label="
-                    canPerformTaskAction(task, 'changeStatus')
-                      ? `切换任务“${task.title}”状态`
-                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
-                  "
-                  :title="
-                    canPerformTaskAction(task, 'changeStatus')
-                      ? '切换任务状态'
-                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
-                  "
-                  class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              <div class="flex items-center gap-3 px-1">
+                <h3 class="text-xs font-semibold tracking-wide text-[var(--color-text-secondary)]">
+                  {{ mainTaskSectionTitle }}
+                </h3>
+              </div>
+              <div class="space-y-2">
+                <div
+                  v-for="task in groupedTasks.unassigned"
+                  :key="task.id"
+                  @click="selectTask(task)"
+                  class="card-base group flex cursor-pointer items-center gap-3 bg-[var(--color-bg-surface)] px-3 py-3"
                   :class="
-                    isTaskCompleted(task.status)
-                      ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
-                      : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
+                    selectedTask?.id === task.id
+                      ? 'bg-[var(--color-task-selected-bg)] ring-2 ring-[var(--color-task-selected-ring)] ring-offset-1 ring-offset-[var(--color-task-selected-offset)]'
+                      : ''
                   "
-                  :style="{ borderColor: getTaskCheckboxBorderColor(task.status) }"
-                  @click.stop="toggleTaskStatus(task)"
+                  :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
                 >
-                  <svg
-                    v-if="isTaskCompleted(task.status)"
-                    class="h-3 w-3 text-[var(--color-text-secondary)]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    ></path>
-                  </svg>
-                </button>
-
-                <span
-                  class="min-w-0 flex-1 text-sm transition-colors"
-                  :class="
-                    isTaskCompleted(task.status)
-                      ? 'text-[var(--color-text-tertiary)] line-through'
-                      : 'text-[var(--color-text-primary)]'
-                  "
-                >
-                  {{ task.title }}
-                </span>
-
-                <div class="flex shrink-0 items-center gap-2">
                   <button
-                    v-if="isTodayView && getTodayAiOrderMeta(task)"
                     type="button"
-                    class="inline-flex items-center rounded-full border border-[var(--color-ai)]/40 bg-[var(--color-success-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--color-ai)] transition-colors hover:bg-[var(--color-success-soft)]/80"
-                    @click.stop="openTodayAiReasonDialog(task)"
+                    :data-testid="`task-status-toggle-${task.id}`"
+                    :disabled="isTaskStatusActionDisabled(task)"
+                    :aria-pressed="isTaskCompleted(task.status)"
+                    :aria-label="
+                      !isTaskStatusActionDisabled(task)
+                        ? `切换任务“${task.title}”状态`
+                        : resolveTaskStatusActionTitle(task)
+                    "
+                    :title="
+                      resolveTaskStatusActionTitle(task)
+                    "
+                    class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    :class="
+                      isTaskCompleted(task.status)
+                        ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
+                        : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
+                    "
+                    :style="{ borderColor: getTaskCheckboxBorderColor(task.status) }"
+                    @click.stop="toggleTaskStatus(task)"
                   >
-                    AI
+                    <svg
+                      v-if="isTaskCompleted(task.status)"
+                      class="h-3 w-3 text-[var(--color-text-secondary)]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M5 13l4 4L19 7"
+                      ></path>
+                    </svg>
                   </button>
+
                   <span
-                    v-if="isAggregateView"
-                    class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
-                    @click="navigateToProject(task.projectId)"
+                    class="min-w-0 flex-1 text-sm transition-colors"
+                    :class="
+                      isTaskCompleted(task.status)
+                        ? 'text-[var(--color-text-tertiary)] line-through'
+                        : 'text-[var(--color-text-primary)]'
+                    "
                   >
-                    <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
-                    <span class="truncate">{{ getTaskProjectName(task) }}</span>
+                    {{ task.title }}
                   </span>
-                  <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
-                    {{ formatTaskDueDate(task.dueDate) }}
-                  </span>
-                  <span
-                    class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs font-medium"
-                    :class="getPriorityOption(task.priority).textClass"
-                  >
-                    <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
-                    {{ getPriorityOption(task.priority).text }}
-                  </span>
+
+                  <div class="flex shrink-0 items-center gap-2">
+                    <button
+                      v-if="isTodayView && getTodayAiOrderMeta(task)"
+                      type="button"
+                      class="inline-flex items-center rounded-full border border-[var(--color-ai)]/40 bg-[var(--color-success-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--color-ai)] transition-colors hover:bg-[var(--color-success-soft)]/80"
+                      @click.stop="openTodayAiReasonDialog(task)"
+                    >
+                      AI
+                    </button>
+                    <span
+                      v-if="isAggregateView"
+                      class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                      @click="navigateToProject(task.projectId)"
+                    >
+                      <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
+                      <span class="truncate">{{ getTaskProjectName(task) }}</span>
+                    </span>
+                    <span
+                      v-if="task.dueDate"
+                      class="mono text-xs text-[var(--color-text-secondary)]"
+                    >
+                      {{ formatTaskDueDate(task.dueDate) }}
+                    </span>
+                    <span
+                      class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs font-medium"
+                      :class="getPriorityOption(task.priority).textClass"
+                    >
+                      <span
+                        class="priority-dot"
+                        :class="getPriorityOption(task.priority).dotClass"
+                      ></span>
+                      {{ getPriorityOption(task.priority).text }}
+                    </span>
+                  </div>
                 </div>
               </div>
+            </section>
+
+            <div
+              v-if="isAggregateView && groupedTasks.unassigned.length === 0"
+              class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)]"
+            >
+              {{ isWeekView ? '本周还没有截止日期在本周的任务' : '今天还没有截止日期为今天的任务' }}
             </div>
-          </section>
 
-          <div
-            v-if="isAggregateView && groupedTasks.unassigned.length === 0"
-            class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)]"
-          >
-            {{ isWeekView ? '本周还没有截止日期在本周的任务' : '今天还没有截止日期为今天的任务' }}
-          </div>
+            <section
+              v-for="group in groupedTasks.milestones"
+              :key="group.milestone.id"
+              class="card-base space-y-3 bg-[var(--color-bg-surface)] p-3 sm:p-4"
+            >
+              <div class="group relative flex flex-wrap items-center justify-between gap-3">
+                <div
+                  v-if="editingMilestoneId === group.milestone.id"
+                  class="flex min-w-0 flex-1 items-center gap-2"
+                >
+                  <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
+                  <input
+                    v-model="editMilestoneName"
+                    @keyup.enter="saveMilestone(group.milestone)"
+                    @blur="saveMilestone(group.milestone)"
+                    v-focus
+                    type="text"
+                    class="focus-ring w-full rounded border border-[var(--color-input-border-focus)] px-2 py-1 text-sm font-semibold text-[var(--color-text-primary)]"
+                  />
+                </div>
 
-          <section
-            v-for="group in groupedTasks.milestones"
-            :key="group.milestone.id"
-            class="card-base space-y-3 bg-[var(--color-bg-surface)] p-3 sm:p-4"
-          >
-            <div class="group relative flex flex-wrap items-center justify-between gap-3">
+                <h3
+                  v-else
+                  class="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-[var(--color-text-primary)]"
+                >
+                  <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
+                  <span class="truncate">{{ group.milestone.name }}</span>
+
+                  <div
+                    class="ml-1 flex items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                  >
+                    <button
+                      @click="startEditMilestone(group.milestone)"
+                      class="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                      title="重命名"
+                    >
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        ></path>
+                      </svg>
+                    </button>
+                    <button
+                      @click="requestDeleteMilestone(group.milestone.id, group.milestone.name)"
+                      class="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
+                      title="删除阶段"
+                    >
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        ></path>
+                      </svg>
+                    </button>
+                  </div>
+                </h3>
+
+                <div class="flex w-full items-center gap-2 sm:w-28">
+                  <span class="mono text-xs text-[var(--color-text-secondary)]"
+                    >{{ group.progress }}%</span
+                  >
+                  <div
+                    class="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]"
+                  >
+                    <div
+                      class="h-full bg-[var(--color-primary)] transition-all duration-500"
+                      :style="{ width: group.progress + '%' }"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <div
+                  v-if="group.tasks.length === 0"
+                  class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] px-3 py-4 text-center text-sm text-[var(--color-text-secondary)]"
+                >
+                  该阶段暂无任务
+                </div>
+
+                <div
+                  v-for="task in group.tasks"
+                  :key="task.id"
+                  @click="selectTask(task)"
+                  class="card-base group flex cursor-pointer items-center gap-3 bg-[var(--color-bg-surface)] px-3 py-3"
+                  :class="
+                    selectedTask?.id === task.id
+                      ? 'bg-[var(--color-task-selected-bg)] ring-2 ring-[var(--color-task-selected-ring)] ring-offset-1 ring-offset-[var(--color-task-selected-offset)]'
+                      : ''
+                  "
+                  :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
+                >
+                  <button
+                    type="button"
+                    :data-testid="`task-status-toggle-${task.id}`"
+                    :disabled="isTaskStatusActionDisabled(task)"
+                    :aria-pressed="isTaskCompleted(task.status)"
+                    :aria-label="
+                      !isTaskStatusActionDisabled(task)
+                        ? `切换任务“${task.title}”状态`
+                        : resolveTaskStatusActionTitle(task)
+                    "
+                    :title="
+                      resolveTaskStatusActionTitle(task)
+                    "
+                    class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    :class="
+                      isTaskCompleted(task.status)
+                        ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
+                        : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
+                    "
+                    :style="{ borderColor: getTaskCheckboxBorderColor(task.status) }"
+                    @click.stop="toggleTaskStatus(task)"
+                  >
+                    <svg
+                      v-if="isTaskCompleted(task.status)"
+                      class="h-3 w-3 text-[var(--color-text-secondary)]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M5 13l4 4L19 7"
+                      ></path>
+                    </svg>
+                  </button>
+
+                  <span
+                    class="min-w-0 flex-1 text-sm transition-colors"
+                    :class="
+                      isTaskCompleted(task.status)
+                        ? 'text-[var(--color-text-tertiary)] line-through'
+                        : 'text-[var(--color-text-primary)]'
+                    "
+                  >
+                    {{ task.title }}
+                  </span>
+
+                  <div class="flex shrink-0 items-center gap-2">
+                    <span
+                      v-if="isAggregateView"
+                      class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
+                      @click="navigateToProject(task.projectId)"
+                    >
+                      <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
+                      <span class="truncate">{{ getTaskProjectName(task) }}</span>
+                    </span>
+                    <span
+                      v-if="task.dueDate"
+                      class="mono text-xs text-[var(--color-text-secondary)]"
+                    >
+                      {{ formatTaskDueDate(task.dueDate) }}
+                    </span>
+                    <span
+                      class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs font-medium"
+                      :class="getPriorityOption(task.priority).textClass"
+                    >
+                      <span
+                        class="priority-dot"
+                        :class="getPriorityOption(task.priority).dotClass"
+                      ></span>
+                      {{ getPriorityOption(task.priority).text }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div v-if="!isAggregateView" class="pt-1">
               <div
-                v-if="editingMilestoneId === group.milestone.id"
-                class="flex min-w-0 flex-1 items-center gap-2"
+                v-if="isAddingMilestone"
+                class="card-base border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] p-1"
               >
-                <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
                 <input
-                  v-model="editMilestoneName"
-                  @keyup.enter="saveMilestone(group.milestone)"
-                  @blur="saveMilestone(group.milestone)"
-                  v-focus
+                  v-model="newMilestoneName"
+                  @keyup.enter="submitNewMilestone"
+                  @blur="isAddingMilestone = false"
+                  autofocus
                   type="text"
-                  class="focus-ring w-full rounded border border-[var(--color-input-border-focus)] px-2 py-1 text-sm font-semibold text-[var(--color-text-primary)]"
+                  placeholder="输入阶段名称，按回车保存"
+                  class="w-full bg-transparent px-3 py-2 text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
                 />
               </div>
 
-              <h3 v-else class="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-[var(--color-text-primary)]">
-                <AppIcon name="flag" class="h-4 w-4 text-[var(--color-text-secondary)]" />
-                <span class="truncate">{{ group.milestone.name }}</span>
-
-                <div
-                  class="ml-1 flex items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                >
-                  <button
-                    @click="startEditMilestone(group.milestone)"
-                    class="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
-                    title="重命名"
-                  >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                      ></path>
-                    </svg>
-                  </button>
-                  <button
-                    @click="requestDeleteMilestone(group.milestone.id, group.milestone.name)"
-                    class="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
-                    title="删除阶段"
-                  >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      ></path>
-                    </svg>
-                  </button>
-                </div>
-              </h3>
-
-              <div class="flex w-full items-center gap-2 sm:w-28">
-                <span class="mono text-xs text-[var(--color-text-secondary)]">{{ group.progress }}%</span>
-                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-bg-surface-secondary)]">
-                  <div
-                    class="h-full bg-[var(--color-primary)] transition-all duration-500"
-                    :style="{ width: group.progress + '%' }"
-                  ></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <div
-                v-if="group.tasks.length === 0"
-                class="rounded-md border border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] px-3 py-4 text-center text-sm text-[var(--color-text-secondary)]"
+              <button
+                v-else
+                @click="openAddMilestoneInput"
+                class="card-base w-full border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] py-3 text-sm font-medium text-[var(--color-text-body)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-surface-secondary)]"
               >
-                该阶段暂无任务
-              </div>
-
-              <div
-                v-for="task in group.tasks"
-                :key="task.id"
-                @click="selectTask(task)"
-                class="card-base group flex cursor-pointer items-center gap-3 bg-[var(--color-bg-surface)] px-3 py-3"
-                :class="
-                  selectedTask?.id === task.id
-                    ? 'bg-[var(--color-task-selected-bg)] ring-2 ring-[var(--color-task-selected-ring)] ring-offset-1 ring-offset-[var(--color-task-selected-offset)]'
-                    : ''
-                "
-                :style="{ borderColor: getTaskItemBorderColor(task.priority) }"
-              >
-                <button
-                  type="button"
-                  :data-testid="`task-status-toggle-${task.id}`"
-                  :disabled="!canPerformTaskAction(task, 'changeStatus')"
-                  :aria-pressed="isTaskCompleted(task.status)"
-                  :aria-label="
-                    canPerformTaskAction(task, 'changeStatus')
-                      ? `切换任务“${task.title}”状态`
-                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
-                  "
-                  :title="
-                    canPerformTaskAction(task, 'changeStatus')
-                      ? '切换任务状态'
-                      : TASK_ACTION_DENIED_MESSAGE.changeStatus
-                  "
-                  class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                  :class="
-                    isTaskCompleted(task.status)
-                      ? 'border-[var(--color-border-strong)] bg-[var(--color-bg-surface-secondary)]'
-                      : 'border-[var(--color-input-border)] group-hover:border-[var(--color-border-strong)]'
-                  "
-                  :style="{ borderColor: getTaskCheckboxBorderColor(task.status) }"
-                  @click.stop="toggleTaskStatus(task)"
-                >
-                  <svg
-                    v-if="isTaskCompleted(task.status)"
-                    class="h-3 w-3 text-[var(--color-text-secondary)]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    ></path>
-                  </svg>
-                </button>
-
-                <span
-                  class="min-w-0 flex-1 text-sm transition-colors"
-                  :class="
-                    isTaskCompleted(task.status)
-                      ? 'text-[var(--color-text-tertiary)] line-through'
-                      : 'text-[var(--color-text-primary)]'
-                  "
-                >
-                  {{ task.title }}
-                </span>
-
-                <div class="flex shrink-0 items-center gap-2">
-                  <span
-                    v-if="isAggregateView"
-                    class="inline-flex max-w-36 cursor-pointer items-center gap-1 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-menu-hover)] hover:text-[var(--color-text-body)]"
-                    @click="navigateToProject(task.projectId)"
-                  >
-                    <AppIcon :name="getTaskProjectIcon(task)" class="h-3.5 w-3.5" />
-                    <span class="truncate">{{ getTaskProjectName(task) }}</span>
-                  </span>
-                  <span v-if="task.dueDate" class="mono text-xs text-[var(--color-text-secondary)]">
-                    {{ formatTaskDueDate(task.dueDate) }}
-                  </span>
-                  <span
-                    class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs font-medium"
-                    :class="getPriorityOption(task.priority).textClass"
-                  >
-                    <span class="priority-dot" :class="getPriorityOption(task.priority).dotClass"></span>
-                    {{ getPriorityOption(task.priority).text }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-            <div v-if="!isAggregateView" class="pt-1">
-            <div v-if="isAddingMilestone" class="card-base border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] p-1">
-              <input
-                v-model="newMilestoneName"
-                @keyup.enter="submitNewMilestone"
-                @blur="isAddingMilestone = false"
-                autofocus
-                type="text"
-                placeholder="输入阶段名称，按回车保存"
-                class="w-full bg-transparent px-3 py-2 text-sm text-[var(--color-text-body)] outline-none placeholder:text-[var(--color-text-tertiary)]"
-              />
-            </div>
-
-            <button
-              v-else
-              @click="openAddMilestoneInput"
-              class="card-base w-full border-dashed border-[var(--color-input-border)] bg-[var(--color-bg-surface-muted)] py-3 text-sm font-medium text-[var(--color-text-body)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-surface-secondary)]"
-            >
-              + 添加阶段
-            </button>
+                + 添加阶段
+              </button>
             </div>
           </div>
 
@@ -501,9 +575,15 @@
                   :key="`task-skeleton-${index}`"
                   class="flex items-center gap-3 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-3 py-3"
                 >
-                  <div class="h-5 w-5 animate-pulse rounded border border-[var(--color-input-border)]"></div>
-                  <div class="h-3 w-2/3 animate-pulse rounded bg-[var(--color-bg-surface-muted)]"></div>
-                  <div class="ml-auto h-3 w-12 animate-pulse rounded bg-[var(--color-bg-surface-muted)]"></div>
+                  <div
+                    class="h-5 w-5 animate-pulse rounded border border-[var(--color-input-border)]"
+                  ></div>
+                  <div
+                    class="h-3 w-2/3 animate-pulse rounded bg-[var(--color-bg-surface-muted)]"
+                  ></div>
+                  <div
+                    class="ml-auto h-3 w-12 animate-pulse rounded bg-[var(--color-bg-surface-muted)]"
+                  ></div>
                 </div>
               </div>
             </div>
@@ -546,7 +626,9 @@
       :style="isMobile ? undefined : { width: detailWidth + 'px' }"
     >
       <template v-if="selectedTask">
-        <div class="flex items-center justify-between border-b border-[var(--color-divider-muted)] p-4 text-[var(--color-text-body)]">
+        <div
+          class="flex items-center justify-between border-b border-[var(--color-divider-muted)] p-4 text-[var(--color-text-body)]"
+        >
           <div class="flex items-center gap-2">
             <button
               v-if="isMobile"
@@ -555,7 +637,12 @@
               title="返回列表"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
             <span class="text-sm font-semibold">任务详情</span>
@@ -565,8 +652,12 @@
             <button
               :data-testid="'task-delete-button'"
               :disabled="!selectedDeleteUi.allowed"
-              :aria-label="selectedDeleteUi.allowed ? '删除任务' : selectedDeleteUi.deniedMessage || '删除任务'"
-              :title="selectedDeleteUi.allowed ? '删除任务' : selectedDeleteUi.deniedMessage || '删除任务'"
+              :aria-label="
+                selectedDeleteUi.allowed ? '删除任务' : selectedDeleteUi.deniedMessage || '删除任务'
+              "
+              :title="
+                selectedDeleteUi.allowed ? '删除任务' : selectedDeleteUi.deniedMessage || '删除任务'
+              "
               @click="requestDeleteTask"
               class="rounded p-1.5 text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-secondary)]"
             >
@@ -586,7 +677,12 @@
               title="关闭详情"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -594,7 +690,11 @@
 
         <div class="flex-1 min-h-0 space-y-4 overflow-y-auto p-4">
           <div
-            v-if="!selectedEditContentUi.allowed || !selectedReorganizeUi.allowed || !selectedDeleteUi.allowed"
+            v-if="
+              !selectedEditContentUi.allowed ||
+              !selectedReorganizeUi.allowed ||
+              !selectedDeleteUi.allowed
+            "
             class="rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-secondary)]"
             role="status"
           >
@@ -605,18 +705,31 @@
             <span
               v-if="!selectedEditContentUi.allowed && !selectedReorganizeUi.allowed"
               aria-hidden="true"
-            >；</span>
+              >；</span
+            >
             <span v-if="!selectedReorganizeUi.allowed" id="task-reorganize-permission-hint">
               {{ selectedReorganizeUi.deniedMessage }}
             </span>
             <span
-              v-if="(!selectedEditContentUi.allowed || !selectedReorganizeUi.allowed) && !selectedDeleteUi.allowed"
+              v-if="
+                (!selectedEditContentUi.allowed || !selectedReorganizeUi.allowed) &&
+                !selectedDeleteUi.allowed
+              "
               aria-hidden="true"
-            >；</span>
+              >；</span
+            >
             <span v-if="!selectedDeleteUi.allowed">
               {{ selectedDeleteUi.deniedMessage }}
             </span>
           </div>
+
+          <TaskStatusRecoveryNotice
+            v-if="selectedTaskStatusMutation"
+            :phase="selectedTaskStatusMutation.phase"
+            :message="selectedTaskStatusMutation.errorMessage"
+            @retry="retrySelectedTaskStatusRequest"
+            @refresh="refreshSelectedTaskStatusFacts"
+          />
 
           <div class="space-y-1">
             <textarea
@@ -625,7 +738,9 @@
               :data-testid="'task-title-input'"
               :disabled="!selectedEditContentUi.allowed"
               :title="selectedEditContentUi.deniedMessage || undefined"
-              :aria-describedby="selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'"
+              :aria-describedby="
+                selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'
+              "
               maxlength="50"
               rows="1"
               @input="onDetailTitleInput"
@@ -642,7 +757,12 @@
             ref="priorityRowRef"
             class="relative flex items-center gap-3 border-y border-[var(--color-divider-muted)] py-3"
           >
-            <svg class="h-5 w-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              class="h-5 w-5 text-[var(--color-text-secondary)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -650,14 +770,18 @@
                 d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-1 6-1 1H11.5l-1-1H5v12"
               ></path>
             </svg>
-            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]">优先级</label>
+            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]"
+              >优先级</label
+            >
             <div class="relative min-w-0 flex-1">
               <button
                 type="button"
                 :data-testid="'task-priority-trigger'"
                 :disabled="!selectedReorganizeUi.allowed"
                 :title="selectedReorganizeUi.deniedMessage || '设置优先级'"
-                :aria-describedby="selectedReorganizeUi.allowed ? undefined : 'task-reorganize-permission-hint'"
+                :aria-describedby="
+                  selectedReorganizeUi.allowed ? undefined : 'task-reorganize-permission-hint'
+                "
                 @click.stop="togglePriorityMenu"
                 class="task-detail-select-trigger"
               >
@@ -667,8 +791,18 @@
                     {{ currentPriorityObj.text }}
                   </span>
                 </span>
-                <svg class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                <svg
+                  class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
                 </svg>
               </button>
 
@@ -692,7 +826,12 @@
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    ></path>
                   </svg>
                 </button>
               </div>
@@ -703,7 +842,12 @@
             ref="dueDateRowRef"
             class="flex items-center gap-3 border-b border-[var(--color-divider-muted)] py-3"
           >
-            <svg class="h-5 w-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              class="h-5 w-5 text-[var(--color-text-secondary)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -711,7 +855,9 @@
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               ></path>
             </svg>
-            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]">截止日期</label>
+            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]"
+              >截止日期</label
+            >
 
             <div class="relative min-w-0 flex-1">
               <button
@@ -719,7 +865,9 @@
                 :data-testid="'task-due-date-trigger'"
                 :disabled="!selectedEditContentUi.allowed"
                 :title="selectedEditContentUi.deniedMessage || '设置截止日期'"
-                :aria-describedby="selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'"
+                :aria-describedby="
+                  selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'
+                "
                 @click="openDueDatePicker"
                 class="task-detail-select-trigger text-left"
               >
@@ -739,7 +887,12 @@
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
                 </svg>
               </button>
 
@@ -756,7 +909,12 @@
                     aria-label="上个月"
                   >
                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M15 19l-7-7 7-7"
+                      ></path>
                     </svg>
                   </button>
                   <span class="mono text-xs font-medium text-[var(--color-text-primary)]">
@@ -769,13 +927,22 @@
                     aria-label="下个月"
                   >
                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9 5l7 7-7 7"
+                      ></path>
                     </svg>
                   </button>
                 </div>
 
-                <div class="mb-1 grid shrink-0 grid-cols-7 gap-1 text-center text-[11px] text-[var(--color-text-tertiary)]">
-                  <span v-for="weekday in calendarWeekdayLabels" :key="weekday" class="py-1">{{ weekday }}</span>
+                <div
+                  class="mb-1 grid shrink-0 grid-cols-7 gap-1 text-center text-[11px] text-[var(--color-text-tertiary)]"
+                >
+                  <span v-for="weekday in calendarWeekdayLabels" :key="weekday" class="py-1">{{
+                    weekday
+                  }}</span>
                 </div>
 
                 <div class="grid min-h-0 flex-1 grid-cols-7 auto-rows-fr gap-1">
@@ -824,7 +991,12 @@
             ref="milestoneRowRef"
             class="relative flex items-center gap-3 border-b border-[var(--color-divider-muted)] py-3"
           >
-            <svg class="h-5 w-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              class="h-5 w-5 text-[var(--color-text-secondary)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -832,7 +1004,9 @@
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               ></path>
             </svg>
-            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]">所属阶段</label>
+            <label class="w-20 text-sm font-medium text-[var(--color-text-secondary)]"
+              >所属阶段</label
+            >
 
             <div class="relative min-w-0 flex-1">
               <button
@@ -840,13 +1014,27 @@
                 :data-testid="'task-milestone-trigger'"
                 :disabled="!selectedReorganizeUi.allowed"
                 :title="selectedReorganizeUi.deniedMessage || '设置所属阶段'"
-                :aria-describedby="selectedReorganizeUi.allowed ? undefined : 'task-reorganize-permission-hint'"
+                :aria-describedby="
+                  selectedReorganizeUi.allowed ? undefined : 'task-reorganize-permission-hint'
+                "
                 @click.stop="toggleMilestoneMenu"
                 class="task-detail-select-trigger"
               >
-                <span class="truncate text-sm text-[var(--color-text-body)]">{{ currentMilestoneLabel }}</span>
-                <svg class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                <span class="truncate text-sm text-[var(--color-text-body)]">{{
+                  currentMilestoneLabel
+                }}</span>
+                <svg
+                  class="h-4 w-4 shrink-0 text-[var(--color-text-tertiary)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
                 </svg>
               </button>
 
@@ -869,7 +1057,12 @@
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    ></path>
                   </svg>
                 </button>
               </div>
@@ -882,6 +1075,7 @@
             :assign-allowed="selectedAssignUi.allowed"
             :assign-denied-message="selectedAssignUi.deniedMessage"
             @request-change="openTaskAssignmentDialog"
+            @request-history="openTaskAssignmentHistoryDrawer"
           />
 
           <textarea
@@ -889,7 +1083,9 @@
             :data-testid="'task-description-input'"
             :disabled="!selectedEditContentUi.allowed"
             :title="selectedEditContentUi.deniedMessage || undefined"
-            :aria-describedby="selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'"
+            :aria-describedby="
+              selectedEditContentUi.allowed ? undefined : 'task-edit-content-permission-hint'
+            "
             v-model="selectedTask.description"
             @input="onDetailDescriptionInput"
             @blur="onTextBlur"
@@ -902,8 +1098,15 @@
       </template>
 
       <template v-else>
-        <div class="flex h-full flex-col items-center justify-center px-4 text-[var(--color-text-tertiary)]">
-          <svg class="mb-4 h-16 w-16 text-[var(--color-text-tertiary)] opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div
+          class="flex h-full flex-col items-center justify-center px-4 text-[var(--color-text-tertiary)]"
+        >
+          <svg
+            class="mb-4 h-16 w-16 text-[var(--color-text-tertiary)] opacity-60"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -936,21 +1139,35 @@
           <div class="ai-reason-header h-1.5 w-full"></div>
           <div class="space-y-4 p-6">
             <div class="text-center">
-              <div class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-ai)]">
+              <div
+                class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-ai)]"
+              >
                 <AppIcon name="sparkles" class="h-6 w-6" />
               </div>
               <h3 class="text-lg font-bold text-[var(--color-text-primary)]">AI 智能排序依据</h3>
-              <p class="mt-1 text-xs text-[var(--color-text-secondary)]">{{ selectedTodayAiReason.taskTitle }}</p>
+              <p class="mt-1 text-xs text-[var(--color-text-secondary)]">
+                {{ selectedTodayAiReason.taskTitle }}
+              </p>
             </div>
-            <div class="rounded-lg bg-[var(--color-bg-surface-muted)] px-3 py-2 text-sm text-[var(--color-text-body)]">
-              排序位次：<span class="mono font-semibold text-[var(--color-ai)]">#{{ selectedTodayAiReason.rank }}</span>
+            <div
+              class="rounded-lg bg-[var(--color-bg-surface-muted)] px-3 py-2 text-sm text-[var(--color-text-body)]"
+            >
+              排序位次：<span class="mono font-semibold text-[var(--color-ai)]"
+                >#{{ selectedTodayAiReason.rank }}</span
+              >
             </div>
-            <div class="rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-3 py-3 text-sm leading-relaxed text-[var(--color-text-body)]">
+            <div
+              class="rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-3 py-3 text-sm leading-relaxed text-[var(--color-text-body)]"
+            >
               {{ selectedTodayAiReason.reason || 'AI 未返回详细理由。' }}
             </div>
           </div>
           <div class="flex justify-end p-4 pt-0">
-            <button type="button" class="btn-ai rounded-xl px-5 py-2 text-sm font-bold" @click="closeTodayAiReasonDialog">
+            <button
+              type="button"
+              class="btn-ai rounded-xl px-5 py-2 text-sm font-bold"
+              @click="closeTodayAiReasonDialog"
+            >
               确认
             </button>
           </div>
@@ -978,14 +1195,20 @@
           <div class="ai-reason-header h-1.5 w-full"></div>
           <div class="space-y-4 p-6">
             <div class="text-center">
-              <div class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-ai)]">
+              <div
+                class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-soft)] text-[var(--color-ai)]"
+              >
                 <AppIcon name="sparkles" class="h-6 w-6" />
               </div>
               <h3 class="text-lg font-bold text-[var(--color-text-primary)]">AI 清单重排预览</h3>
               <p class="mt-1 text-xs text-[var(--color-text-secondary)]">清单：{{ pageTitle }}</p>
             </div>
-            <div class="rounded-lg bg-[var(--color-bg-surface-muted)] px-3 py-2 text-sm text-[var(--color-text-body)]">
-              变更任务数：<span class="mono font-semibold text-[var(--color-ai)]">{{ listReplanChangedCount }}</span>
+            <div
+              class="rounded-lg bg-[var(--color-bg-surface-muted)] px-3 py-2 text-sm text-[var(--color-text-body)]"
+            >
+              变更任务数：<span class="mono font-semibold text-[var(--color-ai)]">{{
+                listReplanChangedCount
+              }}</span>
             </div>
             <div
               v-if="listReplanPreviewItems.length === 0"
@@ -1007,8 +1230,19 @@
                     <span class="list-replan-field-label">标题</span>
                     <div class="list-replan-field-change">
                       <span class="list-replan-chip">{{ item.oldTitle || '（空）' }}</span>
-                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      <svg
+                        class="list-replan-arrow h-3.5 w-3.5"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M4 10h12m-4-4 4 4-4 4"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
                       </svg>
                       <span class="list-replan-chip">{{ item.newTitle || '（空）' }}</span>
                     </div>
@@ -1023,11 +1257,25 @@
                           getListReplanPriorityChipClass(item.oldPriority ?? 0),
                         ]"
                       >
-                        <span class="priority-dot" :class="getPriorityOption(item.oldPriority ?? 0).dotClass"></span>
+                        <span
+                          class="priority-dot"
+                          :class="getPriorityOption(item.oldPriority ?? 0).dotClass"
+                        ></span>
                         {{ getPriorityOption(item.oldPriority ?? 0).text }}
                       </span>
-                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      <svg
+                        class="list-replan-arrow h-3.5 w-3.5"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M4 10h12m-4-4 4 4-4 4"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
                       </svg>
                       <span
                         class="list-replan-priority-chip"
@@ -1036,7 +1284,10 @@
                           getListReplanPriorityChipClass(item.newPriority ?? 0),
                         ]"
                       >
-                        <span class="priority-dot" :class="getPriorityOption(item.newPriority ?? 0).dotClass"></span>
+                        <span
+                          class="priority-dot"
+                          :class="getPriorityOption(item.newPriority ?? 0).dotClass"
+                        ></span>
                         {{ getPriorityOption(item.newPriority ?? 0).text }}
                       </span>
                     </div>
@@ -1044,11 +1295,26 @@
                   <div class="list-replan-field-row">
                     <span class="list-replan-field-label">截止日期</span>
                     <div class="list-replan-field-change">
-                      <span class="list-replan-chip">{{ formatTaskDueDate(item.oldDueDate) || '未设置' }}</span>
-                      <svg class="list-replan-arrow h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                        <path d="M4 10h12m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      <span class="list-replan-chip">{{
+                        formatTaskDueDate(item.oldDueDate) || '未设置'
+                      }}</span>
+                      <svg
+                        class="list-replan-arrow h-3.5 w-3.5"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M4 10h12m-4-4 4 4-4 4"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
                       </svg>
-                      <span class="list-replan-chip">{{ formatTaskDueDate(item.newDueDate) || '未设置' }}</span>
+                      <span class="list-replan-chip">{{
+                        formatTaskDueDate(item.newDueDate) || '未设置'
+                      }}</span>
                     </div>
                   </div>
                   <div class="list-replan-field-row">
@@ -1058,7 +1324,9 @@
                     </span>
                   </div>
                 </div>
-                <div class="mt-2 rounded-lg bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-body)]">
+                <div
+                  class="mt-2 rounded-lg bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-body)]"
+                >
                   {{ item.reason || 'AI 未返回调整原因。' }}
                 </div>
               </div>
@@ -1078,7 +1346,11 @@
               type="button"
               class="btn-ai rounded-xl px-5 py-2 text-sm font-bold"
               :disabled="isListReplanActionBusy || !canConfirmListReplan"
-              :class="isListReplanActionBusy || !canConfirmListReplan ? 'cursor-not-allowed opacity-70' : ''"
+              :class="
+                isListReplanActionBusy || !canConfirmListReplan
+                  ? 'cursor-not-allowed opacity-70'
+                  : ''
+              "
               @click="confirmListReplanPreview"
             >
               {{ isListReplanConfirming ? '确认中...' : '确认生效' }}
@@ -1111,6 +1383,20 @@
       @reconfirm="reconfirmTaskAssignment"
       @cancel="closeTaskAssignmentDialog"
       @confirm="submitTaskAssignment"
+    />
+
+    <TaskAssignmentHistoryDrawer
+      ref="taskAssignmentHistoryDrawerRef"
+      :open="isTaskAssignmentHistoryDrawerOpen"
+      :task-title="selectedTask?.title || ''"
+      :records="taskAssignmentHistoryRecords"
+      :phase="taskAssignmentHistoryPhase"
+      :error-message="taskAssignmentHistoryErrorMessage"
+      :has-more="taskAssignmentHistoryHasMore"
+      :total="taskAssignmentHistoryTotal"
+      @close="closeTaskAssignmentHistoryDrawer"
+      @retry="retryTaskAssignmentHistory"
+      @load-more="loadMoreTaskAssignmentHistory"
     />
 
     <AppConfirmDialog
@@ -1168,14 +1454,18 @@
                 v-for="option in completionQualityOptions"
                 :key="option.status"
                 type="button"
+                :data-testid="`task-completion-quality-${option.status}`"
                 class="completion-option focus-ring rounded-xl px-2 py-3 transition-all"
                 :class="option.toneClass"
+                :disabled="pendingCompletionTask ? isTaskStatusActionDisabled(pendingCompletionTask) : true"
                 @click="confirmCompletionQuality(option.status)"
               >
                 <span class="block text-3xl leading-none">{{ option.emoji }}</span>
                 <span class="mt-2 block text-base font-semibold">
                   {{ option.label }}
-                  <span class="mono ml-1 text-xs font-medium opacity-70">{{ option.shortcutKey }}</span>
+                  <span class="mono ml-1 text-xs font-medium opacity-70">{{
+                    option.shortcutKey
+                  }}</span>
                 </span>
               </button>
             </div>
@@ -1183,7 +1473,11 @@
           </div>
 
           <div class="flex justify-end p-4 pt-0">
-            <button type="button" class="btn-secondary rounded-xl px-4 py-2.5 text-sm font-semibold" @click="closeCompletionQualityModal">
+            <button
+              type="button"
+              class="btn-secondary rounded-xl px-4 py-2.5 text-sm font-semibold"
+              @click="closeCompletionQualityModal"
+            >
               取消
             </button>
           </div>
@@ -1211,7 +1505,6 @@ import {
 import { fetchProjectList } from '@/api/project'
 import {
   addTaskApi,
-  changeTaskStatusApi,
   deleteTaskApi,
   fetchTaskList,
   updateTaskContentApi,
@@ -1240,6 +1533,14 @@ import { useToastStore } from '@/stores/toast'
 import TaskAssigneeEntry from '@/components/TaskAssigneeEntry.vue'
 import TaskAssigneePicker from '@/components/TaskAssigneePicker.vue'
 import TaskAssignmentDialog from '@/components/TaskAssignmentDialog.vue'
+import TaskAssignmentHistoryDrawer from '@/components/TaskAssignmentHistoryDrawer.vue'
+import TaskStatusRecoveryNotice from '@/components/TaskStatusRecoveryNotice.vue'
+import { useTaskAssignmentHistory } from '@/composables/useTaskAssignmentHistory'
+import {
+  useTaskStatusMutation,
+  type TaskStatusMutationOutcome,
+  type TaskStatusMutationState,
+} from '@/composables/useTaskStatusMutation'
 import {
   buildPersonalProjectRoute,
   parseTaskProjectContext,
@@ -1278,11 +1579,7 @@ import {
   TASK_STATUS_DONE_STANDARD,
   TASK_STATUS_TODO,
 } from '@/utils/taskStatus'
-import {
-  DENY_ALL_TASK_CAPABILITIES,
-  type TaskAssignmentResult,
-  type TaskModel,
-} from '@/types/task'
+import { DENY_ALL_TASK_CAPABILITIES, type TaskAssignmentResult, type TaskModel } from '@/types/task'
 import { findTaskById, normalizeTaskRecords } from '@/utils/taskCollection'
 import {
   canPerformTaskAction,
@@ -1291,20 +1588,13 @@ import {
   type TaskAction,
 } from '@/utils/taskCapabilities'
 import { resolveTaskAssigneePresentation } from '@/utils/taskAssigneePresentation'
-import {
-  normalizeTaskAssignmentReason,
-  type TaskAssignmentOperation,
-} from '@/utils/taskAssignment'
+import { normalizeTaskAssignmentReason, type TaskAssignmentOperation } from '@/utils/taskAssignment'
 import {
   buildTaskQuickCreatePayload,
   resolveTaskQuickCreateAccess,
   type TaskQuickCreateContext,
 } from '@/utils/taskQuickCreate'
 import { classifyApiError } from '@/utils/request'
-import {
-  createTaskStatusRequestId,
-  normalizeTaskStatusResult,
-} from '@/utils/taskWrite'
 
 interface TodayAiOrderMeta {
   rank: number
@@ -1399,9 +1689,10 @@ interface ContextLoadOptions {
   forceTaskRefresh?: boolean
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
 
-const extractListPayload = <T>(payload: unknown): T[] | null => {
+const extractListPayload = <T,>(payload: unknown): T[] | null => {
   if (Array.isArray(payload)) return payload as T[]
   if (!isRecord(payload)) return null
 
@@ -1427,7 +1718,8 @@ const extractTaskPagePayload = (payload: unknown): TaskPageResponse => {
     return { records: payload.data }
   }
 
-  const source = isRecord(payload.data) && Array.isArray(payload.data.records) ? payload.data : payload
+  const source =
+    isRecord(payload.data) && Array.isArray(payload.data.records) ? payload.data : payload
   const records = Array.isArray(source.records) ? source.records : []
 
   return {
@@ -1562,7 +1854,8 @@ const normalizeListReplanPreviewPayload = (value: unknown): AiListReplanPreviewR
   if (!operationId) return null
 
   const changedCountRaw = Number(record.changedCount)
-  const changedCount = Number.isFinite(changedCountRaw) && changedCountRaw >= 0 ? Math.floor(changedCountRaw) : 0
+  const changedCount =
+    Number.isFinite(changedCountRaw) && changedCountRaw >= 0 ? Math.floor(changedCountRaw) : 0
 
   return {
     operationId,
@@ -1605,7 +1898,9 @@ const normalizeListReplanStateMap = (value: unknown): ListReplanStateMap => {
     const entry = entryRaw as Record<string, unknown>
     const dirty = Boolean(entry.dirty)
     const pendingOperation = normalizeListReplanPendingOperation(entry.pendingOperation, listId)
-    const previewPayload = pendingOperation ? normalizeListReplanPreviewPayload(entry.previewPayload) : null
+    const previewPayload = pendingOperation
+      ? normalizeListReplanPreviewPayload(entry.previewPayload)
+      : null
     const updatedAt = Number(entry.updatedAt)
 
     next[listId] = {
@@ -1682,7 +1977,42 @@ const {
   beginExplicitReconfirm: beginExplicitTaskAssignmentReconfirm,
   reset: resetTaskAssignmentMutation,
 } = useTaskAssignmentMutation()
+const {
+  activeTaskId: taskAssignmentHistoryTaskId,
+  records: taskAssignmentHistoryRecords,
+  total: taskAssignmentHistoryTotal,
+  phase: taskAssignmentHistoryPhase,
+  busy: taskAssignmentHistoryBusy,
+  errorMessage: taskAssignmentHistoryErrorMessage,
+  hasMore: taskAssignmentHistoryHasMore,
+  open: openTaskAssignmentHistory,
+  refresh: refreshTaskAssignmentHistory,
+  loadMore: loadMoreTaskAssignmentHistoryRecords,
+  reset: resetTaskAssignmentHistory,
+} = useTaskAssignmentHistory()
+const {
+  getState: getTaskStatusMutationState,
+  isBlocked: isTaskStatusMutationBlocked,
+  submitNew: submitNewTaskStatusMutation,
+  retryUncertain: retryUncertainTaskStatusMutation,
+  beginFactReconciliation: beginTaskStatusFactReconciliation,
+  restoreUncertain: restoreUncertainTaskStatusMutation,
+  markCommittedRefreshError: markTaskStatusCommittedRefreshError,
+  markFactRefreshError: markTaskStatusFactRefreshError,
+  beginFactRefreshRetry: beginTaskStatusFactRefreshRetry,
+  claimChangedSideEffect: claimTaskStatusChangedSideEffect,
+  complete: completeTaskStatusMutation,
+  resetAll: resetAllTaskStatusMutations,
+} = useTaskStatusMutation()
+const isTaskAssignmentHistoryDrawerOpen = ref(false)
+const taskAssignmentHistoryDrawerRef = ref<InstanceType<typeof TaskAssignmentHistoryDrawer> | null>(
+  null,
+)
 const taskAssignmentChangedRevision = ref(0)
+const taskAssignmentChangedTaskId = ref<string | null>(null)
+const pendingAssignmentHistoryRefreshRevision = ref(0)
+const appliedAssignmentHistoryRefreshRevision = ref(0)
+const assignmentHistoryAutoRefreshRunning = ref(false)
 const pendingTaskAssignmentRefresh = ref<PendingTaskAssignmentRefresh | null>(null)
 const milestoneList = ref<Milestone[]>([])
 const selectedProjectId = ref('')
@@ -1691,9 +2021,9 @@ const isWeekView = computed(() => route.query.view === 'week')
 const isAggregateView = computed(() => isTodayView.value || isWeekView.value)
 const taskProjectContext = computed(() => parseTaskProjectContext(route.query))
 const isTeamProjectContext = computed(() => taskProjectContext.value.type === 'team-project')
-const selectedTeamId = computed(() => (
-  taskProjectContext.value.type === 'team-project' ? taskProjectContext.value.teamId : ''
-))
+const selectedTeamId = computed(() =>
+  taskProjectContext.value.type === 'team-project' ? taskProjectContext.value.teamId : '',
+)
 const canUsePersistentProjectTaskCache = computed(() => !isTeamProjectContext.value)
 const boardView = computed(() =>
   route.query.view === 'today' || route.query.view === 'week' ? route.query.view : 'project',
@@ -1722,9 +2052,9 @@ const selectedProject = computed<Project | undefined>(() => {
     color: project.color ?? undefined,
   }
 })
-const selectedTeamContext = computed(() => (
-  selectedTeamId.value ? collaborationStore.getTeam(selectedTeamId.value) : null
-))
+const selectedTeamContext = computed(() =>
+  selectedTeamId.value ? collaborationStore.getTeam(selectedTeamId.value) : null,
+)
 const taskQuickCreateContext = computed<TaskQuickCreateContext>(() => {
   if (isAggregateView.value || !selectedProjectId.value) return { kind: 'unavailable' }
 
@@ -1737,9 +2067,9 @@ const taskQuickCreateContext = computed<TaskQuickCreateContext>(() => {
 })
 const taskCreateAccess = computed(() => resolveTaskQuickCreateAccess(taskQuickCreateContext.value))
 const canCreateTaskInCurrentContext = computed(() => taskCreateAccess.value.allowed)
-const taskCreateDeniedMessage = computed(() => (
-  taskCreateAccess.value.deniedMessage || '当前不能创建任务。'
-))
+const taskCreateDeniedMessage = computed(
+  () => taskCreateAccess.value.deniedMessage || '当前不能创建任务。',
+)
 const newTaskAssigneeContext = computed<TaskAssigneeCandidateContext>(() => {
   if (isAggregateView.value || !selectedProjectId.value) return { kind: 'unavailable' }
   if (isTeamProjectContext.value) {
@@ -1777,16 +2107,20 @@ const mainTaskSectionTitle = computed(() => {
 })
 const shouldShowUnifiedAiButton = computed(
   () =>
-    !isTeamProjectContext.value
-    && taskList.value.length > 0
-    && (isTodayView.value || (!isAggregateView.value && Boolean(selectedProjectId.value))),
+    !isTeamProjectContext.value &&
+    taskList.value.length > 0 &&
+    (isTodayView.value || (!isAggregateView.value && Boolean(selectedProjectId.value))),
 )
-const todayAiOrderEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER])
+const todayAiOrderEntry = computed(
+  () => aiPendingRegistry.boards[AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER],
+)
 const listReplanPreviewEntry = computed(
   () => aiPendingRegistry.boards[AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW],
 )
 const isFetchingTodayAiOrder = computed(() => todayAiOrderEntry.value.status === 'pending')
-const isFetchingListReplanPreview = computed(() => listReplanPreviewEntry.value.status === 'pending')
+const isFetchingListReplanPreview = computed(
+  () => listReplanPreviewEntry.value.status === 'pending',
+)
 const isUnifiedAiActionBusy = computed(() =>
   isTodayView.value ? isFetchingTodayAiOrder.value : isListReplanActionBusy.value,
 )
@@ -1841,9 +2175,10 @@ const {
 })
 const taskAssignmentRecoveryMode = computed<TaskAssignmentRecoveryMode>(() => {
   if (
-    taskAssignmentMutationPhase.value === 'conflict-reconciling'
-    || taskAssignmentMutationPhase.value === 'uncertain-reconciling'
-  ) return 'reconciling'
+    taskAssignmentMutationPhase.value === 'conflict-reconciling' ||
+    taskAssignmentMutationPhase.value === 'uncertain-reconciling'
+  )
+    return 'reconciling'
   if (taskAssignmentMutationPhase.value === 'reconfirm-required') return 'reconfirm'
   if (taskAssignmentMutationPhase.value === 'recovery-error') return 'recovery-error'
   return 'none'
@@ -1902,7 +2237,10 @@ const newTaskFlagTriggerRef = ref<HTMLButtonElement | null>(null)
 const newTaskFlagMenuRef = ref<HTMLElement | null>(null)
 const newTaskTitleInputRef = ref<HTMLInputElement | null>(null)
 const newTaskAssigneePickerRef = ref<{ close: (restoreFocus?: boolean) => void } | null>(null)
-const taskAssigneeEntryRef = ref<{ focusChangeButton: () => void } | null>(null)
+const taskAssigneeEntryRef = ref<{
+  focusChangeButton: () => void
+  focusHistoryButton: () => void
+} | null>(null)
 const detailTitleInputRef = ref<HTMLTextAreaElement | null>(null)
 const detailDescriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const MIN_DETAIL_WIDTH = 320
@@ -1982,7 +2320,8 @@ const projectById = computed(() => {
   return map
 })
 
-const getTaskProjectName = (task: TaskModel) => projectById.value.get(String(task.projectId))?.name || '未命名清单'
+const getTaskProjectName = (task: TaskModel) =>
+  projectById.value.get(String(task.projectId))?.name || '未命名清单'
 const getTaskProjectIcon = (task: TaskModel): IconName =>
   getProjectIconName(projectById.value.get(String(task.projectId))?.icon)
 
@@ -1994,7 +2333,8 @@ const priorityOptions: PriorityOption[] = [
 ]
 
 const getPriorityOption = (priority: number) =>
-  priorityOptions.find((option) => option.value === priority) || priorityOptions[priorityOptions.length - 1]!
+  priorityOptions.find((option) => option.value === priority) ||
+  priorityOptions[priorityOptions.length - 1]!
 
 const getListReplanPriorityChipClass = (priority: number) => {
   const option = getPriorityOption(priority)
@@ -2164,7 +2504,10 @@ const listReplanChangedCount = computed(() => {
   return listReplanPreviewItems.value.length
 })
 const isListReplanActionBusy = computed(
-  () => isFetchingListReplanPreview.value || isListReplanConfirming.value || isListReplanCancelling.value,
+  () =>
+    isFetchingListReplanPreview.value ||
+    isListReplanConfirming.value ||
+    isListReplanCancelling.value,
 )
 const canConfirmListReplan = computed(() => Boolean(pendingListReplanOperation.value?.operationId))
 
@@ -2268,7 +2611,9 @@ const closeListReplanPreviewDialog = () => {
   showListReplanPreviewModal.value = false
 }
 
-const clearListReplanPreviewState = (options: { persistListId?: string; keepDirty?: boolean } = {}) => {
+const clearListReplanPreviewState = (
+  options: { persistListId?: string; keepDirty?: boolean } = {},
+) => {
   if (isTeamProjectContext.value) {
     isListReplanDirty.value = false
     resetListReplanRuntimeState()
@@ -2304,10 +2649,7 @@ const ensureFreshPendingListReplanOperation = (options: { notify?: boolean } = {
   const pending = pendingListReplanOperation.value
   if (!pending) return true
 
-  if (
-    pending.listId !== selectedProjectId.value ||
-    isListReplanOperationExpired(pending)
-  ) {
+  if (pending.listId !== selectedProjectId.value || isListReplanOperationExpired(pending)) {
     clearListReplanPreviewState({ persistListId: pending.listId, keepDirty: true })
     if (notify) {
       toast.warning('当前预览已过期，请重新生成。')
@@ -2488,7 +2830,13 @@ const requestTodayAiOrder = async () => {
     return
   }
 
-  if (result.status !== 'success' || !result.ticket || !isTaskViewMounted.value || !isTodayView.value) return
+  if (
+    result.status !== 'success' ||
+    !result.ticket ||
+    !isTaskViewMounted.value ||
+    !isTodayView.value
+  )
+    return
 
   const applied = applyTodayAiOrderPayload(result.payload)
   if (applied) {
@@ -2548,8 +2896,11 @@ const compareTodayTaskByCompletionThenAiThenDueDateThenPriority = (a: TaskModel,
   return 0
 }
 
-const isMilestoneGroupAllCompleted = (group: { milestone: Milestone; tasks: TaskModel[]; progress: number }) =>
-  group.tasks.length > 0 && group.tasks.every((task) => isTaskCompleted(task.status))
+const isMilestoneGroupAllCompleted = (group: {
+  milestone: Milestone
+  tasks: TaskModel[]
+  progress: number
+}) => group.tasks.length > 0 && group.tasks.every((task) => isTaskCompleted(task.status))
 
 const sortTaskListForCurrentBoard = (tasks: TaskModel[]) => {
   if (isTodayView.value) {
@@ -2591,7 +2942,11 @@ const getCurrentWeekRange = () => {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const dayOfWeek = today.getDay()
   const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offsetToMonday)
+  const weekStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() + offsetToMonday,
+  )
   const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6)
 
   return {
@@ -2625,7 +2980,9 @@ const filterAggregateTasks = (records: TaskModel[]) => {
 
 const calendarMonthCursor = ref(getMonthStart(new Date()))
 
-const currentDueDateLabel = computed(() => normalizeTaskDueDate(selectedTask.value?.dueDate) || '设置截止日期')
+const currentDueDateLabel = computed(
+  () => normalizeTaskDueDate(selectedTask.value?.dueDate) || '设置截止日期',
+)
 
 const selectedEditContentUi = computed(() =>
   resolveTaskActionUiState(selectedTask.value, 'editContent'),
@@ -2633,12 +2990,8 @@ const selectedEditContentUi = computed(() =>
 const selectedReorganizeUi = computed(() =>
   resolveTaskActionUiState(selectedTask.value, 'reorganize'),
 )
-const selectedDeleteUi = computed(() =>
-  resolveTaskActionUiState(selectedTask.value, 'delete'),
-)
-const selectedAssignUi = computed(() =>
-  resolveTaskActionUiState(selectedTask.value, 'assign'),
-)
+const selectedDeleteUi = computed(() => resolveTaskActionUiState(selectedTask.value, 'delete'))
+const selectedAssignUi = computed(() => resolveTaskActionUiState(selectedTask.value, 'assign'))
 const selectedAssigneePresentation = computed(() =>
   resolveTaskAssigneePresentation({
     task: selectedTask.value,
@@ -2671,7 +3024,11 @@ const calendarCells = computed<CalendarCell[]>(() => {
   const cells: CalendarCell[] = []
 
   for (let index = 0; index < 42; index += 1) {
-    const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index)
+    const date = new Date(
+      gridStart.getFullYear(),
+      gridStart.getMonth(),
+      gridStart.getDate() + index,
+    )
     const dateKey = toDateKey(date)
 
     cells.push({
@@ -2716,7 +3073,10 @@ const syncDetailDescriptionHeight = () => {
   const textarea = detailDescriptionInputRef.value
   if (!textarea) return
 
-  const viewportLimit = Math.max(220, window.innerHeight - textarea.getBoundingClientRect().top - 20)
+  const viewportLimit = Math.max(
+    220,
+    window.innerHeight - textarea.getBoundingClientRect().top - 20,
+  )
   resizeTextarea(textarea, { minHeight: 140, maxHeight: viewportLimit })
 }
 
@@ -2866,14 +3226,16 @@ const markBoardError = (contextKey: string, error: unknown) => {
 }
 
 const isProjectContextKey = (contextKey: string) => contextKey.startsWith(PROJECT_CONTEXT_PREFIX)
-const hasRouteProjectId = () => typeof route.query.projectId === 'string' && route.query.projectId.length > 0
+const hasRouteProjectId = () =>
+  typeof route.query.projectId === 'string' && route.query.projectId.length > 0
 const ensureSelectedProjectFromList = async () => {
   if (
-    isAggregateView.value
-    || isTeamProjectContext.value
-    || selectedProjectId.value
-    || projectList.value.length === 0
-  ) return
+    isAggregateView.value ||
+    isTeamProjectContext.value ||
+    selectedProjectId.value ||
+    projectList.value.length === 0
+  )
+    return
   const firstProject = projectList.value[0]
   if (!firstProject) return
 
@@ -2941,12 +3303,30 @@ const ensureTaskActionAllowed = (
   return null
 }
 
+const isTaskStatusActionDisabled = (task: TaskModel) => (
+  !canPerformTaskAction(task, 'changeStatus') || isTaskStatusMutationBlocked(task.id)
+)
+
+const resolveTaskStatusActionTitle = (task: TaskModel) => {
+  if (!canPerformTaskAction(task, 'changeStatus')) {
+    return TASK_ACTION_DENIED_MESSAGE.changeStatus
+  }
+  const mutation = getTaskStatusMutationState(task.id)
+  if (!mutation) return '切换任务状态'
+  if (mutation.phase === 'submitting') return '任务状态正在提交'
+  if (mutation.phase === 'uncertain') return '上一次状态结果尚未确认，请打开任务详情恢复'
+  if (mutation.phase === 'committed-refresh-error') return '状态已提交，请重新加载最新任务'
+  return '正在核对最新任务状态'
+}
+
+const selectedTaskStatusMutation = computed<TaskStatusMutationState | null>(() => (
+  selectedTask.value ? getTaskStatusMutationState(selectedTask.value.id) : null
+))
+
 const failClosedTaskCapabilities = (taskId: string) => {
-  taskList.value = taskList.value.map((task) => (
-    task.id === taskId
-      ? { ...task, capabilities: DENY_ALL_TASK_CAPABILITIES }
-      : task
-  ))
+  taskList.value = taskList.value.map((task) =>
+    task.id === taskId ? { ...task, capabilities: DENY_ALL_TASK_CAPABILITIES } : task,
+  )
   syncSelectedTaskFromList()
 }
 
@@ -3038,7 +3418,9 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
           Array.isArray(items) ? items : [],
         )
         const normalizedRecords = normalizeTaskRecords(allRecords)
-        const filteredRecords = filterAggregateTasks(filterTasksByExistingProjects(normalizedRecords))
+        const filteredRecords = filterAggregateTasks(
+          filterTasksByExistingProjects(normalizedRecords),
+        )
         if (isTodayView.value && filteredRecords.length === 0) {
           todayAiOrderMetaByTaskId.value = {}
           clearTaskTodayAiOrderCache()
@@ -3051,9 +3433,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
 
     try {
       const responses = await Promise.all(
-        projectList.value.map((project) =>
-          fetchAllTasksByProject(project.id, isStaleRequest),
-        ),
+        projectList.value.map((project) => fetchAllTasksByProject(project.id, isStaleRequest)),
       )
       if (isStaleRequest()) return staleOutcome()
       const records = responses.flat()
@@ -3202,7 +3582,9 @@ const ensureRouteProjectContext = async (): Promise<LoadOutcome> => {
   )
   if (restoreResult.kind === 'ready') return okOutcome()
   if (restoreResult.kind === 'retryable-error') {
-    return errorOutcome(new Error(`团队项目上下文暂时无法恢复（${restoreResult.errorKind}），请重试。`))
+    return errorOutcome(
+      new Error(`团队项目上下文暂时无法恢复（${restoreResult.errorKind}），请重试。`),
+    )
   }
 
   await replaceWithPersonalProjectFallback()
@@ -3286,9 +3668,9 @@ const addTask = async () => {
   if (createContext.kind === 'unavailable') return
 
   if (
-    createContext.kind === 'team'
-    && newTaskAssigneeUserId.value !== null
-    && !isSelectableNewTaskAssignee(newTaskAssigneeUserId.value)
+    createContext.kind === 'team' &&
+    newTaskAssigneeUserId.value !== null &&
+    !isSelectableNewTaskAssignee(newTaskAssigneeUserId.value)
   ) {
     toast.error('负责人列表已发生变化，请重新选择。')
     return
@@ -3297,13 +3679,15 @@ const addTask = async () => {
   isAddingTask.value = true
   try {
     const finalTitle = newTaskTitle.value.trim().slice(0, TASK_TITLE_MAX_LENGTH)
-    await addTaskApi(buildTaskQuickCreatePayload({
-      title: finalTitle,
-      projectId: selectedProjectId.value,
-      milestoneId: newTaskMilestoneId.value || null,
-      context: createContext.kind,
-      assigneeUserId: newTaskAssigneeUserId.value,
-    }))
+    await addTaskApi(
+      buildTaskQuickCreatePayload({
+        title: finalTitle,
+        projectId: selectedProjectId.value,
+        milestoneId: newTaskMilestoneId.value || null,
+        context: createContext.kind,
+        assigneeUserId: newTaskAssigneeUserId.value,
+      }),
+    )
     markListReplanDirty()
     resetNewTaskDraft({ blurInput: true })
     isNewTaskMilestoneMenuOpen.value = false
@@ -3315,37 +3699,174 @@ const addTask = async () => {
   }
 }
 
+const applyTaskStatusSnapshot = (
+  state: TaskStatusMutationState,
+  status: number,
+  completedAt: string | null,
+) => {
+  if (state.command.contextKey !== currentContextKey.value) return
+  const currentTask = findTaskById(taskList.value, state.command.taskId)
+  if (!currentTask) return
+  currentTask.status = status
+  currentTask.completedAt = completedAt
+}
+
+const reconcileTaskStatusFacts = async (
+  state: TaskStatusMutationState,
+  options: { committed: boolean; failureMessage: string },
+) => {
+  const outcome = await loadTasks({ forceRefresh: true })
+  if (state.command.contextKey !== currentContextKey.value) {
+    completeTaskStatusMutation(state.command.taskId)
+    return false
+  }
+
+  if (outcome.status !== 'ok') {
+    failClosedTaskCapabilities(state.command.taskId)
+    if (options.committed) {
+      markTaskStatusCommittedRefreshError(state.command.taskId, options.failureMessage)
+    } else {
+      markTaskStatusFactRefreshError(state.command.taskId, options.failureMessage)
+    }
+    toast.warning(options.failureMessage)
+    return false
+  }
+
+  const refreshedTask = findTaskById(taskList.value, state.command.taskId)
+  completeTaskStatusMutation(state.command.taskId)
+  if (!refreshedTask) {
+    if (selectedTask.value?.id === state.command.taskId) closeDetail()
+    toast.warning('任务已不存在或当前不可访问。')
+    return false
+  }
+  return true
+}
+
+const handleTaskStatusMutationOutcome = async (outcome: TaskStatusMutationOutcome) => {
+  if (outcome.kind === 'ignored' || outcome.kind === 'stale') return false
+
+  const { state } = outcome
+  const { command } = state
+  if (outcome.kind === 'success') {
+    applyTaskStatusSnapshot(state, outcome.result.finalStatus, outcome.result.completedAt)
+    if (claimTaskStatusChangedSideEffect(command.taskId)) markListReplanDirty()
+    return reconcileTaskStatusFacts(state, {
+      committed: true,
+      failureMessage: '任务状态已提交，但最新任务信息加载失败，请重新加载后再操作。',
+    })
+  }
+
+  applyTaskStatusSnapshot(state, command.expectedStatus, command.previousCompletedAt)
+
+  if (
+    outcome.errorKind === 'NETWORK'
+    || outcome.errorKind === 'SERVER'
+    || outcome.errorKind === 'UNKNOWN'
+  ) {
+    toast.warning(state.errorMessage || '任务状态结果尚未确认，请重试原请求或刷新最新状态。')
+    return false
+  }
+
+  if (outcome.errorKind === 'AUTHENTICATION_REQUIRED') {
+    completeTaskStatusMutation(command.taskId)
+    return false
+  }
+
+  if (outcome.errorKind === 'PERMISSION_DENIED') {
+    failClosedTaskCapabilities(command.taskId)
+  }
+
+  const safeMessage = outcome.errorKind === 'CONFLICT'
+    ? '任务状态已被其他操作修改，已刷新最新状态。'
+    : outcome.errorKind === 'PERMISSION_DENIED'
+      ? '任务状态权限已发生变化，已刷新最新权限。'
+      : outcome.errorKind === 'NOT_FOUND'
+        ? '任务已不存在或当前不可访问。'
+        : '状态变更请求无法应用，已刷新最新任务。'
+  const refreshed = await reconcileTaskStatusFacts(state, {
+    committed: false,
+    failureMessage: '最新任务状态加载失败，请重新加载后再操作。',
+  })
+  if (refreshed) toast.warning(safeMessage)
+  return false
+}
+
 const setTaskStatus = async (task: TaskModel, nextStatus: number) => {
   const currentTask = ensureTaskActionAllowed(task, 'changeStatus')
-  if (!currentTask) return
+  if (!currentTask) return false
+  if (isTaskStatusMutationBlocked(currentTask.id)) {
+    toast.warning('该任务的上一次状态变更尚未确认，请先恢复最新状态。')
+    return false
+  }
 
-  const oldStatus = currentTask.status
-  const clientRequestId = createTaskStatusRequestId()
+  const previousStatus = currentTask.status
+  const previousCompletedAt = currentTask.completedAt
   currentTask.status = nextStatus
-  try {
-    const result = await changeTaskStatusApi({
-      taskId: currentTask.id,
-      targetStatus: nextStatus,
-      expectedStatus: oldStatus,
-      clientRequestId,
-    })
-    currentTask.status = normalizeTaskStatusResult(result.finalStatus)
-    if (result.completedAt !== undefined) {
-      currentTask.completedAt = result.completedAt
+  const outcome = await submitNewTaskStatusMutation({
+    taskId: currentTask.id,
+    projectId: currentTask.projectId,
+    contextKey: currentContextKey.value,
+    expectedStatus: previousStatus,
+    targetStatus: nextStatus,
+    previousCompletedAt,
+  })
+  return handleTaskStatusMutationOutcome(outcome)
+}
+
+const retrySelectedTaskStatusRequest = async () => {
+  const taskId = selectedTask.value?.id
+  if (!taskId) return
+  const state = getTaskStatusMutationState(taskId)
+  if (!state || state.phase !== 'uncertain') return
+
+  applyTaskStatusSnapshot(state, state.command.targetStatus, state.command.previousCompletedAt)
+  const outcome = await retryUncertainTaskStatusMutation(taskId)
+  await handleTaskStatusMutationOutcome(outcome)
+}
+
+const refreshSelectedTaskStatusFacts = async () => {
+  const taskId = selectedTask.value?.id
+  if (!taskId) return
+  const currentState = getTaskStatusMutationState(taskId)
+  if (!currentState) return
+  const previousPhase = currentState.phase
+  const state = previousPhase === 'uncertain'
+    ? beginTaskStatusFactReconciliation(taskId)
+    : beginTaskStatusFactRefreshRetry(taskId)
+  if (!state) return
+
+  const outcome = await loadTasks({ forceRefresh: true })
+  if (state.command.contextKey !== currentContextKey.value) {
+    completeTaskStatusMutation(taskId)
+    return
+  }
+  if (outcome.status !== 'ok') {
+    failClosedTaskCapabilities(taskId)
+    if (previousPhase === 'uncertain') {
+      restoreUncertainTaskStatusMutation(
+        taskId,
+        '最新任务状态加载失败，仍可重试原请求或再次刷新。',
+      )
+    } else {
+      markTaskStatusFactRefreshError(taskId, '最新任务状态加载失败，请重新加载后再操作。')
     }
-    await loadTasks({ forceRefresh: true })
-    if (result.changed) markListReplanDirty()
-  } catch (error) {
-    currentTask.status = oldStatus
-    const permissionRecovered = await handleTaskMutationFailure(
-      error,
-      currentTask.id,
-      '更新状态失败，请检查网络后重试。',
-    )
-    if (!permissionRecovered) {
-      await loadTasks({ forceRefresh: true })
-    }
-    throw new Error('update-task-status-failed')
+    toast.warning('最新任务状态加载失败，请稍后重试。')
+    return
+  }
+
+  const refreshedTask = findTaskById(taskList.value, taskId)
+  if (
+    previousPhase === 'uncertain'
+    && refreshedTask?.status === state.command.targetStatus
+    && state.command.expectedStatus !== state.command.targetStatus
+  ) {
+    markListReplanDirty()
+    toast.info('任务状态已经生效，已同步最新状态。')
+  }
+  completeTaskStatusMutation(taskId)
+  if (!refreshedTask) {
+    closeDetail()
+    toast.warning('任务已不存在或当前不可访问。')
   }
 }
 
@@ -3437,9 +3958,9 @@ const newTaskMilestoneLabel = computed(() => {
   return matched?.name || '默认列表'
 })
 
-const newTaskPersonalAssigneeLabel = computed(() => (
-  newTaskAssigneeOptions.value[0]?.label || '当前用户'
-))
+const newTaskPersonalAssigneeLabel = computed(
+  () => newTaskAssigneeOptions.value[0]?.label || '当前用户',
+)
 
 const getNewTaskFlagOptionId = (index: number) => `new-task-flag-option-${index}`
 
@@ -3449,7 +3970,9 @@ const isNewTaskMilestoneSelected = (value: string | null) => {
 }
 
 const getSelectedNewTaskMilestoneIndex = () => {
-  const selectedIndex = milestoneOptions.value.findIndex((option) => isNewTaskMilestoneSelected(option.value))
+  const selectedIndex = milestoneOptions.value.findIndex((option) =>
+    isNewTaskMilestoneSelected(option.value),
+  )
   return selectedIndex >= 0 ? selectedIndex : 0
 }
 
@@ -3471,9 +3994,13 @@ const syncNewTaskActiveMilestoneIndex = () => {
   normalizeNewTaskActiveMilestoneIndex()
 }
 
-watch([milestoneOptions, newTaskMilestoneId], () => {
-  syncNewTaskActiveMilestoneIndex()
-}, { immediate: true })
+watch(
+  [milestoneOptions, newTaskMilestoneId],
+  () => {
+    syncNewTaskActiveMilestoneIndex()
+  },
+  { immediate: true },
+)
 
 const selectedMilestoneValue = computed(() => {
   const milestoneId = selectedTask.value?.milestoneId
@@ -3537,7 +4064,7 @@ const armInputEnterSuppression = () => {
 const moveNewTaskActiveMilestoneIndex = (direction: 1 | -1) => {
   const total = milestoneOptions.value.length
   if (total <= 0) return
-  const offset = ((newTaskActiveMilestoneIndex.value + direction) % total + total) % total
+  const offset = (((newTaskActiveMilestoneIndex.value + direction) % total) + total) % total
   newTaskActiveMilestoneIndex.value = offset
 }
 
@@ -3575,7 +4102,8 @@ const selectActiveNewTaskMilestone = (
     suppressEnter?: boolean
   } = {},
 ) => {
-  const activeOption = milestoneOptions.value[newTaskActiveMilestoneIndex.value] ?? milestoneOptions.value[0]
+  const activeOption =
+    milestoneOptions.value[newTaskActiveMilestoneIndex.value] ?? milestoneOptions.value[0]
   selectNewTaskMilestone(activeOption?.value ?? null, options)
 }
 
@@ -3618,7 +4146,8 @@ const onNewTaskAssigneePickerClose = () => {
 }
 
 const onNewTaskAssigneePickerRetry = () => {
-  if (!isTeamProjectContext.value || !canCreateTaskInCurrentContext.value || isAddingTask.value) return
+  if (!isTeamProjectContext.value || !canCreateTaskInCurrentContext.value || isAddingTask.value)
+    return
   void retryNewTaskAssigneeCandidates()
 }
 
@@ -3730,6 +4259,140 @@ const closeDueDatePicker = () => {
   isDueDatePickerOpen.value = false
 }
 
+const handleTaskAssignmentHistoryOutcome = async (
+  outcome: Awaited<ReturnType<typeof openTaskAssignmentHistory>>,
+  taskId: string | null,
+) => {
+  if (outcome.kind !== 'error' || !taskId || taskAssignmentHistoryTaskId.value !== taskId) return
+
+  if (outcome.errorKind === 'PERMISSION_DENIED') {
+    await loadTasks({ forceRefresh: true })
+    if (selectedTask.value?.id === taskId) {
+      toast.warning('负责人历史查看权限已发生变化，已刷新最新任务权限。')
+    }
+    return
+  }
+
+  if (outcome.errorKind === 'NOT_FOUND') {
+    closeTaskAssignmentHistoryDrawer(false)
+    closeDetail()
+    await loadTasks({ forceRefresh: true })
+    return
+  }
+
+  if (outcome.errorKind === 'AUTHENTICATION_REQUIRED') {
+    closeTaskAssignmentHistoryDrawer(false)
+  }
+}
+
+const emitTaskAssignmentChanged = (taskId: string) => {
+  taskAssignmentChangedTaskId.value = taskId
+  taskAssignmentChangedRevision.value += 1
+}
+
+const drainAssignmentHistoryAutoRefresh = async () => {
+  if (assignmentHistoryAutoRefreshRunning.value) return
+
+  assignmentHistoryAutoRefreshRunning.value = true
+  try {
+    while (
+      pendingAssignmentHistoryRefreshRevision.value > appliedAssignmentHistoryRefreshRevision.value
+    ) {
+      const revision = pendingAssignmentHistoryRefreshRevision.value
+      const taskId = taskAssignmentChangedTaskId.value
+
+      if (
+        !taskId
+        || !isTaskAssignmentHistoryDrawerOpen.value
+        || taskAssignmentHistoryTaskId.value !== taskId
+        || selectedTask.value?.id !== taskId
+      ) {
+        appliedAssignmentHistoryRefreshRevision.value = revision
+        break
+      }
+
+      const outcome = await refreshTaskAssignmentHistory()
+      if (outcome.kind === 'ignored') {
+        // A first-page or load-more request is still running. The busy watcher
+        // will drain this revision once that request settles.
+        break
+      }
+
+      appliedAssignmentHistoryRefreshRevision.value = revision
+      await handleTaskAssignmentHistoryOutcome(outcome, taskId)
+
+      // Errors are surfaced by the drawer and must be retried explicitly.
+      // A stale response also means the task/context changed underneath us.
+      if (outcome.kind === 'error' || outcome.kind === 'stale') break
+    }
+  } finally {
+    assignmentHistoryAutoRefreshRunning.value = false
+  }
+}
+
+const scheduleAssignmentHistoryAutoRefresh = (
+  revision: number,
+  taskId: string | null,
+) => {
+  if (
+    !taskId
+    || !isTaskAssignmentHistoryDrawerOpen.value
+    || taskAssignmentHistoryTaskId.value !== taskId
+    || selectedTask.value?.id !== taskId
+  ) return
+
+  pendingAssignmentHistoryRefreshRevision.value = Math.max(
+    pendingAssignmentHistoryRefreshRevision.value,
+    revision,
+  )
+  void drainAssignmentHistoryAutoRefresh()
+}
+
+const closeTaskAssignmentHistoryDrawer = (restoreFocus = true) => {
+  const wasOpen = isTaskAssignmentHistoryDrawerOpen.value
+  const taskId = taskAssignmentHistoryTaskId.value
+  isTaskAssignmentHistoryDrawerOpen.value = false
+  resetTaskAssignmentHistory()
+  pendingAssignmentHistoryRefreshRevision.value = appliedAssignmentHistoryRefreshRevision.value
+  taskAssignmentChangedTaskId.value = null
+
+  if (wasOpen && restoreFocus && taskId && selectedTask.value?.id === taskId) {
+    void nextTick(() => taskAssigneeEntryRef.value?.focusHistoryButton())
+  }
+}
+
+const openTaskAssignmentHistoryDrawer = async () => {
+  const task = selectedTask.value
+  if (!task || taskAssignmentMutationBusy.value) return
+
+  closeNewTaskQuickCreateMenus()
+  closeDueDatePicker()
+  isPriorityMenuOpen.value = false
+  isMilestoneMenuOpen.value = false
+  isTaskAssignmentHistoryDrawerOpen.value = true
+
+  const outcome = await openTaskAssignmentHistory(task.id)
+  await handleTaskAssignmentHistoryOutcome(outcome, task.id)
+}
+
+const retryTaskAssignmentHistory = async () => {
+  const taskId = taskAssignmentHistoryTaskId.value
+  if (!taskId) return
+
+  const outcome =
+    taskAssignmentHistoryPhase.value === 'load-more-error'
+      ? await loadMoreTaskAssignmentHistoryRecords()
+      : await refreshTaskAssignmentHistory()
+  await handleTaskAssignmentHistoryOutcome(outcome, taskId)
+}
+
+const loadMoreTaskAssignmentHistory = async () => {
+  const taskId = taskAssignmentHistoryTaskId.value
+  if (!taskId) return
+  const outcome = await loadMoreTaskAssignmentHistoryRecords()
+  await handleTaskAssignmentHistoryOutcome(outcome, taskId)
+}
+
 const dismissTaskAssignmentDialog = (restoreFocus = true) => {
   const wasOpen = Boolean(taskAssignmentDraft.value)
   closeTaskAssignmentDraft()
@@ -3779,23 +4442,20 @@ const getTaskAssignmentSuccessMessage = (operation: TaskAssignmentOperation) => 
   return '负责人已同步。'
 }
 
-const getCommittedTaskAssignmentRefreshErrorMessage = (changed: boolean) => (
+const getCommittedTaskAssignmentRefreshErrorMessage = (changed: boolean) =>
   changed
     ? '负责人变更已提交，但最新任务状态加载失败，请重新加载后再操作。'
     : '负责人状态已确认，但最新任务状态加载失败，请重新加载后再操作。'
-)
 
-const reconcileCommittedTaskAssignment = async (
-  snapshot: PendingTaskAssignmentRefresh,
-) => {
+const reconcileCommittedTaskAssignment = async (snapshot: PendingTaskAssignmentRefresh) => {
   if (snapshot.result.changed && !snapshot.cacheInvalidated) {
     removeProjectTaskCaches(snapshot.projectId)
     snapshot.cacheInvalidated = true
   }
 
   if (
-    snapshot.contextKey !== currentContextKey.value
-    || selectedTask.value?.id !== snapshot.taskId
+    snapshot.contextKey !== currentContextKey.value ||
+    selectedTask.value?.id !== snapshot.taskId
   ) {
     completeTaskAssignmentMutation()
     if (pendingTaskAssignmentRefresh.value === snapshot) {
@@ -3826,9 +4486,9 @@ const reconcileCommittedTaskAssignment = async (
 
   const refreshedTask = findTaskById(taskList.value, snapshot.taskId)
   if (
-    refreshOutcome.status !== 'ok'
-    || !refreshedTask
-    || refreshedTask.assigneeUserId !== snapshot.result.assigneeUserId
+    refreshOutcome.status !== 'ok' ||
+    !refreshedTask ||
+    refreshedTask.assigneeUserId !== snapshot.result.assigneeUserId
   ) {
     const message = getCommittedTaskAssignmentRefreshErrorMessage(snapshot.result.changed)
     markTaskAssignmentCommittedRefreshError(message)
@@ -3840,7 +4500,7 @@ const reconcileCommittedTaskAssignment = async (
   completeTaskAssignmentMutation()
   if (snapshot.result.changed && !snapshot.changedEventEmitted) {
     snapshot.changedEventEmitted = true
-    taskAssignmentChangedRevision.value += 1
+    emitTaskAssignmentChanged(snapshot.taskId)
   }
   if (pendingTaskAssignmentRefresh.value === snapshot) {
     pendingTaskAssignmentRefresh.value = null
@@ -3861,23 +4521,17 @@ const retryCommittedTaskAssignmentRefresh = async () => {
   await reconcileCommittedTaskAssignment(snapshot)
 }
 
-const isCurrentTaskAssignmentRecovery = (
-  taskId: string,
-  contextKey: string,
-) => (
-  taskAssignmentDraft.value?.taskId === taskId
-  && taskAssignmentDraft.value.contextKey === contextKey
-  && currentContextKey.value === contextKey
-)
+const isCurrentTaskAssignmentRecovery = (taskId: string, contextKey: string) =>
+  taskAssignmentDraft.value?.taskId === taskId &&
+  taskAssignmentDraft.value.contextKey === contextKey &&
+  currentContextKey.value === contextKey
 
 const abandonStaleTaskAssignmentRecovery = () => {
   completeTaskAssignmentMutation()
   dismissTaskAssignmentDialog(false)
 }
 
-const reconcileFailedTaskAssignment = async (
-  source: TaskAssignmentRecoverySource,
-) => {
+const reconcileFailedTaskAssignment = async (source: TaskAssignmentRecoverySource) => {
   const draft = taskAssignmentDraft.value
   if (!draft) {
     completeTaskAssignmentMutation()
@@ -3935,7 +4589,7 @@ const reconcileFailedTaskAssignment = async (
 
   if (refreshedTask.assigneeUserId === targetAssigneeUserId) {
     completeTaskAssignmentMutation()
-    taskAssignmentChangedRevision.value += 1
+    emitTaskAssignmentChanged(taskId)
     dismissTaskAssignmentDialog()
     toast.info(
       source === 'CONFLICT'
@@ -3945,9 +4599,10 @@ const reconcileFailedTaskAssignment = async (
     return true
   }
 
-  const message = source === 'CONFLICT'
-    ? '任务负责人已被其他操作修改，请基于最新负责人再次确认。'
-    : '已核对最新负责人，请确认后再重新提交。'
+  const message =
+    source === 'CONFLICT'
+      ? '任务负责人已被其他操作修改，请基于最新负责人再次确认。'
+      : '已核对最新负责人，请确认后再重新提交。'
   requireTaskAssignmentReconfirmation(message)
   toast.warning(message)
   return true
@@ -4004,8 +4659,8 @@ const submitTaskAssignment = async (payload: {
     return
   }
   if (
-    payload.targetAssigneeUserId !== draft.expectedAssigneeUserId
-    && !isSelectableTaskAssignmentAssignee(payload.targetAssigneeUserId)
+    payload.targetAssigneeUserId !== draft.expectedAssigneeUserId &&
+    !isSelectableTaskAssignmentAssignee(payload.targetAssigneeUserId)
   ) {
     toast.warning('负责人列表已发生变化，请重新选择。')
     return
@@ -4057,14 +4712,13 @@ const submitTaskAssignment = async (payload: {
     }
 
     if (
-      outcome.errorKind === 'CONFLICT'
-      || outcome.errorKind === 'NETWORK'
-      || outcome.errorKind === 'SERVER'
-      || outcome.errorKind === 'UNKNOWN'
+      outcome.errorKind === 'CONFLICT' ||
+      outcome.errorKind === 'NETWORK' ||
+      outcome.errorKind === 'SERVER' ||
+      outcome.errorKind === 'UNKNOWN'
     ) {
-      const source: TaskAssignmentRecoverySource = outcome.errorKind === 'CONFLICT'
-        ? 'CONFLICT'
-        : 'UNCERTAIN'
+      const source: TaskAssignmentRecoverySource =
+        outcome.errorKind === 'CONFLICT' ? 'CONFLICT' : 'UNCERTAIN'
       await reconcileFailedTaskAssignment(source)
       return
     }
@@ -4087,6 +4741,7 @@ const submitTaskAssignment = async (payload: {
 
 const closeTaskScopedInteractions = () => {
   closeTaskAssignmentDialog(false)
+  closeTaskAssignmentHistoryDrawer(false)
   closeDueDatePicker()
   isPriorityMenuOpen.value = false
   isMilestoneMenuOpen.value = false
@@ -4118,15 +4773,27 @@ const handleDocumentPointerDown = (event: PointerEvent) => {
   const targetNode = event.target as Node | null
   if (!targetNode) return
 
-  if (isPriorityMenuOpen.value && priorityRowRef.value && !priorityRowRef.value.contains(targetNode)) {
+  if (
+    isPriorityMenuOpen.value &&
+    priorityRowRef.value &&
+    !priorityRowRef.value.contains(targetNode)
+  ) {
     isPriorityMenuOpen.value = false
   }
 
-  if (isDueDatePickerOpen.value && dueDateRowRef.value && !dueDateRowRef.value.contains(targetNode)) {
+  if (
+    isDueDatePickerOpen.value &&
+    dueDateRowRef.value &&
+    !dueDateRowRef.value.contains(targetNode)
+  ) {
     closeDueDatePicker()
   }
 
-  if (isMilestoneMenuOpen.value && milestoneRowRef.value && !milestoneRowRef.value.contains(targetNode)) {
+  if (
+    isMilestoneMenuOpen.value &&
+    milestoneRowRef.value &&
+    !milestoneRowRef.value.contains(targetNode)
+  ) {
     isMilestoneMenuOpen.value = false
   }
 
@@ -4153,11 +4820,7 @@ const selectPriority = async (val: number) => {
     markListReplanDirty()
   } catch (error) {
     currentTask.priority = oldPriority
-    await handleTaskMutationFailure(
-      error,
-      currentTask.id,
-      '更新优先级失败，请检查网络后重试。',
-    )
+    await handleTaskMutationFailure(error, currentTask.id, '更新优先级失败，请检查网络后重试。')
   }
 }
 
@@ -4183,11 +4846,7 @@ const updateDueDate = async (nextDate: string | null) => {
     await loadTasks({ forceRefresh: true })
   } catch (error) {
     currentTask.dueDate = oldDate
-    await handleTaskMutationFailure(
-      error,
-      currentTask.id,
-      '更新日期失败，请检查网络后重试。',
-    )
+    await handleTaskMutationFailure(error, currentTask.id, '更新日期失败，请检查网络后重试。')
   }
 }
 
@@ -4222,11 +4881,7 @@ const selectMilestone = async (milestoneId: string | null) => {
     await loadTasks({ forceRefresh: true })
   } catch (error) {
     currentTask.milestoneId = oldMilestoneId
-    await handleTaskMutationFailure(
-      error,
-      currentTask.id,
-      '更新所属阶段失败，请检查网络后重试。',
-    )
+    await handleTaskMutationFailure(error, currentTask.id, '更新所属阶段失败，请检查网络后重试。')
   }
 }
 
@@ -4254,11 +4909,7 @@ const onTextBlur = async () => {
     await loadTasks({ forceRefresh: true })
   } catch (error) {
     console.error('保存任务失败', error)
-    await handleTaskMutationFailure(
-      error,
-      currentTask.id,
-      '保存失败，请检查网络后重试。',
-    )
+    await handleTaskMutationFailure(error, currentTask.id, '保存失败，请检查网络后重试。')
   }
 }
 
@@ -4382,7 +5033,6 @@ const confirmDeleteMilestone = async () => {
 }
 
 const deleteMilestone = async (id: string, name: string) => {
-
   const snapshot = [...milestoneList.value]
   const removedIndex = snapshot.findIndex((milestone) => milestone.id === id)
   const removedMilestone = snapshot.find((milestone) => milestone.id === id)
@@ -4401,7 +5051,8 @@ const deleteMilestone = async (id: string, name: string) => {
     onRollback: () => {
       if (!milestoneList.value.some((milestone) => milestone.id === id)) {
         const next = [...milestoneList.value]
-        const insertIndex = removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
+        const insertIndex =
+          removedIndex >= 0 && removedIndex <= next.length ? removedIndex : next.length
         next.splice(insertIndex, 0, removedMilestone)
         milestoneList.value = next.sort((a, b) => (a.orderNo || 0) - (b.orderNo || 0))
       }
@@ -4474,9 +5125,9 @@ watch(newTaskAssigneeStatus, (status) => {
   if (!isTeamProjectContext.value || newTaskAssigneeUserId.value === null) return
 
   if (
-    status === 'error'
-    || status === 'unavailable'
-    || (status === 'ready' && !isSelectableNewTaskAssignee(newTaskAssigneeUserId.value))
+    status === 'error' ||
+    status === 'unavailable' ||
+    (status === 'ready' && !isSelectableNewTaskAssignee(newTaskAssigneeUserId.value))
   ) {
     newTaskAssigneeUserId.value = null
   }
@@ -4486,8 +5137,8 @@ watch(taskAssignmentCandidatesStatus, (status) => {
   const draft = taskAssignmentDraft.value
   if (!draft || status !== 'ready') return
   if (
-    draft.targetAssigneeUserId !== draft.expectedAssigneeUserId
-    && !isSelectableTaskAssignmentAssignee(draft.targetAssigneeUserId)
+    draft.targetAssigneeUserId !== draft.expectedAssigneeUserId &&
+    !isSelectableTaskAssignmentAssignee(draft.targetAssigneeUserId)
   ) {
     if (taskAssignmentRecoveryActive.value) {
       toast.warning('原目标负责人已不在最新成员列表中，请重新选择。')
@@ -4503,14 +5154,10 @@ watch(
   ([contextKey, taskId]) => {
     const pendingRefresh = pendingTaskAssignmentRefresh.value
     if (
-      (
-        pendingRefresh?.contextKey === contextKey
-        || (
-          taskAssignmentRecoveryActive.value
-          && taskAssignmentDraft.value?.contextKey === contextKey
-        )
-      )
-      && taskId === null
+      (pendingRefresh?.contextKey === contextKey ||
+        (taskAssignmentRecoveryActive.value &&
+          taskAssignmentDraft.value?.contextKey === contextKey)) &&
+      taskId === null
     ) {
       return
     }
@@ -4531,6 +5178,8 @@ watch(
     if (previousActorId !== undefined && currentActorId !== previousActorId) {
       resetNewTaskDraft({ blurInput: true })
       closeTaskAssignmentDialog(false)
+      closeTaskAssignmentHistoryDrawer(false)
+      resetAllTaskStatusMutations()
     }
   },
 )
@@ -4563,6 +5212,8 @@ watch(
     closeTodayAiReasonDialog()
     closeListReplanPreviewDialog()
     resetNewTaskDraft({ blurInput: true })
+    closeTaskAssignmentHistoryDrawer(false)
+    resetAllTaskStatusMutations()
 
     if (previousListId && !prevTeamId) {
       clearListReplanPreviewState({
@@ -4610,6 +5261,14 @@ watch(
   },
 )
 
+watch(taskAssignmentChangedRevision, (revision) => {
+  scheduleAssignmentHistoryAutoRefresh(revision, taskAssignmentChangedTaskId.value)
+})
+
+watch(taskAssignmentHistoryBusy, (busy) => {
+  if (!busy) void drainAssignmentHistoryAutoRefresh()
+})
+
 watch(
   () => {
     const task = selectedTask.value
@@ -4654,12 +5313,9 @@ watch(
   },
 )
 
-watch(
-  [() => todayAiOrderEntry.value.status, isTodayView, () => taskList.value.length],
-  () => {
-    consumePendingTodayAiOrder()
-  },
-)
+watch([() => todayAiOrderEntry.value.status, isTodayView, () => taskList.value.length], () => {
+  consumePendingTodayAiOrder()
+})
 
 watch(
   [() => listReplanPreviewEntry.value.status, isAggregateView, () => selectedProjectId.value],
@@ -4703,11 +5359,13 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  resetAllTaskStatusMutations()
   isTaskViewMounted.value = false
   closeTodayAiReasonDialog()
   closeListReplanPreviewDialog()
   closeCompletionQualityModal()
   closeTaskAssignmentDialog(false)
+  closeTaskAssignmentHistoryDrawer(false)
   if (!isAggregateView.value && !isTeamProjectContext.value && selectedProjectId.value) {
     if (isListReplanOperationExpired(pendingListReplanOperation.value)) {
       clearListReplanPreviewState({

@@ -7,6 +7,7 @@ import type { ProjectContext, ProjectWire } from '@/types/project'
 import type { WeeklyReviewDetailWire } from '@/types/review'
 import type { TaskWire } from '@/types/task'
 import { ApiRequestError } from '@/utils/request'
+import { useToastStore } from '@/stores/toast'
 
 const router = vi.hoisted(() => ({
   push: vi.fn(),
@@ -152,6 +153,8 @@ const mountPage = async (current: WeeklyReviewDetailWire) => {
   await vi.waitFor(() => {
     expect(reviewApi.fetchCurrentReview).toHaveBeenCalled()
     expect(wrapper.get('[data-testid="review-association-picker"]')).toBeTruthy()
+    expect((wrapper.get('textarea[placeholder^="可选补充内容"]').element as HTMLTextAreaElement).value)
+      .toBe(typeof current.reflection === 'string' ? current.reflection : '')
   })
   return wrapper
 }
@@ -187,6 +190,63 @@ describe('WeeklyReview D3-2 association integration', () => {
     collaborationStore.getTeamProjects.mockReturnValue([])
     projectApi.fetchProjectList.mockResolvedValue(page([]))
     taskApi.fetchTaskList.mockResolvedValue(page([]))
+  })
+
+  it('D4-1 saves an author draft through the typed API and reloads canonical server state', async () => {
+    const wrapper = await mountPage(currentFixture({
+      id: null,
+      reflection: '本地草稿',
+      taskIds: ['101'],
+    }))
+    reviewApi.fetchCurrentReview.mockResolvedValueOnce(currentFixture({
+      id: '41',
+      reflection: '服务端规范化后的正文',
+      taskIds: ['102'],
+    }))
+
+    await clickSave(wrapper)
+    await confirmSave(wrapper)
+
+    await vi.waitFor(() => {
+      expect(reviewApi.saveWeeklyReviewApi).toHaveBeenCalledWith(expect.objectContaining({
+        year: 2026,
+        weekNo: 36,
+        visibilityScope: 'PRIVATE',
+        teamId: null,
+        reflection: '本地草稿',
+        taskIds: ['101'],
+      }))
+      expect(reviewApi.updateWeeklyReviewApi).not.toHaveBeenCalled()
+      expect(reviewApi.fetchCurrentReview).toHaveBeenCalledTimes(2)
+      expect(reviewApi.fetchReviewHistory).toHaveBeenCalledTimes(2)
+    })
+
+    await vi.waitFor(() => {
+      expect((wrapper.get('textarea[placeholder^="可选补充内容"]').element as HTMLTextAreaElement).value)
+        .toBe('服务端规范化后的正文')
+      expect(wrapper.get('[data-testid="review-selected-tasks"]').text()).toContain('任务 #102')
+      expect(wrapper.get('[data-testid="review-selected-tasks"]').text()).not.toContain('任务 #101')
+    })
+  })
+
+  it('D4-1 reports a completed mutation separately when the authoritative refresh fails', async () => {
+    const wrapper = await mountPage(currentFixture({ id: null, reflection: '等待保存的草稿' }))
+    const toastStore = useToastStore()
+    reviewApi.fetchCurrentReview.mockRejectedValueOnce(new Error('refresh failed'))
+
+    await clickSave(wrapper)
+    await confirmSave(wrapper)
+
+    await vi.waitFor(() => {
+      expect(reviewApi.saveWeeklyReviewApi).toHaveBeenCalledTimes(1)
+      expect(reviewApi.fetchCurrentReview).toHaveBeenCalledTimes(2)
+      expect(reviewApi.fetchReviewHistory).toHaveBeenCalledTimes(1)
+      expect(toastStore.toasts.some((toast) => (
+        toast.type === 'warning'
+        && toast.message === '保存已完成，但最新内容加载失败，请刷新页面后确认。'
+      ))).toBe(true)
+    })
+    expect(reviewApi.updateWeeklyReviewApi).not.toHaveBeenCalled()
   })
 
   it('PR7-T-034 clears TEAM A associations before loading B and drops A late data', async () => {

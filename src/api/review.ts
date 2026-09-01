@@ -8,17 +8,6 @@ import type {
 } from '@/types/review'
 import { omitUndefined, requireEntityId } from './guards'
 
-export interface LegacyPrivateReviewPayload {
-  year?: number
-  weekNo?: number
-  reflection?: string
-}
-
-export interface LegacyPrivateReviewUpdatePayload {
-  id: EntityId
-  reflection?: string
-}
-
 const toWeeklyReviewSaveBody = (
   data: WeeklyReviewSavePayload,
 ): WeeklyReviewSavePayload => ({
@@ -63,25 +52,6 @@ export const updateWeeklyReviewApi = (data: WeeklyReviewUpdatePayload) => {
     '/review/update',
     toWeeklyReviewUpdateBody(data),
   )
-}
-
-/** @deprecated Migrate the stage-0 PRIVATE editor to saveWeeklyReviewApi in WP7-D. */
-export const saveReviewApi = (data: LegacyPrivateReviewPayload) => {
-  const body = omitUndefined({
-    year: data.year,
-    weekNo: data.weekNo,
-    reflection: data.reflection,
-  })
-  return request.post('/review/save', body)
-}
-
-/** @deprecated Migrate the stage-0 PRIVATE editor to updateWeeklyReviewApi in WP7-D. */
-export const updateReviewApi = (data: LegacyPrivateReviewUpdatePayload) => {
-  const body = omitUndefined({
-    id: requireEntityId(data.id, 'id'),
-    reflection: data.reflection,
-  })
-  return request.post('/review/update', body)
 }
 
 export const deleteReviewApi = (id: string | number) => request.post(`/review/delete/${id}`)

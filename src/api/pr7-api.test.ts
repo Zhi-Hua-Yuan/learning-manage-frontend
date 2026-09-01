@@ -32,9 +32,7 @@ import {
   fetchReviewHistory,
   fetchTeamSharedReviewsApi,
   getReviewDetailApi,
-  saveReviewApi,
   saveWeeklyReviewApi,
-  updateReviewApi,
   updateWeeklyReviewApi,
 } from './review'
 import { clearAuthToken } from '@/utils/authToken'
@@ -248,39 +246,6 @@ describe('PR7 B2 API clients', () => {
       nextPlan: 'Updated plan',
       sharedSummary: '',
       taskIds: [],
-    })
-  })
-
-  it('keeps the stage-0 review compatibility calls on a narrow whitelist', async () => {
-    const readSave = mockSuccess(true)
-    const legacySave = {
-      year: 2026,
-      weekNo: 35,
-      startDate: '2026-08-24',
-      endDate: '2026-08-30',
-      completedTaskCount: 4,
-      focusProjectName: 'Private project',
-      reflection: 'Legacy reflection',
-    }
-    await saveReviewApi(legacySave)
-    expect(parseBody(readSave()?.data)).toEqual({
-      year: 2026,
-      weekNo: 35,
-      reflection: 'Legacy reflection',
-    })
-
-    const readUpdate = mockSuccess(true)
-    const legacyUpdate = {
-      id: '31',
-      year: 2026,
-      weekNo: 35,
-      completedTaskCount: 4,
-      reflection: 'Legacy update',
-    }
-    await updateReviewApi(legacyUpdate)
-    expect(parseBody(readUpdate()?.data)).toEqual({
-      id: '31',
-      reflection: 'Legacy update',
     })
   })
 

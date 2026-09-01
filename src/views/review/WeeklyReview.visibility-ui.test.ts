@@ -96,6 +96,9 @@ const mountPage = async (current: WeeklyReviewDetailWire = currentFixture()) => 
   await vi.waitFor(() => {
     expect(reviewApi.fetchCurrentReview).toHaveBeenCalled()
     expect(wrapper.get('[data-testid="review-visibility-fields"]')).toBeTruthy()
+    expect(wrapper.text()).toContain(`第 ${String(current.weekNo)} 周`)
+    expect((wrapper.get('textarea[placeholder^="可选补充内容"]').element as HTMLTextAreaElement).value)
+      .toBe(typeof current.reflection === 'string' ? current.reflection : '')
   })
   return wrapper
 }

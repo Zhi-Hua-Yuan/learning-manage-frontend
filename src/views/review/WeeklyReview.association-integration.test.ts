@@ -23,7 +23,10 @@ const reviewApi = vi.hoisted(() => ({
   saveWeeklyReviewApi: vi.fn(),
   updateWeeklyReviewApi: vi.fn(),
 }))
-const projectApi = vi.hoisted(() => ({ fetchProjectList: vi.fn() }))
+const projectApi = vi.hoisted(() => ({
+  fetchProjectList: vi.fn(),
+  fetchTeamProjectsApi: vi.fn(),
+}))
 const taskApi = vi.hoisted(() => ({ fetchTaskList: vi.fn() }))
 const aiApi = vi.hoisted(() => ({ aiPolishApi: vi.fn() }))
 const collaborationStore = vi.hoisted(() => ({
@@ -189,6 +192,7 @@ describe('WeeklyReview D3-2 association integration', () => {
     collaborationStore.loadMoreTeamProjects.mockResolvedValue([])
     collaborationStore.getTeamProjects.mockReturnValue([])
     projectApi.fetchProjectList.mockResolvedValue(page([]))
+    projectApi.fetchTeamProjectsApi.mockResolvedValue(page([]))
     taskApi.fetchTaskList.mockResolvedValue(page([]))
   })
 

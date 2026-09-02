@@ -325,8 +325,6 @@ import ReviewVisibilityFields from '@/components/review/ReviewVisibilityFields.v
 import { aiPolishApi } from '@/api/ai'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { useWeeklyReviewAssociations } from '@/composables/useWeeklyReviewAssociations'
-import { fetchProjectList } from '@/api/project'
-import { fetchTaskList } from '@/api/task'
 import {
   deleteReviewApi,
   fetchCurrentReview,
@@ -349,6 +347,7 @@ import type {
   WeeklyReviewSavePayload,
   WeeklyReviewUpdatePayload,
 } from '@/types/review'
+import type { TaskModel } from '@/types/task'
 import {
   buildWeeklyReviewSavePayload,
   buildWeeklyReviewUpdatePayload,
@@ -365,35 +364,18 @@ import {
 } from '@/utils/weeklyReviewForm'
 import { classifyApiError } from '@/utils/request'
 import { isTaskCompleted } from '@/utils/taskStatus'
-
-interface ProjectItem {
-  id: string | number
-  name: string
-}
-
-interface TaskItem {
-  id: string | number
-  status: number
-  projectId: string | number
-  dueDate?: string | null
-}
-
-interface TaskListResponse {
-  records?: TaskItem[]
-}
+import {
+  buildWeeklyReviewAuthoritativeCompletedTaskSummary,
+  calculateWeeklyReviewAuxiliaryMetrics,
+  normalizeWeeklyReviewDateKey,
+} from '@/utils/weeklyReviewMetrics'
+import { loadWeeklyReviewTaskSnapshot } from '@/utils/weeklyReviewTaskSnapshot'
 
 interface SummaryMetrics {
-  completedCount: number | null
-  assignedCount: number | null
   completionRate: string
   wowRate: string
-  completedDiff: number | null
   completionRateDiff: number | null
-  currentCompletedRaw: number | null
   currentAssignedRaw: number | null
-  previousCompletedRaw: number | null
-  previousAssignedRaw: number | null
-  currentCompletionRateRaw: number | null
   previousCompletionRateRaw: number | null
 }
 
@@ -430,19 +412,6 @@ const createEmptyReviewDetail = (): WeeklyReviewDetail => ({
   updateTime: null,
 })
 
-const SUMMARY_PAGE_SIZE = 100
-const MAX_PAGES_PER_PROJECT = 10
-const MAX_TOTAL_REQUESTS = 60
-const MAX_CONCURRENT_PROJECT_FETCHES = 3
-const TIMEZONE_BASELINE = 'Asia/Shanghai'
-const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
-const DATE_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
-  timeZone: TIMEZONE_BASELINE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-})
-
 const router = useRouter()
 const toast = useToast()
 const undoDelete = useUndoDelete()
@@ -453,6 +422,7 @@ const { runAiRequest } = useAiPendingRequest()
 
 const currentReview = ref<WeeklyReviewDetail>(createEmptyReviewDetail())
 const historyReviews = ref<WeeklyReviewDetail[]>([])
+const authorFactsReady = ref(false)
 const reviewForm = ref<WeeklyReviewFormState>(createDefaultWeeklyReviewForm(0, 0))
 const formIssues = ref<WeeklyReviewFormIssue[]>([])
 const pendingMutation = ref<PendingWeeklyReviewMutation | null>(null)
@@ -476,19 +446,15 @@ const summaryError = ref('')
 const summaryGuardHit = ref(false)
 const weeklyCompletedTaskIds = ref<string[]>([])
 const summaryMetrics = ref<SummaryMetrics>({
-  completedCount: null,
-  assignedCount: null,
   completionRate: '--',
   wowRate: '--',
-  completedDiff: null,
   completionRateDiff: null,
-  currentCompletedRaw: null,
   currentAssignedRaw: null,
-  previousCompletedRaw: null,
-  previousAssignedRaw: null,
-  currentCompletionRateRaw: null,
   previousCompletionRateRaw: null,
 })
+let summaryRequestEpoch = 0
+let authorContextRequestEpoch = 0
+let activeAuthorContextIdentity: string | null = null
 
 const weeklyPolishEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH])
 const isPolishing = computed(() => weeklyPolishEntry.value.status === 'pending')
@@ -666,51 +632,8 @@ const jumpToRelatedTasks = async () => {
   }
 }
 
-const formatDateKeyInTimeZone = (date: Date) => {
-  return DATE_KEY_FORMATTER.formatToParts(date).reduce((acc, part) => {
-    if (part.type === 'year') return `${part.value}-`
-    if (part.type === 'month') return `${acc}${part.value}-`
-    if (part.type === 'day') return `${acc}${part.value}`
-    return acc
-  }, '')
-}
-
-const normalizeDueDateKey = (value?: string | null) => {
-  if (!value) return ''
-  const trimmed = value.trim()
-  if (DATE_KEY_PATTERN.test(trimmed)) return trimmed
-
-  const parsed = new Date(trimmed)
-  if (Number.isNaN(parsed.getTime())) return ''
-
-  return formatDateKeyInTimeZone(parsed)
-}
-
-const parseDateKeyToUtc = (dateKey: string) => {
-  if (!DATE_KEY_PATTERN.test(dateKey)) return null
-  const [year, month, day] = dateKey.split('-').map(Number)
-  const timestamp = Date.UTC(year || 0, (month || 1) - 1, day || 1)
-  return Number.isNaN(timestamp) ? null : timestamp
-}
-
-const shiftDateKey = (dateKey: string, offsetDays: number) => {
-  const timestamp = parseDateKeyToUtc(dateKey)
-  if (timestamp === null) return ''
-
-  const shifted = new Date(timestamp + offsetDays * 24 * 60 * 60 * 1000)
-  const year = shifted.getUTCFullYear()
-  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(shifted.getUTCDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 const isDateKeyWithinRange = (dateKey: string, startDate: string, endDate: string) => {
   return dateKey >= startDate && dateKey <= endDate
-}
-
-const calcRate = (completed: number, assigned: number) => {
-  if (assigned === 0) return null
-  return (completed / assigned) * 100
 }
 
 const formatRate = (rate: number | null) => {
@@ -725,62 +648,27 @@ const formatWow = (currentRate: number | null, previousRate: number | null) => {
   return `${prefix}${diff.toFixed(1)}pp`
 }
 
-const calcWeekMetrics = (tasks: TaskItem[], startDate: string, endDate: string): SummaryMetrics => {
-  const previousStartDate = shiftDateKey(startDate, -7)
-  const previousEndDate = shiftDateKey(endDate, -7)
-
-  let currentAssignedCount = 0
-  let currentCompletedCount = 0
-  let previousAssignedCount = 0
-  let previousCompletedCount = 0
-
-  tasks.forEach((task) => {
-    const dueDateKey = normalizeDueDateKey(task.dueDate)
-    if (!dueDateKey) return
-
-    if (isDateKeyWithinRange(dueDateKey, startDate, endDate)) {
-      currentAssignedCount += 1
-      if (isTaskCompleted(task.status)) {
-        currentCompletedCount += 1
-      }
-      return
-    }
-
-    if (previousStartDate && previousEndDate && isDateKeyWithinRange(dueDateKey, previousStartDate, previousEndDate)) {
-      previousAssignedCount += 1
-      if (isTaskCompleted(task.status)) {
-        previousCompletedCount += 1
-      }
-    }
-  })
-
-  const currentRate = calcRate(currentCompletedCount, currentAssignedCount)
-  const previousRate = calcRate(previousCompletedCount, previousAssignedCount)
-  const completedDiff = currentCompletedCount - previousCompletedCount
-  const completionRateDiff =
-    currentRate === null || previousRate === null ? null : currentRate - previousRate
-
+const createSummaryMetrics = (
+  tasks: TaskModel[],
+  actorId: string,
+  startDate: string,
+  endDate: string,
+): SummaryMetrics => {
+  const metrics = calculateWeeklyReviewAuxiliaryMetrics(tasks, actorId, startDate, endDate)
   return {
-    completedCount: currentCompletedCount,
-    assignedCount: currentAssignedCount,
-    completionRate: formatRate(currentRate),
-    wowRate: formatWow(currentRate, previousRate),
-    completedDiff,
-    completionRateDiff,
-    currentCompletedRaw: currentCompletedCount,
-    currentAssignedRaw: currentAssignedCount,
-    previousCompletedRaw: previousCompletedCount,
-    previousAssignedRaw: previousAssignedCount,
-    currentCompletionRateRaw: currentRate,
-    previousCompletionRateRaw: previousRate,
+    completionRate: formatRate(metrics.currentCompletionRate),
+    wowRate: formatWow(metrics.currentCompletionRate, metrics.previousCompletionRate),
+    completionRateDiff: metrics.completionRateDiff,
+    currentAssignedRaw: metrics.currentAssignedCount,
+    previousCompletionRateRaw: metrics.previousCompletionRate,
   }
 }
 
-const collectCompletedTaskIdsInRange = (tasks: TaskItem[], startDate: string, endDate: string) => {
+const collectCompletedTaskIdsInRange = (tasks: TaskModel[], startDate: string, endDate: string) => {
   const idSet = new Set<string>()
 
   tasks.forEach((task) => {
-    const dueDateKey = normalizeDueDateKey(task.dueDate)
+    const dueDateKey = normalizeWeeklyReviewDateKey(task.dueDate)
     if (!dueDateKey || !isDateKeyWithinRange(dueDateKey, startDate, endDate)) return
     if (!isTaskCompleted(task.status)) return
 
@@ -792,112 +680,140 @@ const collectCompletedTaskIdsInRange = (tasks: TaskItem[], startDate: string, en
 }
 
 const createSummaryPlaceholder = (): SummaryMetrics => ({
-  completedCount: null,
-  assignedCount: null,
   completionRate: '--',
   wowRate: '--',
-  completedDiff: null,
   completionRateDiff: null,
-  currentCompletedRaw: null,
   currentAssignedRaw: null,
-  previousCompletedRaw: null,
-  previousAssignedRaw: null,
-  currentCompletionRateRaw: null,
   previousCompletionRateRaw: null,
 })
 
+const resetSummaryDerivedState = () => {
+  summaryRequestEpoch += 1
+  summaryLoading.value = false
+  summaryReady.value = false
+  summaryError.value = ''
+  summaryGuardHit.value = false
+  weeklyCompletedTaskIds.value = []
+  summaryMetrics.value = createSummaryPlaceholder()
+}
+
+const getSummaryReviewKey = () => [
+  currentReview.value.id ?? 'draft',
+  currentReview.value.year,
+  currentReview.value.weekNo,
+  currentReview.value.startDate ?? '-',
+  currentReview.value.endDate ?? '-',
+].join(':')
+
+const getActorContextIdentity = () => {
+  const actorId = collaborationStore.currentUser?.id
+  return actorId ? `${collaborationStore.sessionEpoch}:${actorId}` : null
+}
+
+const updateLegacyAiTaskCandidates = (
+  tasks: TaskModel[],
+  actorId: string,
+  startDate: string,
+  endDate: string,
+) => {
+  weeklyCompletedTaskIds.value = collectCompletedTaskIdsInRange(
+    tasks.filter((task) => task.assigneeUserId === actorId),
+    startDate,
+    endDate,
+  )
+}
+
 const hydrateSummaryMetrics = async () => {
+  const requestEpoch = ++summaryRequestEpoch
+  const reviewKey = getSummaryReviewKey()
+  let actorId: string | null = null
+  let actorSessionEpoch: number | null = null
+  let teamSnapshotKey: string | null = null
+  const isRequestActive = () => (
+    isViewMounted.value
+    && requestEpoch === summaryRequestEpoch
+    && reviewKey === getSummaryReviewKey()
+    && (
+      actorId === null
+      || (
+        collaborationStore.currentUser?.id === actorId
+        && collaborationStore.sessionEpoch === actorSessionEpoch
+        && collaborationStore.teams.map((team) => team.id).join(',') === teamSnapshotKey
+      )
+    )
+  )
+
   summaryLoading.value = true
   summaryReady.value = false
   summaryError.value = ''
   summaryGuardHit.value = false
-
-  const startDate = normalizeDueDateKey(currentReview.value.startDate)
-  const endDate = normalizeDueDateKey(currentReview.value.endDate)
-
-  if (!startDate || !endDate) {
-    summaryMetrics.value = createSummaryPlaceholder()
-    weeklyCompletedTaskIds.value = []
-    summaryReady.value = true
-    summaryLoading.value = false
-    summaryError.value = '本周时间范围暂未设置，先填写后可自动生成看板。'
-    return
-  }
+  weeklyCompletedTaskIds.value = []
 
   try {
-    const projectResponse = await fetchProjectList()
-    const projects = (projectResponse as { records?: ProjectItem[] })?.records || []
-    const guardState = {
-      totalRequests: 0,
-      hit: false,
-      reason: '',
+    const startDate = normalizeWeeklyReviewDateKey(currentReview.value.startDate)
+    const endDate = normalizeWeeklyReviewDateKey(currentReview.value.endDate)
+    if (!startDate || !endDate || startDate > endDate) {
+      summaryMetrics.value = createSummaryPlaceholder()
+      summaryError.value = '本周时间范围暂未设置，先填写后可自动生成看板。'
+      return
     }
 
-    const fetchProjectTasks = async (projectId: string | number) => {
-      const projectTasks: TaskItem[] = []
-      let currentPage = 1
-
-      while (currentPage <= MAX_PAGES_PER_PROJECT && !guardState.hit) {
-        if (guardState.totalRequests >= MAX_TOTAL_REQUESTS) {
-          guardState.hit = true
-          guardState.reason = '数据较多，当前先展示主要结果。'
-          break
-        }
-
-        guardState.totalRequests += 1
-        const response = await fetchTaskList({
-          projectId,
-          current: currentPage,
-          size: SUMMARY_PAGE_SIZE,
-        })
-        const records = ((response as TaskListResponse)?.records || []) as TaskItem[]
-
-        projectTasks.push(...records)
-
-        if (records.length === 0 || records.length < SUMMARY_PAGE_SIZE) {
-          break
-        }
-
-        currentPage += 1
+    if (!collaborationStore.currentUser || collaborationStore.teamsLoadState.status !== 'ready') {
+      try {
+        await collaborationStore.bootstrapCollaborationContext()
+      } catch (error) {
+        console.error('加载统计所需的当前用户上下文失败', error)
       }
-
-      if (currentPage > MAX_PAGES_PER_PROJECT && !guardState.hit) {
-        guardState.hit = true
-        guardState.reason = '数据较多，当前先展示主要结果。'
-      }
-
-      return projectTasks
     }
 
-    const allTasks: TaskItem[] = []
-
-    for (let index = 0; index < projects.length; index += MAX_CONCURRENT_PROJECT_FETCHES) {
-      if (guardState.hit) break
-
-      const chunk = projects.slice(index, index + MAX_CONCURRENT_PROJECT_FETCHES)
-      const chunkResults = await Promise.all(chunk.map((project) => fetchProjectTasks(project.id)))
-      chunkResults.forEach((records) => {
-        allTasks.push(...records)
-      })
+    if (!isRequestActive()) return
+    actorId = collaborationStore.currentUser?.id ?? null
+    actorSessionEpoch = collaborationStore.sessionEpoch
+    teamSnapshotKey = collaborationStore.teams.map((team) => team.id).join(',')
+    if (!actorId || collaborationStore.teamsLoadState.status !== 'ready') {
+      summaryMetrics.value = createSummaryPlaceholder()
+      summaryError.value = '当前用户或团队信息暂不可用，辅助完成率未计算。'
+      return
     }
 
-    const finalMetrics = calcWeekMetrics(allTasks, startDate, endDate)
-    summaryMetrics.value = finalMetrics
-    weeklyCompletedTaskIds.value = collectCompletedTaskIdsInRange(allTasks, startDate, endDate)
-    currentReview.value.completedTaskCount = finalMetrics.completedCount ?? currentReview.value.completedTaskCount
-    summaryGuardHit.value = guardState.hit
-    if (guardState.reason) {
-      summaryError.value = guardState.reason
+    const snapshot = await loadWeeklyReviewTaskSnapshot({
+      teamIds: collaborationStore.teams.map((team) => team.id),
+      isActive: isRequestActive,
+    })
+    if (!isRequestActive()) return
+    if (!snapshot.complete) {
+      summaryGuardHit.value = true
+      summaryError.value = snapshot.reason
+      summaryMetrics.value = createSummaryPlaceholder()
+      summaryReady.value = false
+      weeklyCompletedTaskIds.value = []
+      return
     }
+
+    updateLegacyAiTaskCandidates(snapshot.tasks, actorId, startDate, endDate)
+    summaryMetrics.value = createSummaryMetrics(snapshot.tasks, actorId, startDate, endDate)
     summaryReady.value = true
   } catch (error) {
+    if (!isRequestActive()) return
     console.error('加载摘要看板失败', error)
     summaryMetrics.value = createSummaryPlaceholder()
     weeklyCompletedTaskIds.value = []
-    summaryError.value = '网络不太稳定，暂时没拿到最新数据，请稍后重试。'
+    summaryError.value = '辅助任务数据暂时不可用，服务端周复盘统计仍然有效。'
   } finally {
-    summaryLoading.value = false
+    if (isRequestActive()) summaryLoading.value = false
   }
+}
+
+const switchAuthorReviewContext = async (review: WeeklyReviewDetail) => {
+  resetSummaryDerivedState()
+  const switchEpoch = summaryRequestEpoch
+  currentReview.value = { ...review, taskIds: [...review.taskIds] }
+  reviewForm.value = createWeeklyReviewFormFromDetail(review)
+  authorFactsReady.value = true
+  formIssues.value = []
+  await activateAssociationContext()
+  if (switchEpoch !== summaryRequestEpoch) return
+  await hydrateSummaryMetrics()
 }
 
 const summaryDisplayValue = (value: number | string | null) => {
@@ -906,11 +822,15 @@ const summaryDisplayValue = (value: number | string | null) => {
   return String(value)
 }
 
-const hasPreviousWeekBaseline = computed(() => {
-  const previousAssigned = summaryMetrics.value.previousAssignedRaw
-  const previousCompleted = summaryMetrics.value.previousCompletedRaw
-  return (previousAssigned ?? 0) > 0 || (previousCompleted ?? 0) > 0
-})
+const authoritativeCompletedTaskSummary = computed(() => (
+  buildWeeklyReviewAuthoritativeCompletedTaskSummary(currentReview.value, historyReviews.value)
+))
+const previousAuthoritativeCompletedTaskCount = computed(() => (
+  authoritativeCompletedTaskSummary.value.previousCompletedTaskCount
+))
+const authoritativeCompletedTaskDiff = computed(() => (
+  authoritativeCompletedTaskSummary.value.completedTaskCountDiff
+))
 
 const formatSignedCount = (value: number | null) => {
   if (value === null) return '--'
@@ -950,27 +870,27 @@ const getSummaryCardToneClasses = (tone: 'positive' | 'negative' | 'neutral') =>
 const summaryCards = computed<SummaryCardView[]>(() => {
   const metric = summaryMetrics.value
   const completedTone =
-    !summaryReady.value || !hasPreviousWeekBaseline.value
+    !authorFactsReady.value || authoritativeCompletedTaskDiff.value === null
       ? 'neutral'
-      : getTrendTone(metric.completedDiff)
+      : getTrendTone(authoritativeCompletedTaskDiff.value)
   const completionRateTone =
     !summaryReady.value || metric.previousCompletionRateRaw === null
       ? 'neutral'
       : getTrendTone(metric.completionRateDiff)
   const completedDiffTone =
-    !summaryReady.value || !hasPreviousWeekBaseline.value
+    !authorFactsReady.value || authoritativeCompletedTaskDiff.value === null
       ? 'neutral'
-      : getTrendTone(metric.completedDiff)
+      : getTrendTone(authoritativeCompletedTaskDiff.value)
   const wowTone =
     !summaryReady.value || metric.previousCompletionRateRaw === null
       ? 'neutral'
       : getTrendTone(metric.completionRateDiff)
 
-  const completedCountHint = !summaryReady.value
-    ? '正在整理本周数据'
-    : !hasPreviousWeekBaseline.value
-      ? `本周共完成 ${metric.currentCompletedRaw ?? 0} 项`
-      : `较上周 ${formatSignedCount(metric.completedDiff)} 项`
+  const completedCountHint = !authorFactsReady.value
+    ? '正在加载服务端周复盘统计'
+    : authoritativeCompletedTaskDiff.value === null
+      ? '以后端周复盘统计为准'
+      : `较上周 ${formatSignedCount(authoritativeCompletedTaskDiff.value)} 项`
 
   const completionRateHint = !summaryReady.value
     ? '正在整理本周数据'
@@ -983,16 +903,22 @@ const summaryCards = computed<SummaryCardView[]>(() => {
   return [
     {
       label: '本周完成任务',
-      value: summaryDisplayValue(metric.completedCount),
+      value: authorFactsReady.value
+        ? String(authoritativeCompletedTaskSummary.value.currentCompletedTaskCount)
+        : '--',
       hint: completedCountHint,
       ...getSummaryCardToneClasses(completedTone),
     },
     {
       label: '完成任务变化',
-      value: summaryDisplayValue(
-        summaryReady.value && hasPreviousWeekBaseline.value ? formatSignedCount(metric.completedDiff) : '--',
-      ),
-      hint: hasPreviousWeekBaseline.value ? `上周完成 ${metric.previousCompletedRaw ?? 0} 项` : '暂无上周数据',
+      value:
+        authorFactsReady.value && authoritativeCompletedTaskDiff.value !== null
+          ? formatSignedCount(authoritativeCompletedTaskDiff.value)
+          : '--',
+      hint:
+        previousAuthoritativeCompletedTaskCount.value === null
+          ? '暂无上周服务端复盘统计'
+          : `上周完成 ${previousAuthoritativeCompletedTaskCount.value} 项`,
       ...getSummaryCardToneClasses(completedDiffTone),
     },
     {
@@ -1011,8 +937,8 @@ const summaryCards = computed<SummaryCardView[]>(() => {
 })
 
 const summaryNoticeText = computed(() => {
-  if (summaryLoading.value) return '正在更新本周看板，请稍候。'
-  if (summaryGuardHit.value) return summaryError.value || '数据较多，当前先展示已整理完成的结果。'
+  if (summaryLoading.value) return '服务端周复盘统计已保留，正在整理辅助完成率。'
+  if (summaryGuardHit.value) return summaryError.value || '辅助任务数据不完整，完成率暂不展示。'
   if (summaryError.value) return summaryError.value
   if (!summaryReady.value) return '看板尚未准备好。'
   return '绿色表示比上周更好，红色表示需要重点关注。'
@@ -1036,25 +962,35 @@ const loadReviewData = async () => {
 }
 
 const loadAuthorReviewContext = async (): Promise<boolean> => {
+  const requestEpoch = ++authorContextRequestEpoch
+  const actorIdentity = getActorContextIdentity()
+  resetSummaryDerivedState()
+  authorFactsReady.value = false
+  const isRequestActive = () => (
+    isViewMounted.value
+    && requestEpoch === authorContextRequestEpoch
+    && actorIdentity === getActorContextIdentity()
+  )
+
   try {
     const currentRes = await fetchCurrentReview()
+    if (!isRequestActive()) return false
     const normalizedCurrent = normalizeCurrentWeeklyReviewWire(currentRes)
     if (!normalizedCurrent) throw new TypeError('Invalid current weekly review response')
 
     const historyRes = await fetchReviewHistory()
+    if (!isRequestActive()) return false
     if (!Array.isArray(historyRes)) throw new TypeError('Invalid weekly review history response')
     const normalizedHistory = historyRes
       .map((review) => normalizePersistedWeeklyReviewWire(review))
       .filter((review): review is WeeklyReviewDetail & { id: string } => review !== null)
 
-    currentReview.value = normalizedCurrent
-    reviewForm.value = createWeeklyReviewFormFromDetail(normalizedCurrent)
     historyReviews.value = normalizedHistory
-    formIssues.value = []
-    void activateAssociationContext()
-    await hydrateSummaryMetrics()
-    return true
+    activeAuthorContextIdentity = actorIdentity
+    await switchAuthorReviewContext(normalizedCurrent)
+    return isRequestActive()
   } catch (error) {
+    if (requestEpoch !== authorContextRequestEpoch) return false
     console.error('加载周报数据失败', error)
     summaryLoading.value = false
     summaryReady.value = false
@@ -1215,10 +1151,10 @@ const executeDelete = async () => {
 
 const handleEditReview = () => {
   if (!selectedReview.value) return
-  currentReview.value = { ...selectedReview.value, taskIds: [...selectedReview.value.taskIds] }
-  reviewForm.value = createWeeklyReviewFormFromDetail(selectedReview.value)
-  formIssues.value = []
+  const review = { ...selectedReview.value, taskIds: [...selectedReview.value.taskIds] }
   showDetailModal.value = false
+  selectedReview.value = null
+  void switchAuthorReviewContext(review)
   window.scrollTo({ top: 0, behavior: 'smooth' })
   toast.success('已加载至编辑器，修改后点击保存即可。')
 }
@@ -1331,6 +1267,42 @@ onMounted(async () => {
 
 watch(
   [
+    () => collaborationStore.currentUser?.id ?? null,
+    () => collaborationStore.sessionEpoch,
+  ],
+  () => {
+    if (!isViewMounted.value) return
+    const actorIdentity = getActorContextIdentity()
+    if (actorIdentity === activeAuthorContextIdentity) return
+
+    authorContextRequestEpoch += 1
+    resetSummaryDerivedState()
+    authorFactsReady.value = false
+    if (actorIdentity) void loadAuthorReviewContext()
+  },
+)
+
+watch(
+  [
+    () => collaborationStore.teamsLoadState.status,
+    () => collaborationStore.teams.map((team) => team.id).join(','),
+  ],
+  ([status, teamIds], previous) => {
+    if (!isViewMounted.value || !authorFactsReady.value) return
+    const previousStatus = previous?.[0]
+    const previousTeamIds = previous?.[1]
+    if (status === previousStatus && teamIds === previousTeamIds) return
+    resetSummaryDerivedState()
+    if (status === 'ready') {
+      void hydrateSummaryMetrics()
+    } else {
+      summaryError.value = '团队上下文正在变化，辅助完成率暂不展示。'
+    }
+  },
+)
+
+watch(
+  [
     () => collaborationStore.teamsLoadState.status,
     () => collaborationStore.teams.map((team) => team.id).join(','),
     () => reviewForm.value.visibilityScope,
@@ -1385,6 +1357,8 @@ watch(
 
 onBeforeUnmount(() => {
   isViewMounted.value = false
+  authorContextRequestEpoch += 1
+  resetSummaryDerivedState()
   reviewAssociations.resetContext()
 })
 </script>

@@ -19,7 +19,10 @@ const reviewApi = vi.hoisted(() => ({
   saveWeeklyReviewApi: vi.fn(),
   updateWeeklyReviewApi: vi.fn(),
 }))
-const projectApi = vi.hoisted(() => ({ fetchProjectList: vi.fn() }))
+const projectApi = vi.hoisted(() => ({
+  fetchProjectList: vi.fn(),
+  fetchTeamProjectsApi: vi.fn(),
+}))
 const taskApi = vi.hoisted(() => ({ fetchTaskList: vi.fn() }))
 const aiApi = vi.hoisted(() => ({ aiPolishApi: vi.fn() }))
 const collaborationStore = vi.hoisted(() => ({
@@ -80,6 +83,7 @@ const mountPage = async (current: WeeklyReviewDetailWire = currentFixture()) => 
   reviewApi.saveWeeklyReviewApi.mockResolvedValue(undefined)
   reviewApi.updateWeeklyReviewApi.mockResolvedValue(undefined)
   projectApi.fetchProjectList.mockResolvedValue({ records: [] })
+  projectApi.fetchTeamProjectsApi.mockResolvedValue({ records: [] })
   taskApi.fetchTaskList.mockResolvedValue({ records: [] })
   collaborationStore.bootstrapCollaborationContext.mockResolvedValue({
     currentUser: collaborationStore.currentUser,

@@ -63,10 +63,9 @@ describe('WeeklyReview D2 visibility integration contract', () => {
     expect(loadAuthorReviewContext).toContain('normalizeCurrentWeeklyReviewWire(currentRes)')
     expect(loadAuthorReviewContext).toContain('normalizePersistedWeeklyReviewWire(review)')
     expect(loadAuthorReviewContext).toContain("throw new TypeError('Invalid weekly review history response')")
-    expect(loadAuthorReviewContext).toContain('currentReview.value = normalizedCurrent')
-    expect(loadAuthorReviewContext).toContain('reviewForm.value = createWeeklyReviewFormFromDetail(normalizedCurrent)')
     expect(loadAuthorReviewContext).toContain('historyReviews.value = normalizedHistory')
-    expect(loadAuthorReviewContext).toContain('return true')
+    expect(loadAuthorReviewContext).toContain('switchAuthorReviewContext(normalizedCurrent)')
+    expect(loadAuthorReviewContext).toContain('return isRequestActive()')
     expect(loadAuthorReviewContext).toContain('return false')
 
     expect(executeSave).toContain('const refreshed = await loadAuthorReviewContext()')

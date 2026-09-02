@@ -2,6 +2,7 @@ import { storageAssetPolicy } from './storage-asset-policy.mjs'
 
 export const GAP_STATUSES = Object.freeze(['OPEN', 'MONITORED', 'BASELINE_CLOSED'])
 export const GAP_TARGETS = Object.freeze(['KEEP', 'E1-2', 'E1-3', 'E2', 'E3'])
+export const GAP_SEVERITIES = Object.freeze(['P0', 'P1', 'P2'])
 
 /**
  * E1-1.5 routing matrix. The asset policy remains the source of truth for
@@ -176,6 +177,12 @@ export const validateStorageGapMatrix = ({ assets = storageAssetPolicy, gaps = s
   for (const gap of gaps) {
     if (!gap.gapId || !GAP_STATUSES.includes(gap.status)) violations.push(`${gap.gapId || '<missing>'}: invalid status`)
     if (!GAP_TARGETS.includes(gap.primaryTarget)) violations.push(`${gap.gapId || '<missing>'}: invalid primaryTarget`)
+    if (!GAP_SEVERITIES.includes(gap.severity)) violations.push(`${gap.gapId || '<missing>'}: invalid severity`)
+    if (typeof gap.currentState !== 'string' || !gap.currentState.trim()) violations.push(`${gap.gapId || '<missing>'}: currentState is required`)
+    if (typeof gap.targetInvariant !== 'string' || !gap.targetInvariant.trim()) violations.push(`${gap.gapId || '<missing>'}: targetInvariant is required`)
+    if (!Array.isArray(gap.verification) || gap.verification.length === 0 || gap.verification.some((item) => typeof item !== 'string' || !item.trim())) {
+      violations.push(`${gap.gapId || '<missing>'}: verification must contain non-empty strings`)
+    }
     if (!Array.isArray(gap.assetIds) || gap.assetIds.length === 0) violations.push(`${gap.gapId || '<missing>'}: assetIds must be non-empty`)
     for (const id of gap.assetIds || []) {
       if (!knownAssetIds.has(id)) violations.push(`${gap.gapId}: unknown asset ${id}`)

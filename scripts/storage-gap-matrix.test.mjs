@@ -36,6 +36,21 @@ test('rejects unknown assets, invalid targets and unowned implementation targets
   assert.ok(violations.some((item) => item.includes('implementationTarget KEEP')))
 })
 
+test('rejects incomplete gap metadata and unsupported severity', () => {
+  const invalid = [{
+    ...storageGapMatrix[0],
+    currentState: ' ',
+    targetInvariant: '',
+    severity: 'P9',
+    verification: ['ok', ' '],
+  }]
+  const violations = validateStorageGapMatrix({ assets: [], gaps: invalid })
+  assert.ok(violations.some((item) => item.includes('invalid severity')))
+  assert.ok(violations.some((item) => item.includes('currentState is required')))
+  assert.ok(violations.some((item) => item.includes('targetInvariant is required')))
+  assert.ok(violations.some((item) => item.includes('verification must contain non-empty strings')))
+})
+
 test('rejects unknown dependencies and duplicate gap identifiers', () => {
   const invalid = [
     { ...storageGapMatrix[0], gapId: 'S7-GAP-DUPLICATE', dependencies: ['S7-GAP-NOT-FOUND'] },

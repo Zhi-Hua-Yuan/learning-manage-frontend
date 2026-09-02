@@ -1,5 +1,8 @@
 import { readCache, removeCache, writeCache } from '@/utils/cacheClient'
-import { CACHE_REGISTRY, getProjectListCacheEntry } from '@/utils/cacheRegistry'
+import {
+  getActorProjectListCacheEntry,
+  getActorProjectProgressCacheEntry,
+} from '@/utils/cacheRegistry'
 
 type CacheStatus = 0 | 1
 
@@ -12,7 +15,9 @@ export const PROJECT_LIST_CACHE_TTL_MS = 5 * 60 * 1000
 export const PROJECT_PROGRESS_CACHE_TTL_MS = 30 * 60 * 1000
 
 const readProjectProgressMap = () => {
-  const cached = readCache<Record<string, ProjectProgressCacheItem>>(CACHE_REGISTRY.projectProgress, {
+  const entry = getActorProjectProgressCacheEntry()
+  if (!entry) return null
+  const cached = readCache<Record<string, ProjectProgressCacheItem>>(entry, {
     allowLegacyVersionless: true,
   })
   if (!cached || typeof cached !== 'object') return null
@@ -20,7 +25,9 @@ const readProjectProgressMap = () => {
 }
 
 export const readProjectListCache = <T>(status: CacheStatus, maxAgeMs = PROJECT_LIST_CACHE_TTL_MS): T[] | null => {
-  const cached = readCache<T[]>(getProjectListCacheEntry(status), {
+  const entry = getActorProjectListCacheEntry(status)
+  if (!entry) return null
+  const cached = readCache<T[]>(entry, {
     maxAgeMs,
     allowLegacyVersionless: true,
   })
@@ -28,16 +35,20 @@ export const readProjectListCache = <T>(status: CacheStatus, maxAgeMs = PROJECT_
 }
 
 export const writeProjectListCache = <T>(status: CacheStatus, records: T[]) => {
-  writeCache(getProjectListCacheEntry(status), records)
+  const entry = getActorProjectListCacheEntry(status)
+  if (entry) writeCache(entry, records)
 }
 
 export const clearProjectListCache = (status?: CacheStatus) => {
+  const activeEntries = [0, 1].map((value) => getActorProjectListCacheEntry(value as CacheStatus))
   if (status === undefined) {
-    removeCache(getProjectListCacheEntry(0))
-    removeCache(getProjectListCacheEntry(1))
+    activeEntries.forEach((entry) => {
+      if (entry) removeCache(entry)
+    })
     return
   }
-  removeCache(getProjectListCacheEntry(status))
+  const entry = getActorProjectListCacheEntry(status)
+  if (entry) removeCache(entry)
 }
 
 export const readProjectProgressCache = (projectId: string, maxAgeMs = PROJECT_PROGRESS_CACHE_TTL_MS): number | null => {
@@ -57,19 +68,22 @@ export const writeProjectProgressCache = (projectId: string, progress: number) =
     updatedAt: Date.now(),
     value: nextValue,
   }
-  writeCache(CACHE_REGISTRY.projectProgress, progressMap)
+  const entry = getActorProjectProgressCacheEntry()
+  if (entry) writeCache(entry, progressMap)
 }
 
 export const clearProjectProgressCache = (projectId?: string) => {
   if (!projectId) {
-    removeCache(CACHE_REGISTRY.projectProgress)
+    const entry = getActorProjectProgressCacheEntry()
+    if (entry) removeCache(entry)
     return
   }
 
   const progressMap = readProjectProgressMap()
   if (!progressMap || !(projectId in progressMap)) return
   delete progressMap[projectId]
-  writeCache(CACHE_REGISTRY.projectProgress, progressMap)
+  const entry = getActorProjectProgressCacheEntry()
+  if (entry) writeCache(entry, progressMap)
 }
 
 export const normalizeProjectProgress = (value: unknown): number => {

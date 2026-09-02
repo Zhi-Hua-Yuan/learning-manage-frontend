@@ -1,4 +1,10 @@
-import { CACHE_REGISTRY } from '@/utils/cacheRegistry'
+import {
+  CACHE_REGISTRY,
+  getActorAiPlannerDraftCacheEntry,
+  getActorScopedCacheEntry,
+  getActorTaskListReplanStateCacheEntry,
+  getActorTaskTodayAiOrderCacheEntry,
+} from '@/utils/cacheRegistry'
 import { readCache, readRawStorage, removeCache, writeCache } from '@/utils/cacheClient'
 
 const readLegacyString = (key: string): string | null => {
@@ -14,18 +20,16 @@ const readLegacyString = (key: string): string | null => {
 }
 
 export const readSelectedProjectIdCache = () => {
-  const entry = CACHE_REGISTRY.selectedProjectId
+  const entry = getActorScopedCacheEntry(CACHE_REGISTRY.selectedProjectId)
+  if (!entry) return ''
   const cached = readCache<string>(entry)
   if (typeof cached === 'string' && cached) return cached
-
-  const legacy = readLegacyString(entry.key)
-  if (!legacy) return ''
-  writeCache(entry, legacy)
-  return legacy
+  return ''
 }
 
 export const writeSelectedProjectIdCache = (projectId: string) => {
-  const entry = CACHE_REGISTRY.selectedProjectId
+  const entry = getActorScopedCacheEntry(CACHE_REGISTRY.selectedProjectId)
+  if (!entry) return
   if (!projectId) {
     removeCache(entry)
     return
@@ -34,7 +38,8 @@ export const writeSelectedProjectIdCache = (projectId: string) => {
 }
 
 export const clearSelectedProjectIdCache = () => {
-  removeCache(CACHE_REGISTRY.selectedProjectId)
+  const entry = getActorScopedCacheEntry(CACHE_REGISTRY.selectedProjectId)
+  if (entry) removeCache(entry)
 }
 
 export const readThemeModeCache = () => {
@@ -53,76 +58,55 @@ export const writeThemeModeCache = (mode: string) => {
 }
 
 export const readAiPlannerDraftCache = <T>(): T | null => {
-  const entry = CACHE_REGISTRY.aiPlannerDraft
+  const entry = getActorAiPlannerDraftCacheEntry()
+  if (!entry) return null
   const cached = readCache<T>(entry)
   if (cached) return cached
-
-  const raw = readRawStorage(entry.key)
-  if (!raw) return null
-
-  try {
-    const parsed = JSON.parse(raw) as T
-    writeCache(entry, parsed)
-    return parsed
-  } catch {
-    return null
-  }
+  return null
 }
 
 export const writeAiPlannerDraftCache = <T>(payload: T) => {
-  writeCache(CACHE_REGISTRY.aiPlannerDraft, payload)
+  const entry = getActorAiPlannerDraftCacheEntry()
+  if (entry) writeCache(entry, payload)
 }
 
 export const clearAiPlannerDraftCache = () => {
-  removeCache(CACHE_REGISTRY.aiPlannerDraft)
+  const entry = getActorAiPlannerDraftCacheEntry()
+  if (entry) removeCache(entry)
 }
 
 export const readTaskTodayAiOrderCache = <T>(): T | null => {
-  const entry = CACHE_REGISTRY.taskTodayAiOrder
+  const entry = getActorTaskTodayAiOrderCacheEntry()
+  if (!entry) return null
   const cached = readCache<T>(entry)
   if (cached) return cached
-
-  const raw = readRawStorage(entry.key)
-  if (!raw) return null
-
-  try {
-    const parsed = JSON.parse(raw) as T
-    writeCache(entry, parsed)
-    return parsed
-  } catch {
-    return null
-  }
+  return null
 }
 
 export const writeTaskTodayAiOrderCache = <T>(payload: T) => {
-  writeCache(CACHE_REGISTRY.taskTodayAiOrder, payload)
+  const entry = getActorTaskTodayAiOrderCacheEntry()
+  if (entry) writeCache(entry, payload)
 }
 
 export const clearTaskTodayAiOrderCache = () => {
-  removeCache(CACHE_REGISTRY.taskTodayAiOrder)
+  const entry = getActorTaskTodayAiOrderCacheEntry()
+  if (entry) removeCache(entry)
 }
 
 export const readTaskListReplanStateCache = <T>(): T | null => {
-  const entry = CACHE_REGISTRY.taskListReplanState
+  const entry = getActorTaskListReplanStateCacheEntry()
+  if (!entry) return null
   const cached = readCache<T>(entry)
   if (cached) return cached
-
-  const raw = readRawStorage(entry.key)
-  if (!raw) return null
-
-  try {
-    const parsed = JSON.parse(raw) as T
-    writeCache(entry, parsed)
-    return parsed
-  } catch {
-    return null
-  }
+  return null
 }
 
 export const writeTaskListReplanStateCache = <T>(payload: T) => {
-  writeCache(CACHE_REGISTRY.taskListReplanState, payload)
+  const entry = getActorTaskListReplanStateCacheEntry()
+  if (entry) writeCache(entry, payload)
 }
 
 export const clearTaskListReplanStateCache = () => {
-  removeCache(CACHE_REGISTRY.taskListReplanState)
+  const entry = getActorTaskListReplanStateCacheEntry()
+  if (entry) removeCache(entry)
 }

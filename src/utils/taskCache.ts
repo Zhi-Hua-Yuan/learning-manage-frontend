@@ -1,9 +1,10 @@
 import { listStorageKeys, readCache, removeCache, removeRawStorage, writeCache } from '@/utils/cacheClient'
 import {
-  getTaskListAllCacheEntry,
-  getTaskListCacheEntry,
+  getActorTaskListAllCacheEntry,
+  getActorTaskListCacheEntry,
   TASK_LIST_CACHE_PREFIX,
 } from '@/utils/cacheRegistry'
+import { getActiveCacheActor } from '@/utils/cacheActor'
 import type { TaskModel } from '@/types/task'
 import { normalizeCachedTaskRecords } from '@/utils/taskCollection'
 
@@ -33,7 +34,8 @@ const upsertTaskList = (tasks: TaskModel[], task: TaskModel) =>
 
 export const readTaskCache = (projectId: string, maxAgeMs = TASK_LIST_CACHE_TTL_MS): TaskModel[] | null => {
   if (!projectId) return null
-  const entry = getTaskListCacheEntry(projectId)
+  const entry = getActorTaskListCacheEntry(projectId)
+  if (!entry) return null
   const cached = readCache<TaskModel[]>(entry, {
     maxAgeMs,
     allowLegacyVersionless: true,
@@ -43,23 +45,31 @@ export const readTaskCache = (projectId: string, maxAgeMs = TASK_LIST_CACHE_TTL_
 
 export const writeTaskCache = (projectId: string, tasks: TaskModel[]) => {
   if (!projectId) return
-  writeCache(getTaskListCacheEntry(projectId), normalizeCachedTaskRecords(tasks))
+  const entry = getActorTaskListCacheEntry(projectId)
+  if (entry) writeCache(entry, normalizeCachedTaskRecords(tasks))
 }
 
 export const clearTaskCache = (projectId?: string) => {
+  const actorId = getActiveCacheActor()
+  if (!actorId) return
   if (projectId === undefined) {
+    const actorSuffix = `:actor-${encodeURIComponent(actorId)}`
     listStorageKeys()
-      .filter((key) => key.startsWith(TASK_LIST_CACHE_PREFIX))
+      .filter((key) => key.startsWith(`${TASK_LIST_CACHE_PREFIX}:`) && key.endsWith(actorSuffix))
       .forEach((key) => removeRawStorage(key))
-    removeCache(getTaskListAllCacheEntry())
+    const aggregateEntry = getActorTaskListAllCacheEntry(actorId)
+    if (aggregateEntry) removeCache(aggregateEntry)
     return
   }
 
-  removeCache(getTaskListCacheEntry(projectId))
+  const entry = getActorTaskListCacheEntry(projectId, actorId)
+  if (entry) removeCache(entry)
 }
 
 export const readAllProjectsTaskCache = (maxAgeMs = TASK_LIST_CACHE_TTL_MS): Record<string, TaskModel[]> | null => {
-  const cached = readCache<Record<string, TaskModel[]>>(getTaskListAllCacheEntry(), {
+  const entry = getActorTaskListAllCacheEntry()
+  if (!entry) return null
+  const cached = readCache<Record<string, TaskModel[]>>(entry, {
     maxAgeMs,
     allowLegacyVersionless: true,
   })
@@ -67,7 +77,8 @@ export const readAllProjectsTaskCache = (maxAgeMs = TASK_LIST_CACHE_TTL_MS): Rec
 }
 
 export const writeAllProjectsTaskCache = (data: Record<string, TaskModel[]>) => {
-  writeCache(getTaskListAllCacheEntry(), normalizeAllProjectsTaskCache(data) || {})
+  const entry = getActorTaskListAllCacheEntry()
+  if (entry) writeCache(entry, normalizeAllProjectsTaskCache(data) || {})
 }
 
 export const upsertTaskInCaches = (task: TaskModel) => {

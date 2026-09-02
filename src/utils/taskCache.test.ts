@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { getTaskListCacheEntry } from '@/utils/cacheRegistry'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { getActorTaskListCacheEntry } from '@/utils/cacheRegistry'
 
 import {
   clearTaskCache,
@@ -14,6 +14,15 @@ import {
   writeTaskCache,
 } from './taskCache'
 import type { TaskModel } from '@/types/task'
+import { clearActiveCacheActor, setActiveCacheActor } from './cacheActor'
+
+beforeEach(() => {
+  setActiveCacheActor('1')
+})
+
+afterEach(() => {
+  clearActiveCacheActor()
+})
 
 const task = (id: string, projectId = '101', title = `Task ${id}`): TaskModel => ({
   id,
@@ -64,14 +73,14 @@ describe('task cache coordination', () => {
 
     expect(readTaskCache('101')).toEqual([task('1')])
 
-    const raw = window.localStorage.getItem(getTaskListCacheEntry('101').key)
+    const raw = window.localStorage.getItem(getActorTaskListCacheEntry('101')?.key || '')
     expect(raw).not.toBeNull()
     const envelope = JSON.parse(raw || '{}') as { data?: TaskModel[] }
     expect(envelope.data?.[0]?.capabilities).toEqual(task('1').capabilities)
   })
 
   it('rejects the previous task cache schema instead of trusting old capabilities', () => {
-    const entry = getTaskListCacheEntry('101')
+    const entry = getActorTaskListCacheEntry('101')!
     window.localStorage.setItem(entry.key, JSON.stringify({
       version: 1,
       updatedAt: Date.now(),

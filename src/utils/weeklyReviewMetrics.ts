@@ -29,6 +29,19 @@ const DATE_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 })
 
+const isStrictDateKey = (value: string) => {
+  const match = DATE_KEY_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(5, 7))
+  const day = Number(value.slice(8, 10))
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
+}
+
 export const createWeeklyReviewAuxiliaryMetricsPlaceholder = (): WeeklyReviewAuxiliaryMetrics => ({
   currentAssignedCount: null,
   currentCompletedCount: null,
@@ -42,7 +55,10 @@ export const createWeeklyReviewAuxiliaryMetricsPlaceholder = (): WeeklyReviewAux
 export const normalizeWeeklyReviewDateKey = (value: string | null | undefined) => {
   if (!value) return null
   const trimmed = value.trim()
-  if (DATE_KEY_PATTERN.test(trimmed)) return trimmed
+  if (DATE_KEY_PATTERN.test(trimmed)) return isStrictDateKey(trimmed) ? trimmed : null
+
+  const leadingDateKey = trimmed.slice(0, 10)
+  if (DATE_KEY_PATTERN.test(leadingDateKey) && !isStrictDateKey(leadingDateKey)) return null
 
   const timestamp = Date.parse(trimmed)
   if (Number.isNaN(timestamp)) return null

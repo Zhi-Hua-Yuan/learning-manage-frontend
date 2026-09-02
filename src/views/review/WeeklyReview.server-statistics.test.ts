@@ -71,6 +71,15 @@ describe('WeeklyReview D4-2 server statistics contract', () => {
     expect(hydrateSummaryMetrics).toContain('if (!isRequestActive()) return')
   })
 
+  it('loads server-authoritative author facts without requiring collaboration bootstrap', () => {
+    const loadAuthorReviewContext = extractFunctionBlock('loadAuthorReviewContext')
+
+    expect(loadAuthorReviewContext).toContain('fetchCurrentReview()')
+    expect(loadAuthorReviewContext).toContain('fetchReviewHistory()')
+    expect(loadAuthorReviewContext).not.toContain('bootstrapCollaborationContext')
+    expect(loadAuthorReviewContext).toContain('actorIdentity === getActorContextIdentity()')
+  })
+
   it('resets all derived state before switching to a historical author review', () => {
     const switchAuthorReviewContext = extractFunctionBlock('switchAuthorReviewContext')
     const handleEditReview = extractFunctionBlock('handleEditReview')

@@ -4,6 +4,7 @@ import {
   buildWeeklyReviewAuthoritativeCompletedTaskSummary,
   calculateWeeklyReviewAuxiliaryMetrics,
   findPreviousWeeklyReviewCompletedTaskCount,
+  normalizeWeeklyReviewDateKey,
 } from './weeklyReviewMetrics'
 import type { WeeklyReviewMetricTask } from './weeklyReviewMetrics'
 
@@ -46,6 +47,20 @@ describe('weekly review metric authority boundary', () => {
       }))
     expect(calculateWeeklyReviewAuxiliaryMetrics(tasks, '1', null, '2026-09-06'))
       .toEqual(expect.objectContaining({ currentAssignedCount: null }))
+  })
+
+  it('rejects calendar-invalid date keys instead of normalizing them into another week', () => {
+    expect(normalizeWeeklyReviewDateKey('2026-02-29')).toBeNull()
+    expect(normalizeWeeklyReviewDateKey('2026-04-31')).toBeNull()
+    expect(normalizeWeeklyReviewDateKey('2026-04-31T08:00:00+08:00')).toBeNull()
+    expect(normalizeWeeklyReviewDateKey('2028-02-29')).toBe('2028-02-29')
+
+    expect(calculateWeeklyReviewAuxiliaryMetrics(
+      [task('1', '2026-03-01', 2)],
+      '1',
+      '2026-02-29',
+      '2026-03-06',
+    )).toEqual(expect.objectContaining({ currentAssignedCount: null }))
   })
 
   it('finds the authoritative previous review across a year boundary', () => {

@@ -963,18 +963,16 @@ const loadReviewData = async () => {
 
 const loadAuthorReviewContext = async (): Promise<boolean> => {
   const requestEpoch = ++authorContextRequestEpoch
+  const actorIdentity = getActorContextIdentity()
   resetSummaryDerivedState()
   authorFactsReady.value = false
-  try {
-    await collaborationStore.bootstrapCollaborationContext()
-    const actorIdentity = getActorContextIdentity()
-    if (!actorIdentity || requestEpoch !== authorContextRequestEpoch) return false
-    const isRequestActive = () => (
-      isViewMounted.value
-      && requestEpoch === authorContextRequestEpoch
-      && actorIdentity === getActorContextIdentity()
-    )
+  const isRequestActive = () => (
+    isViewMounted.value
+    && requestEpoch === authorContextRequestEpoch
+    && actorIdentity === getActorContextIdentity()
+  )
 
+  try {
     const currentRes = await fetchCurrentReview()
     if (!isRequestActive()) return false
     const normalizedCurrent = normalizeCurrentWeeklyReviewWire(currentRes)

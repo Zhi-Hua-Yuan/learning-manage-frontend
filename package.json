@@ -15,6 +15,7 @@
     "contract:verify": "node scripts/ci/export-api-contract.mjs --check",
     "contract:export": "node scripts/ci/export-api-contract.mjs --output ci-artifacts/frontend-api-contract.json",
     "scan:storage-assets": "node scripts/scan-storage-assets.mjs",
+    "test:storage-policy": "node --test scripts/storage-asset-policy.test.mjs",
     "type-check": "vue-tsc --build",
     "lint:ci": "run-s lint:cache-views lint:task-cache-sync lint:oxlint:ci lint:eslint:ci",
     "lint:oxlint:ci": "oxlint .",

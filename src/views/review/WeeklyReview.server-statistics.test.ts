@@ -49,16 +49,19 @@ describe('WeeklyReview D4-2 server statistics contract', () => {
     expect(hydrateSummaryMetrics).toContain('if (!snapshot.complete)')
     expect(hydrateSummaryMetrics).toContain('summaryMetrics.value = createSummaryPlaceholder()')
     expect(hydrateSummaryMetrics).toContain('summaryReady.value = false')
-    expect(hydrateSummaryMetrics).toContain('weeklyCompletedTaskIds.value = []')
+    expect(hydrateSummaryMetrics).toContain('weeklyTaskSnapshot.value = []')
+    expect(hydrateSummaryMetrics).toContain('weeklyTaskSnapshotComplete.value = false')
   })
 
-  it('separates legacy AI candidates from the auxiliary metric calculator', () => {
+  it('separates the D4-3 AI context resolver from the auxiliary metric calculator', () => {
     const createSummaryMetrics = extractFunctionBlock('createSummaryMetrics')
-    const updateLegacyAiTaskCandidates = extractFunctionBlock('updateLegacyAiTaskCandidates')
+    const handleAiPolish = extractFunctionBlock('handleAiPolish')
 
-    expect(createSummaryMetrics).not.toContain('weeklyCompletedTaskIds')
-    expect(updateLegacyAiTaskCandidates).toContain('weeklyCompletedTaskIds.value')
-    expect(updateLegacyAiTaskCandidates).toContain('task.assigneeUserId === actorId')
+    expect(createSummaryMetrics).not.toContain('resolveWeeklyPolishTaskContext')
+    expect(handleAiPolish).toContain('resolveWeeklyPolishTaskContext')
+    expect(handleAiPolish).toContain('selectedTaskIds: reviewForm.value.taskIds')
+    expect(weeklyReviewSource).not.toContain('weeklyCompletedTaskIds')
+    expect(weeklyReviewSource).not.toContain('updateLegacyAiTaskCandidates')
   })
 
   it('guards late auxiliary responses by review, actor, session and team snapshot', () => {

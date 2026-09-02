@@ -86,12 +86,14 @@ export const cancelAiDraftApi = (data: AiDraftCancelRequest): Promise<boolean> =
   return request.post('/ai/draft/cancel', data) as Promise<boolean>
 }
 
-// AI 周总结润色
-export const aiPolishApi = (data: {
-  taskIds?: string[]
+export interface AiPolishRequest {
+  taskIds: string[]
   reflection?: string
-}) => {
-  return request.post('/ai/polish', data)
+}
+
+// AI 周总结润色
+export const aiPolishApi = (data: AiPolishRequest): Promise<string> => {
+  return request.post('/ai/polish', data) as Promise<string>
 }
 
 export interface AiTodayOrderRecommendRequest {

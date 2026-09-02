@@ -111,6 +111,7 @@
                 </label>
 
                 <button
+                  data-testid="weekly-review-ai-polish"
                   @click="handleAiPolish"
                   :disabled="isPolishing"
                   class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all"
@@ -363,7 +364,10 @@ import {
   unselectWeeklyReviewTask,
 } from '@/utils/weeklyReviewForm'
 import { classifyApiError } from '@/utils/request'
-import { isTaskCompleted } from '@/utils/taskStatus'
+import {
+  normalizeAiPolishResponse,
+  resolveWeeklyPolishTaskContext,
+} from '@/utils/weeklyReviewAiContext'
 import {
   buildWeeklyReviewAuthoritativeCompletedTaskSummary,
   calculateWeeklyReviewAuxiliaryMetrics,
@@ -444,7 +448,8 @@ const summaryLoading = ref(false)
 const summaryReady = ref(false)
 const summaryError = ref('')
 const summaryGuardHit = ref(false)
-const weeklyCompletedTaskIds = ref<string[]>([])
+const weeklyTaskSnapshot = ref<TaskModel[]>([])
+const weeklyTaskSnapshotComplete = ref(false)
 const summaryMetrics = ref<SummaryMetrics>({
   completionRate: '--',
   wowRate: '--',
@@ -455,6 +460,9 @@ const summaryMetrics = ref<SummaryMetrics>({
 let summaryRequestEpoch = 0
 let authorContextRequestEpoch = 0
 let activeAuthorContextIdentity: string | null = null
+let polishContextRevision = 0
+const polishPageInstanceId = globalThis.crypto?.randomUUID?.()
+  ?? `weekly-polish-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
 const weeklyPolishEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH])
 const isPolishing = computed(() => weeklyPolishEntry.value.status === 'pending')
@@ -533,6 +541,7 @@ const activateAssociationContext = async (force = false) => {
 }
 
 const handleVisibilityChange = (scope: ReviewWriteVisibilityScope) => {
+  polishContextRevision += 1
   reviewForm.value = changeWeeklyReviewVisibility(reviewForm.value, scope)
   clearFormIssues('visibilityScope', 'teamId', 'focusProjectId', 'taskIds')
   if (scope === 'PRIVATE') clearFormIssues('sharedSummary')
@@ -543,6 +552,7 @@ const handleVisibilityChange = (scope: ReviewWriteVisibilityScope) => {
 }
 
 const handleTeamChange = (teamId: string | null) => {
+  polishContextRevision += 1
   reviewForm.value = changeWeeklyReviewTargetTeam(reviewForm.value, teamId)
   clearFormIssues('teamId', 'focusProjectId', 'taskIds')
   void activateAssociationContext()
@@ -578,6 +588,7 @@ const handleTaskSelect = (taskId: string) => {
     ]
     return
   }
+  polishContextRevision += 1
   reviewForm.value = result.form
   clearFormIssues('taskIds')
 }
@@ -585,6 +596,7 @@ const handleTaskSelect = (taskId: string) => {
 const handleTaskUnselect = (taskId: string) => {
   const result = unselectWeeklyReviewTask(reviewForm.value, taskId)
   if (!result.ok) return
+  polishContextRevision += 1
   reviewForm.value = result.form
   clearFormIssues('taskIds')
 }
@@ -632,10 +644,6 @@ const jumpToRelatedTasks = async () => {
   }
 }
 
-const isDateKeyWithinRange = (dateKey: string, startDate: string, endDate: string) => {
-  return dateKey >= startDate && dateKey <= endDate
-}
-
 const formatRate = (rate: number | null) => {
   return rate === null ? '--' : `${rate.toFixed(1)}%`
 }
@@ -664,21 +672,6 @@ const createSummaryMetrics = (
   }
 }
 
-const collectCompletedTaskIdsInRange = (tasks: TaskModel[], startDate: string, endDate: string) => {
-  const idSet = new Set<string>()
-
-  tasks.forEach((task) => {
-    const dueDateKey = normalizeWeeklyReviewDateKey(task.dueDate)
-    if (!dueDateKey || !isDateKeyWithinRange(dueDateKey, startDate, endDate)) return
-    if (!isTaskCompleted(task.status)) return
-
-    const normalizedId = String(task.id).trim()
-    if (normalizedId) idSet.add(normalizedId)
-  })
-
-  return Array.from(idSet)
-}
-
 const createSummaryPlaceholder = (): SummaryMetrics => ({
   completionRate: '--',
   wowRate: '--',
@@ -689,11 +682,13 @@ const createSummaryPlaceholder = (): SummaryMetrics => ({
 
 const resetSummaryDerivedState = () => {
   summaryRequestEpoch += 1
+  polishContextRevision += 1
   summaryLoading.value = false
   summaryReady.value = false
   summaryError.value = ''
   summaryGuardHit.value = false
-  weeklyCompletedTaskIds.value = []
+  weeklyTaskSnapshot.value = []
+  weeklyTaskSnapshotComplete.value = false
   summaryMetrics.value = createSummaryPlaceholder()
 }
 
@@ -708,19 +703,6 @@ const getSummaryReviewKey = () => [
 const getActorContextIdentity = () => {
   const actorId = collaborationStore.currentUser?.id
   return actorId ? `${collaborationStore.sessionEpoch}:${actorId}` : null
-}
-
-const updateLegacyAiTaskCandidates = (
-  tasks: TaskModel[],
-  actorId: string,
-  startDate: string,
-  endDate: string,
-) => {
-  weeklyCompletedTaskIds.value = collectCompletedTaskIdsInRange(
-    tasks.filter((task) => task.assigneeUserId === actorId),
-    startDate,
-    endDate,
-  )
 }
 
 const hydrateSummaryMetrics = async () => {
@@ -747,7 +729,8 @@ const hydrateSummaryMetrics = async () => {
   summaryReady.value = false
   summaryError.value = ''
   summaryGuardHit.value = false
-  weeklyCompletedTaskIds.value = []
+  weeklyTaskSnapshot.value = []
+  weeklyTaskSnapshotComplete.value = false
 
   try {
     const startDate = normalizeWeeklyReviewDateKey(currentReview.value.startDate)
@@ -786,18 +769,19 @@ const hydrateSummaryMetrics = async () => {
       summaryError.value = snapshot.reason
       summaryMetrics.value = createSummaryPlaceholder()
       summaryReady.value = false
-      weeklyCompletedTaskIds.value = []
       return
     }
 
-    updateLegacyAiTaskCandidates(snapshot.tasks, actorId, startDate, endDate)
+    weeklyTaskSnapshot.value = [...snapshot.tasks]
+    weeklyTaskSnapshotComplete.value = true
     summaryMetrics.value = createSummaryMetrics(snapshot.tasks, actorId, startDate, endDate)
     summaryReady.value = true
   } catch (error) {
     if (!isRequestActive()) return
     console.error('加载摘要看板失败', error)
     summaryMetrics.value = createSummaryPlaceholder()
-    weeklyCompletedTaskIds.value = []
+    weeklyTaskSnapshot.value = []
+    weeklyTaskSnapshotComplete.value = false
     summaryError.value = '辅助任务数据暂时不可用，服务端周复盘统计仍然有效。'
   } finally {
     if (isRequestActive()) summaryLoading.value = false
@@ -1194,69 +1178,137 @@ ${review.reflection || '无复盘内容'}
   toast.success('Markdown 导出成功。')
 }
 
+interface WeeklyPolishRequestMeta {
+  pageInstanceId: string
+  contextRevision: number
+  actorContextIdentity: string
+  reviewKey: string
+  source: 'EXPLICIT' | 'FALLBACK'
+  taskCount: number
+}
+
+const isWeeklyPolishRequestMeta = (
+  value: Record<string, unknown> | null,
+): value is Record<string, unknown> & WeeklyPolishRequestMeta => (
+  Boolean(value)
+  && typeof value?.pageInstanceId === 'string'
+  && typeof value.contextRevision === 'number'
+  && typeof value.actorContextIdentity === 'string'
+  && typeof value.reviewKey === 'string'
+  && (value.source === 'EXPLICIT' || value.source === 'FALLBACK')
+  && typeof value.taskCount === 'number'
+)
+
+const isCurrentWeeklyPolishContext = (meta: Record<string, unknown> | null) => (
+  isWeeklyPolishRequestMeta(meta)
+  && meta.pageInstanceId === polishPageInstanceId
+  && meta.contextRevision === polishContextRevision
+  && meta.actorContextIdentity === getActorContextIdentity()
+  && meta.reviewKey === getSummaryReviewKey()
+)
+
 const applyWeeklyPolishResponse = (payload: unknown) => {
-  if (payload && typeof payload === 'object') {
-    const response = payload as { review?: unknown }
-    if (typeof response.review === 'string' && response.review.trim()) {
-      reviewForm.value = { ...reviewForm.value, reflection: response.review }
-      return true
-    }
-  }
-
-  if (typeof payload !== 'string' || !payload) return false
-
-  try {
-    const parsedData = JSON.parse(payload) as { review?: unknown }
-    if (typeof parsedData.review === 'string' && parsedData.review.trim()) {
-      reviewForm.value = { ...reviewForm.value, reflection: parsedData.review }
-      return true
-    }
-  } catch {
-    console.error('JSON 解析失败, AI 返回的原始数据为:', payload)
-    reviewForm.value = { ...reviewForm.value, reflection: payload }
-    toast.error('AI 返回格式异常，内容已填入复盘区，请手动调整。')
-    return true
-  }
-
-  reviewForm.value = { ...reviewForm.value, reflection: payload }
+  const polishedReview = normalizeAiPolishResponse(payload)
+  if (!polishedReview) return false
+  reviewForm.value = { ...reviewForm.value, reflection: polishedReview }
   return true
 }
 
-const consumePendingWeeklyPolish = () => {
+const consumePendingWeeklyPolish = (requestId?: number) => {
   const entry = weeklyPolishEntry.value
   if (entry.status !== 'success') return
+  if (requestId !== undefined && entry.requestId !== requestId) return
+
+  if (!isCurrentWeeklyPolishContext(entry.requestMeta)) {
+    const belongsToThisPage = entry.requestMeta?.pageInstanceId === polishPageInstanceId
+    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH, entry.requestId)
+    if (belongsToThisPage) {
+      toast.info('AI 已返回，但复盘内容或任务关联已变化，结果未自动应用，请重新生成。')
+    }
+    return
+  }
 
   const applied = applyWeeklyPolishResponse(entry.responsePayload)
-  if (applied) {
-    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH, entry.requestId)
+  aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH, entry.requestId)
+  if (!applied) {
+    toast.error('AI 返回格式异常，原复盘内容已保留，请重试。')
   }
 }
 
+const refreshWeeklyPolishTaskCandidates = async () => {
+  resetSummaryDerivedState()
+  const refreshRevision = polishContextRevision
+  await activateAssociationContext(true)
+  await hydrateSummaryMetrics()
+  if (!isViewMounted.value || refreshRevision !== polishContextRevision) return
+  associationAccessMessage.value = '关联任务权限已变化，候选任务已刷新，请重新确认后再润色。'
+}
+
+const weeklyPolishErrorMessage = (error: unknown) => {
+  const errorKind = classifyApiError(error)
+  if (errorKind === 'PERMISSION_DENIED' || errorKind === 'NOT_FOUND' || errorKind === 'VALIDATION') {
+    return '关联任务权限或状态已变化，请刷新候选并重新确认。'
+  }
+  if (errorKind === 'NETWORK') return 'AI 润色请求未完成，请检查网络后重试。'
+  return 'AI 润色失败，请稍后重试。'
+}
+
 const handleAiPolish = async () => {
+  const taskContext = resolveWeeklyPolishTaskContext({
+    selectedTaskIds: reviewForm.value.taskIds,
+    snapshotTasks: weeklyTaskSnapshot.value,
+    snapshotComplete: weeklyTaskSnapshotComplete.value,
+    actorId: collaborationStore.currentUser?.id ?? null,
+    startDate: currentReview.value.startDate,
+    endDate: currentReview.value.endDate,
+  })
+
+  if (!taskContext.ready) {
+    const messages = {
+      ACTOR_UNAVAILABLE: '当前用户信息尚未就绪，暂时无法安全生成周复盘。',
+      DATE_RANGE_UNAVAILABLE: '本周时间范围尚未就绪，暂时无法安全生成周复盘。',
+      INVALID_EXPLICIT_TASK_IDS: '关联任务中存在无效 ID，请重新选择后再润色。',
+      TASK_SNAPSHOT_INCOMPLETE: '当前任务数据尚未完整加载，暂时无法安全生成周复盘，请刷新后重试。',
+    } as const
+    toast.error(messages[taskContext.reason])
+    if (taskContext.reason === 'TASK_SNAPSHOT_INCOMPLETE' && !summaryLoading.value) {
+      void hydrateSummaryMetrics()
+    }
+    return
+  }
+
   const reflectionInput = reviewForm.value.reflection.trim()
-  const taskIds = weeklyCompletedTaskIds.value.length > 0 ? weeklyCompletedTaskIds.value : undefined
+  const requestRevision = polishContextRevision
 
   const result = await runAiRequest({
     board: AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH,
     requestMeta: {
-      taskCount: taskIds?.length || 0,
-      hasReflection: Boolean(reflectionInput),
+      pageInstanceId: polishPageInstanceId,
+      contextRevision: requestRevision,
+      actorContextIdentity: getActorContextIdentity()!,
+      reviewKey: getSummaryReviewKey(),
+      source: taskContext.source,
+      taskCount: taskContext.taskIds.length,
     },
     request: () =>
       aiPolishApi({
-        taskIds,
+        taskIds: taskContext.taskIds,
         reflection: reflectionInput || undefined,
       }),
     successMessage: '周报回顾 AI 响应完成。',
-    errorMessage: 'AI 润色失败，请检查网络后重试。',
+    errorMessage: weeklyPolishErrorMessage,
   })
 
+  if (result.status === 'error') {
+    const errorKind = classifyApiError(result.error)
+    if (errorKind === 'PERMISSION_DENIED' || errorKind === 'NOT_FOUND' || errorKind === 'VALIDATION') {
+      await refreshWeeklyPolishTaskCandidates()
+    }
+    return
+  }
   if (result.status !== 'success' || !result.ticket || !isViewMounted.value) return
 
-  const applied = applyWeeklyPolishResponse(result.payload)
-  if (applied) {
-    aiPendingRegistry.markConsumed(AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH, result.ticket.requestId)
-  }
+  consumePendingWeeklyPolish(result.ticket.requestId)
 }
 
 onMounted(async () => {
@@ -1343,6 +1395,23 @@ watch(
     associationAccessMessage.value = signal.kind === 'PROJECT_ACCESS_LOST'
       ? '关联项目权限已变化，请重试加载或重新打开本复盘。'
       : '部分任务权限已变化，请重试加载；已保存关联以后端最新详情为准。'
+  },
+)
+
+watch(
+  [
+    () => currentReview.value.id,
+    () => currentReview.value.year,
+    () => currentReview.value.weekNo,
+    () => currentReview.value.startDate,
+    () => currentReview.value.endDate,
+    () => reviewForm.value.visibilityScope,
+    () => reviewForm.value.teamId,
+    () => reviewForm.value.taskIds.join(','),
+    () => reviewForm.value.reflection,
+  ],
+  () => {
+    polishContextRevision += 1
   },
 )
 

@@ -9,6 +9,51 @@
         <span class="text-sm text-[var(--color-text-secondary)]">看看这周做得怎么样</span>
       </div>
 
+      <div
+        class="flex w-full max-w-md rounded-xl bg-[var(--color-bg-surface-muted)] p-1"
+        role="tablist"
+        aria-label="周复盘视图"
+      >
+        <button
+          id="weekly-review-mine-tab"
+          type="button"
+          role="tab"
+          aria-controls="weekly-review-mine-panel"
+          :aria-selected="activeReviewView === 'mine'"
+          class="flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors"
+          :class="activeReviewView === 'mine'
+            ? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm'
+            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'"
+          :disabled="isSaving || showSaveConfirmModal"
+          data-testid="weekly-review-mine-tab"
+          @click="switchReviewView('mine')"
+        >
+          我的复盘
+        </button>
+        <button
+          id="weekly-review-team-tab"
+          type="button"
+          role="tab"
+          aria-controls="weekly-review-team-panel"
+          :aria-selected="activeReviewView === 'team'"
+          class="flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors"
+          :class="activeReviewView === 'team'
+            ? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm'
+            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'"
+          :disabled="isSaving || showSaveConfirmModal"
+          data-testid="weekly-review-team-tab"
+          @click="switchReviewView('team')"
+        >
+          团队动态
+        </button>
+      </div>
+
+      <div
+        v-if="activeReviewView === 'mine'"
+        id="weekly-review-mine-panel"
+        role="tabpanel"
+        aria-labelledby="weekly-review-mine-tab"
+      >
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-6">
         <div class="space-y-6 xl:col-span-2">
           <div
@@ -214,6 +259,7 @@
     </div>
 
     <AppConfirmDialog
+      v-if="activeReviewView === 'mine'"
       v-model="showSaveConfirmModal"
       icon-name="save"
       :title="saveConfirmTitle"
@@ -226,7 +272,7 @@
     />
 
     <div
-      v-if="showDetailModal && selectedReview"
+      v-if="activeReviewView === 'mine' && showDetailModal && selectedReview"
       class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-backdrop-strong)] p-4 backdrop-blur-md"
     >
       <div
@@ -304,6 +350,7 @@
     </div>
 
     <AppConfirmDialog
+      v-if="activeReviewView === 'mine'"
       v-model="showDeleteConfirmModal"
       variant="danger"
       icon-name="trash"
@@ -313,6 +360,28 @@
       cancel-text="取消"
       @confirm="executeDelete"
     />
+
+      <TeamSharedReviewFeed
+        v-if="activeReviewView === 'team'"
+        id="weekly-review-team-panel"
+        role="tabpanel"
+        aria-labelledby="weekly-review-team-tab"
+        :teams="collaborationStore.teams"
+        :selected-team-id="sharedReviewTeamId"
+        :records="sharedReviewRecords"
+        :phase="sharedReviewPhase"
+        :error-message="sharedReviewErrorMessage"
+        :has-more="sharedReviewHasMore"
+        :busy="sharedReviewBusy"
+        :teams-loading="collaborationStore.teamsLoadState.status === 'loading'"
+        :teams-error="teamLoadError"
+        @select-team="handleSharedTeamSelect"
+        @retry-teams="handleSharedTeamsRetry"
+        @refresh="handleSharedReviewRefresh"
+        @retry="handleSharedReviewRetry"
+        @load-more="handleSharedReviewLoadMore"
+      />
+      </div>
   </main>
 </template>
 
@@ -323,8 +392,10 @@ import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import ReviewAssociationPicker from '@/components/review/ReviewAssociationPicker.vue'
 import ReviewVisibilityFields from '@/components/review/ReviewVisibilityFields.vue'
+import TeamSharedReviewFeed from '@/components/review/TeamSharedReviewFeed.vue'
 import { aiPolishApi } from '@/api/ai'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
+import { useTeamSharedReviews } from '@/composables/useTeamSharedReviews'
 import { useWeeklyReviewAssociations } from '@/composables/useWeeklyReviewAssociations'
 import {
   deleteReviewApi,
@@ -421,6 +492,7 @@ const toast = useToast()
 const undoDelete = useUndoDelete()
 const aiPendingRegistry = useAiPendingRegistryStore()
 const collaborationStore = useCollaborationStore()
+const teamSharedReviews = useTeamSharedReviews()
 const reviewAssociations = useWeeklyReviewAssociations()
 const { runAiRequest } = useAiPendingRequest()
 
@@ -444,6 +516,8 @@ const showDetailModal = ref(false)
 const selectedReview = ref<WeeklyReviewDetail | null>(null)
 const showSaveConfirmModal = ref(false)
 const showDeleteConfirmModal = ref(false)
+type WeeklyReviewView = 'mine' | 'team'
+const activeReviewView = ref<WeeklyReviewView>('mine')
 const summaryLoading = ref(false)
 const summaryReady = ref(false)
 const summaryError = ref('')
@@ -471,6 +545,12 @@ const teamLoadError = computed(() => (
     ? collaborationStore.teamsLoadState.errorMessage || '团队加载失败，请稍后重试。'
     : null
 ))
+const sharedReviewTeamId = teamSharedReviews.activeTeamId
+const sharedReviewRecords = teamSharedReviews.records
+const sharedReviewPhase = teamSharedReviews.phase
+const sharedReviewErrorMessage = teamSharedReviews.errorMessage
+const sharedReviewHasMore = teamSharedReviews.hasMore
+const sharedReviewBusy = teamSharedReviews.busy
 const saveConfirmTitle = computed(() => (
   pendingMutation.value?.payload.visibilityScope === 'TEAM'
     ? `确认向「${pendingMutation.value.targetTeamName || '所选团队'}」共享摘要？`
@@ -490,6 +570,63 @@ const saveConfirmText = computed(() => (
 const clearFormIssues = (...fields: WeeklyReviewFormIssue['field'][]) => {
   const fieldSet = new Set(fields)
   formIssues.value = formIssues.value.filter((issue) => !fieldSet.has(issue.field))
+}
+
+const switchReviewView = (view: WeeklyReviewView) => {
+  if (view === activeReviewView.value) return
+  if (isSaving.value || showSaveConfirmModal.value) return
+
+  if (view === 'team') {
+    showDetailModal.value = false
+    showDeleteConfirmModal.value = false
+    pendingMutation.value = null
+  }
+
+  activeReviewView.value = view
+
+  if (view === 'team' && teamSharedReviews.activeTeamId.value) {
+    void teamSharedReviews.refresh()
+  }
+}
+
+const handleSharedTeamSelect = (teamId: string | null) => {
+  if (!teamId) {
+    teamSharedReviews.reset()
+    return
+  }
+
+  void teamSharedReviews.open(teamId)
+}
+
+const handleSharedReviewRefresh = () => {
+  void teamSharedReviews.refresh()
+}
+
+const handleSharedReviewLoadMore = () => {
+  void teamSharedReviews.loadMore()
+}
+
+const handleSharedReviewRetry = async () => {
+  const phase = teamSharedReviews.phase.value
+  if (phase === 'forbidden' || phase === 'not-found') {
+    await loadCollaborationContext(true)
+    if (collaborationStore.teamsLoadState.status === 'ready') {
+      teamSharedReviews.reset()
+    }
+    return
+  }
+
+  if (phase === 'authentication-required') {
+    teamSharedReviews.reset()
+    return
+  }
+
+  await teamSharedReviews.refresh()
+}
+
+const handleSharedTeamsRetry = async () => {
+  await loadCollaborationContext(true)
+  teamSharedReviews.reconcileTeamAccess()
 }
 
 const loadCollaborationContext = async (force = false) => {
@@ -1324,6 +1461,7 @@ watch(
   ],
   () => {
     if (!isViewMounted.value) return
+    teamSharedReviews.reset()
     const actorIdentity = getActorContextIdentity()
     if (actorIdentity === activeAuthorContextIdentity) return
 
@@ -1344,6 +1482,7 @@ watch(
     const previousStatus = previous?.[0]
     const previousTeamIds = previous?.[1]
     if (status === previousStatus && teamIds === previousTeamIds) return
+    teamSharedReviews.reconcileTeamAccess()
     resetSummaryDerivedState()
     if (status === 'ready') {
       void hydrateSummaryMetrics()
@@ -1429,5 +1568,6 @@ onBeforeUnmount(() => {
   authorContextRequestEpoch += 1
   resetSummaryDerivedState()
   reviewAssociations.resetContext()
+  teamSharedReviews.reset()
 })
 </script>

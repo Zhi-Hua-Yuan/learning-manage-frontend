@@ -15,6 +15,7 @@ const reviewApi = vi.hoisted(() => ({
   deleteReviewApi: vi.fn(),
   fetchCurrentReview: vi.fn(),
   fetchReviewHistory: vi.fn(),
+  fetchTeamSharedReviewsApi: vi.fn(),
   getReviewDetailApi: vi.fn(),
   saveWeeklyReviewApi: vi.fn(),
   updateWeeklyReviewApi: vi.fn(),
@@ -80,6 +81,7 @@ const currentFixture = (overrides: Partial<WeeklyReviewDetailWire> = {}): Weekly
 const mountPage = async (current: WeeklyReviewDetailWire = currentFixture()) => {
   reviewApi.fetchCurrentReview.mockResolvedValue(current)
   reviewApi.fetchReviewHistory.mockResolvedValue([])
+  reviewApi.fetchTeamSharedReviewsApi.mockResolvedValue({ records: [], current: 1, size: 20, total: 0 })
   reviewApi.saveWeeklyReviewApi.mockResolvedValue(undefined)
   reviewApi.updateWeeklyReviewApi.mockResolvedValue(undefined)
   projectApi.fetchProjectList.mockResolvedValue({ records: [] })

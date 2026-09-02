@@ -345,6 +345,25 @@ export function normalizeSharedWeeklyReviewWire(review: SharedWeeklyReviewWire |
   }
 }
 
+export function normalizeSharedWeeklyReviewPage(
+  page: WirePage<SharedWeeklyReviewWire> | null | undefined,
+): PageResult<SharedWeeklyReview> {
+  const normalizedPage = normalizePage(page)
+  const records: SharedWeeklyReview[] = []
+
+  for (const wire of normalizedPage.records) {
+    const review = normalizeSharedWeeklyReviewWire(wire)
+    if (review) records.push(review)
+  }
+
+  return {
+    records,
+    current: normalizedPage.current,
+    size: normalizedPage.size,
+    total: normalizedPage.total,
+  }
+}
+
 export function normalizeProjectWire(project: ProjectWire | null | undefined) {
   if (!project) return null
   const id = normalizeEntityId(project.id)

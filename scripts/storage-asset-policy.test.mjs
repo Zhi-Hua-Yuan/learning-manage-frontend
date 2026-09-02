@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   IMPLEMENTATION_TARGETS,
   LEGACY_ACTIONS,
+  MEMORY_RESET_STATUSES,
   STORAGE_SCOPES,
   STORAGE_SENSITIVITY,
   storageAssetPolicy,
@@ -39,6 +40,24 @@ test('has a complete, closed classification for every asset', () => {
       assert.equal(asset.staleGuardRequired, true)
       assert.ok(asset.resetTarget)
       assert.equal(asset.currentStorage, 'memory')
+      assert.ok(asset.lifecycleOwner)
+      assert.ok(Array.isArray(asset.acquisitionPoints))
+      assert.ok(asset.acquisitionPoints.length > 0)
+      assert.ok(Array.isArray(asset.derivedSurfaces))
+      assert.ok(asset.currentReset)
+      assert.ok(asset.currentReset.entrypoint)
+      assert.ok(Array.isArray(asset.currentReset.coverage))
+      assert.ok(asset.currentReset.coverage.length > 0)
+      assert.ok(MEMORY_RESET_STATUSES.includes(asset.currentReset.status))
+      assert.ok(Array.isArray(asset.requiredResetTriggers))
+      assert.ok(asset.requiredResetTriggers.includes('SESSION_END'))
+      assert.ok(asset.requiredResetTriggers.includes('ACTOR_CHANGE'))
+      assert.ok(asset.staleGuard)
+      assert.ok(asset.staleGuard.strategy)
+      assert.ok(Array.isArray(asset.staleGuard.tokens))
+      assert.ok(asset.staleGuard.tokens.length > 0)
+      assert.ok(MEMORY_RESET_STATUSES.includes(asset.staleGuard.status))
+      assert.equal(asset.resetIntegrationStatus, 'MISSING')
     }
     if (asset.targetScope === 'GLOBAL_PREFERENCE') {
       assert.equal(asset.actorRequired, false)

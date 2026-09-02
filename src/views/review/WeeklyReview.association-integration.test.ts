@@ -31,6 +31,7 @@ const taskApi = vi.hoisted(() => ({ fetchTaskList: vi.fn() }))
 const aiApi = vi.hoisted(() => ({ aiPolishApi: vi.fn() }))
 const collaborationStore = vi.hoisted(() => ({
   currentUser: { id: '1', username: '当前用户' },
+  sessionEpoch: 0,
   teams: [
     { id: '7', ownerId: '1', name: '研发组', description: '', role: 'MEMBER' },
     { id: '8', ownerId: '2', name: '产品组', description: '', role: 'ADMIN' },
@@ -117,7 +118,11 @@ const projectContext = (
   updateTime: null,
 })
 
-const taskWire = (id: string, projectId = '10'): TaskWire => ({
+const taskWire = (
+  id: string,
+  projectId = '10',
+  overrides: Partial<TaskWire> = {},
+): TaskWire => ({
   id,
   projectId,
   createdByUserId: '1',
@@ -127,6 +132,7 @@ const taskWire = (id: string, projectId = '10'): TaskWire => ({
   status: 0,
   priority: 1,
   capabilities: {},
+  ...overrides,
 })
 
 const page = <T,>(records: T[]) => ({
@@ -135,6 +141,16 @@ const page = <T,>(records: T[]) => ({
   size: 100,
   total: records.length,
 })
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
 
 const mountPage = async (current: WeeklyReviewDetailWire) => {
   reviewApi.fetchCurrentReview.mockResolvedValue(current)
@@ -194,6 +210,7 @@ describe('WeeklyReview D3-2 association integration', () => {
     projectApi.fetchProjectList.mockResolvedValue(page([]))
     projectApi.fetchTeamProjectsApi.mockResolvedValue(page([]))
     taskApi.fetchTaskList.mockResolvedValue(page([]))
+    aiApi.aiPolishApi.mockResolvedValue('{"review":"AI 润色结果"}')
   })
 
   it('D4-1 saves an author draft through the typed API and reloads canonical server state', async () => {
@@ -392,5 +409,128 @@ describe('WeeklyReview D3-2 association integration', () => {
       .toBe('不能丢失的私人正文')
     expect(wrapper.get('[data-testid="review-task-count"]').text()).toContain('1 / 500')
     expect(wrapper.get('[data-testid="review-selected-tasks"]').text()).toContain('任务 #101')
+  })
+
+  it('D4-3 sends explicit review task associations without mixing automatic candidates', async () => {
+    const wrapper = await mountPage(currentFixture({
+      reflection: '需要润色的正文',
+      taskIds: ['101', '102'],
+    }))
+
+    await wrapper.get('[data-testid="weekly-review-ai-polish"]').trigger('click')
+
+    await vi.waitFor(() => {
+      expect(aiApi.aiPolishApi).toHaveBeenCalledTimes(1)
+      expect(aiApi.aiPolishApi).toHaveBeenCalledWith({
+        taskIds: ['101', '102'],
+        reflection: '需要润色的正文',
+      })
+      expect((wrapper.get('textarea[placeholder^="可选补充内容"]').element as HTMLTextAreaElement).value)
+        .toBe('AI 润色结果')
+    })
+  })
+
+  it('D4-3 uses only current-user tasks completed in the review week as fallback', async () => {
+    projectApi.fetchProjectList.mockResolvedValue(page([projectWire('10')]))
+    taskApi.fetchTaskList.mockResolvedValue(page([
+      taskWire('101', '10', {
+        status: 2,
+        dueDate: '2026-09-02',
+        completedAt: '2026-09-03T09:00:00+08:00',
+      }),
+      taskWire('102', '10', {
+        assigneeUserId: '2',
+        status: 2,
+        dueDate: '2026-09-02',
+        completedAt: '2026-09-03T09:00:00+08:00',
+      }),
+      taskWire('103', '10', {
+        status: 2,
+        dueDate: '2026-09-02',
+        completedAt: '2026-08-20T09:00:00+08:00',
+      }),
+      taskWire('104', '10', {
+        status: 0,
+        dueDate: '2026-09-02',
+        completedAt: '2026-09-03T09:00:00+08:00',
+      }),
+    ]))
+    const wrapper = await mountPage(currentFixture({
+      startDate: '2026-08-31',
+      endDate: '2026-09-06',
+      reflection: '自动候选正文',
+      taskIds: [],
+    }))
+
+    await vi.waitFor(() => {
+      expect(taskApi.fetchTaskList).toHaveBeenCalled()
+      expect(wrapper.text()).toContain('66.7%')
+    })
+    await wrapper.get('[data-testid="weekly-review-ai-polish"]').trigger('click')
+
+    await vi.waitFor(() => {
+      expect(aiApi.aiPolishApi).toHaveBeenCalledWith({
+        taskIds: ['101'],
+        reflection: '自动候选正文',
+      })
+    })
+  })
+
+  it('D4-3 refreshes association candidates after authorization failure without partial retry', async () => {
+    aiApi.aiPolishApi.mockRejectedValueOnce(
+      new ApiRequestError('forbidden', { code: 40300, httpStatus: 403 }),
+    )
+    const wrapper = await mountPage(currentFixture({
+      reflection: '不能丢失的私人正文',
+      taskIds: ['101', '102'],
+    }))
+    const projectCallsBeforePolish = projectApi.fetchProjectList.mock.calls.length
+
+    await wrapper.get('[data-testid="weekly-review-ai-polish"]').trigger('click')
+
+    await vi.waitFor(() => {
+      expect(aiApi.aiPolishApi).toHaveBeenCalledTimes(1)
+      expect(projectApi.fetchProjectList.mock.calls.length).toBeGreaterThan(projectCallsBeforePolish)
+      expect(wrapper.get('[data-testid="review-association-access-message"]').text())
+        .toContain('请重新确认')
+    })
+    expect((wrapper.get('textarea[placeholder^="可选补充内容"]').element as HTMLTextAreaElement).value)
+      .toBe('不能丢失的私人正文')
+  })
+
+  it('D4-3 discards a successful response after the review context changes', async () => {
+    const pending = deferred<string>()
+    aiApi.aiPolishApi.mockReturnValueOnce(pending.promise)
+    const wrapper = await mountPage(currentFixture({
+      reflection: '用户当前正文',
+      taskIds: ['101'],
+    }))
+
+    await wrapper.get('[data-testid="weekly-review-ai-polish"]').trigger('click')
+    await vi.waitFor(() => expect(aiApi.aiPolishApi).toHaveBeenCalledTimes(1))
+    await wrapper.get('[data-testid="review-visibility-team"]').setValue(true)
+    pending.resolve('{"review":"不应覆盖的新结果"}')
+
+    await vi.waitFor(() => {
+      expect((wrapper.get('textarea[placeholder^="可选补充内容"]').element as HTMLTextAreaElement).value)
+        .toBe('用户当前正文')
+      expect(useToastStore().toasts.some((item) => item.message.includes('结果未自动应用'))).toBe(true)
+    })
+  })
+
+  it('D4-3 preserves authored text when the AI response is malformed', async () => {
+    aiApi.aiPolishApi.mockResolvedValueOnce('raw model output')
+    const wrapper = await mountPage(currentFixture({
+      reflection: '必须保留的正文',
+      taskIds: ['101'],
+    }))
+
+    await wrapper.get('[data-testid="weekly-review-ai-polish"]').trigger('click')
+
+    await vi.waitFor(() => {
+      expect((wrapper.get('textarea[placeholder^="可选补充内容"]').element as HTMLTextAreaElement).value)
+        .toBe('必须保留的正文')
+      expect(useToastStore().toasts.some((item) => item.message.includes('AI 返回格式异常'))).toBe(true)
+    })
   })
 })

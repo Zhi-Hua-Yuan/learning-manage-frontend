@@ -60,12 +60,16 @@ export const removeRawStorage = (key: string) => {
 
 export const listStorageKeys = () => {
   if (!canUseStorage()) return []
-  const keys: string[] = []
-  for (let i = 0; i < window.localStorage.length; i++) {
-    const key = window.localStorage.key(i)
-    if (key) keys.push(key)
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i)
+      if (key) keys.push(key)
+    }
+    return keys
+  } catch {
+    return []
   }
-  return keys
 }
 
 const parseEnvelope = <T>(

@@ -1,3 +1,6 @@
+import { listStorageKeys, removeRawStorage } from '@/utils/cacheClient'
+import { dropLegacyUnscopedBusinessCaches } from '@/utils/cacheMigration'
+
 const BACKEND_CACHE_VERSION_KEY = 'tick_backend_cache_version'
 const BACKEND_CACHE_RELOAD_LOCK_KEY = 'tick_backend_cache_reload_lock'
 
@@ -71,18 +74,32 @@ const extractVersionFromHeaders = (headers: unknown): string | null => {
   return null
 }
 
-const clearAllTickCaches = () => {
-  if (!canUseLocalStorage()) return
+const BACKEND_INVALIDATED_CACHE_KEY_PATTERNS = [
+  /^tick_selectedProjectId:actor-.+$/,
+  /^tick:cache:project-list:status-[01]:v1:actor-.+$/,
+  /^tick:cache:project-progress:v2:actor-.+$/,
+  /^tick:cache:task-list:v1:[^:]+:actor-.+$/,
+  /^tick:cache:task-list:all:v1:actor-.+$/,
+  /^tick:cache:task-today-ai-order:v1:actor-.+$/,
+  /^tick:cache:task-list-replan-state:v1:actor-.+$/,
+]
 
-  const keys: string[] = []
-  for (let i = 0; i < window.localStorage.length; i += 1) {
-    const key = window.localStorage.key(i)
-    if (key) keys.push(key)
-  }
+export const isBackendVersionAffectedCacheKey = (key: string) => (
+  BACKEND_INVALIDATED_CACHE_KEY_PATTERNS.some((pattern) => pattern.test(key))
+)
 
-  keys
-    .filter((key) => key.startsWith('tick_') || key.startsWith('tick:'))
-    .forEach((key) => window.localStorage.removeItem(key))
+export interface BackendCacheCleanupResult {
+  scanned: number
+  matched: number
+}
+
+export const clearBackendInvalidatedCaches = (): BackendCacheCleanupResult => {
+  if (!canUseLocalStorage()) return { scanned: 0, matched: 0 }
+
+  const keys = listStorageKeys()
+  const matchedKeys = keys.filter(isBackendVersionAffectedCacheKey)
+  matchedKeys.forEach(removeRawStorage)
+  return { scanned: keys.length, matched: matchedKeys.length }
 }
 
 const shouldReloadForVersion = (nextVersion: string) => {
@@ -109,6 +126,10 @@ export const syncBackendCacheVersion = (
   const nextVersion = extractVersionFromHeaders(headers) || extractVersionFromPayload(payload)
   if (!nextVersion) return null
 
+  // Keep this defensive call for responses received before the startup hook;
+  // it only removes known legacy localStorage business keys.
+  dropLegacyUnscopedBusinessCaches()
+
   const previousVersion = (window.localStorage.getItem(BACKEND_CACHE_VERSION_KEY) || '').trim()
   if (!previousVersion) {
     window.localStorage.setItem(BACKEND_CACHE_VERSION_KEY, nextVersion)
@@ -129,7 +150,7 @@ export const syncBackendCacheVersion = (
     }
   }
 
-  clearAllTickCaches()
+  clearBackendInvalidatedCaches()
   window.localStorage.setItem(BACKEND_CACHE_VERSION_KEY, nextVersion)
 
   return {
@@ -139,4 +160,3 @@ export const syncBackendCacheVersion = (
     shouldReload: shouldReloadForVersion(nextVersion),
   }
 }
-

@@ -6,6 +6,9 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import { useTheme } from './composables/useTheme'
 import router from './router'
+import { dropLegacyUnscopedBusinessCaches } from './utils/cacheMigration'
+
+dropLegacyUnscopedBusinessCaches()
 
 const { initTheme } = useTheme()
 initTheme()

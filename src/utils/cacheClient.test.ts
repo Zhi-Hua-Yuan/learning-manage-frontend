@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { readCache, writeCache } from './cacheClient'
+import { listStorageKeys, readCache, writeCache } from './cacheClient'
 import type { CacheEntry } from './cacheRegistry'
 
 const entry: CacheEntry = {
@@ -61,5 +61,15 @@ describe('cache client', () => {
     vi.advanceTimersByTime(100000)
 
     expect(readCache(entry, { maxAgeMs: Number.POSITIVE_INFINITY })).toBe('old-but-valid')
+  })
+
+  it('fails closed when storage key enumeration throws', () => {
+    const key = vi.spyOn(Storage.prototype, 'key').mockImplementation(() => {
+      throw new Error('storage unavailable')
+    })
+
+    expect(listStorageKeys()).toEqual([])
+
+    key.mockRestore()
   })
 })

@@ -146,7 +146,7 @@ describe('TaskList write integration contract', () => {
     expect(guard).toContain('canPerformTaskAction(latestTask, action)')
     expect(failureHandler).toContain("classifyApiError(error) === 'PERMISSION_DENIED'")
     expectOrderedMarkers(failureHandler, [
-      'recoverTaskPermissionDenial(taskId)',
+      'recoverTaskPermissionDenial(taskId, contextSnapshot)',
       "toast.warning('任务权限已发生变化，已刷新最新权限。')",
     ])
   })
@@ -161,5 +161,39 @@ describe('TaskList write integration contract', () => {
       /readTaskCache\(selectedProjectId\.value\)[\s\S]*?hasCachedSnapshot = true[\s\S]*?fetchTaskList\(\{/,
     )
     expect(loadTasks).toContain('任务权限校验失败，当前缓存仅供查看。')
+  })
+
+  it('binds async task writeback to the captured session and board context', () => {
+    const addTask = extractFunctionBlock('addTask')
+    const selectPriority = extractFunctionBlock('selectPriority')
+    const updateDueDate = extractFunctionBlock('updateDueDate')
+    const selectMilestone = extractFunctionBlock('selectMilestone')
+    const onTextBlur = extractFunctionBlock('onTextBlur')
+    const submitNewMilestone = extractFunctionBlock('submitNewMilestone')
+    const saveMilestone = extractFunctionBlock('saveMilestone')
+    const loadTasks = extractFunctionBlock('loadTasks')
+    const loadProjects = extractFunctionBlock('loadProjects')
+    const reconcileAssignment = extractFunctionBlock('reconcileCommittedTaskAssignment')
+
+    expect(taskListSource).toContain('captureAuthSessionSnapshot()')
+    expect(taskListSource).toContain('isAuthSessionSnapshotActive')
+    expect(taskListSource).toContain('contextSnapshot?: TaskContextSnapshot')
+    expect(loadTasks).toContain('isTaskContextSnapshotActive(contextSnapshot)')
+    expect(loadProjects).toContain('isTaskContextSnapshotActive(contextSnapshot)')
+    for (const writePath of [
+      addTask,
+      selectPriority,
+      updateDueDate,
+      selectMilestone,
+      onTextBlur,
+      submitNewMilestone,
+      saveMilestone,
+    ]) {
+      expect(writePath).toContain('captureTaskWriteSnapshot(')
+      expect(writePath).toContain('isTaskWriteSnapshotActive(writeSnapshot)')
+    }
+    expect(reconcileAssignment).toContain('snapshot.sessionSnapshot')
+    expect(reconcileAssignment).toContain('abandonStaleRefresh')
+    expect(reconcileAssignment).toContain('if (!isContextActive()) return abandonStaleRefresh()')
   })
 })

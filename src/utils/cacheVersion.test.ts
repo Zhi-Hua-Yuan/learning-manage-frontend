@@ -1,9 +1,77 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { syncBackendCacheVersion } from './cacheVersion'
+import {
+  clearBackendInvalidatedCaches,
+  isBackendVersionAffectedCacheKey,
+  syncBackendCacheVersion,
+} from './cacheVersion'
 import { dropLegacyUnscopedBusinessCaches } from './cacheMigration'
 
 describe('backend cache version synchronization', () => {
+  it.each([
+    'tick_selectedProjectId:actor-1',
+    'tick:cache:project-list:status-0:v1:actor-1',
+    'tick:cache:project-list:status-1:v1:actor-user%3A1',
+    'tick:cache:project-progress:v2:actor-2',
+    'tick:cache:task-list:v1:101:actor-1',
+    'tick:cache:task-list:all:v1:actor-1',
+    'tick:cache:task-today-ai-order:v1:actor-1',
+    'tick:cache:task-list-replan-state:v1:actor-1',
+  ])('matches backend-invalidated actor resource key: %s', (key) => {
+    expect(isBackendVersionAffectedCacheKey(key)).toBe(true)
+  })
+
+  it.each([
+    'tick_selectedProjectId',
+    'tick:cache:project-list:status-0:v1',
+    'tick:cache:task-list:v1:101',
+    'tick_aiPlannerDraft_v1:actor-1',
+    'tick_themeMode',
+    'tick_sidebarWidth',
+    'tick_detailWidth',
+    'token',
+    'tick_backend_cache_version',
+    'tick_backend_cache_reload_lock',
+    'ai:draft:confirm-operation:123',
+  ])('does not match preserved or legacy key: %s', (key) => {
+    expect(isBackendVersionAffectedCacheKey(key)).toBe(false)
+  })
+
+  it('clears backend-invalidated resources for every actor and preserves unrelated state', () => {
+    const invalidatedKeys = [
+      'tick_selectedProjectId:actor-1',
+      'tick:cache:project-list:status-0:v1:actor-1',
+      'tick:cache:project-progress:v2:actor-2',
+      'tick:cache:task-list:v1:101:actor-1',
+      'tick:cache:task-list:all:v1:actor-2',
+      'tick:cache:task-today-ai-order:v1:actor-1',
+      'tick:cache:task-list-replan-state:v1:actor-2',
+    ]
+    const preservedKeys = [
+      'tick_aiPlannerDraft_v1:actor-1',
+      'tick_themeMode',
+      'tick_sidebarWidth',
+      'tick_detailWidth',
+      'token',
+      'tick_backend_cache_version',
+      'tick_backend_cache_reload_lock',
+      'ai:draft:confirm-operation:123',
+      'tick:unrelated',
+    ]
+
+    invalidatedKeys.forEach((key) => window.localStorage.setItem(key, 'remove'))
+    preservedKeys.forEach((key) => window.localStorage.setItem(key, 'keep'))
+    window.sessionStorage.setItem('ai:draft:confirm-operation:123', 'keep-session-operation')
+
+    expect(clearBackendInvalidatedCaches()).toEqual({
+      scanned: invalidatedKeys.length + preservedKeys.length,
+      matched: invalidatedKeys.length,
+    })
+    invalidatedKeys.forEach((key) => expect(window.localStorage.getItem(key)).toBeNull())
+    preservedKeys.forEach((key) => expect(window.localStorage.getItem(key)).toBe('keep'))
+    expect(window.sessionStorage.getItem('ai:draft:confirm-operation:123')).toBe('keep-session-operation')
+  })
+
   it('records the first version without invalidating caches', () => {
     window.localStorage.setItem('tick:cache:task-list:v1:1:actor-1', 'cached')
     window.localStorage.setItem('tick_selectedProjectId', 'legacy')

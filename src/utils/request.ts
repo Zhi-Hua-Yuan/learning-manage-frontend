@@ -164,7 +164,7 @@ request.interceptors.response.use(
     const versionSync = syncBackendCacheVersion(response.headers, res)
     if (versionSync?.changed) {
       console.warn(
-        `[cache] backend version changed: ${versionSync.previousVersion} -> ${versionSync.currentVersion}. local cache cleared.`,
+        `[cache] backend version changed: ${versionSync.previousVersion} -> ${versionSync.currentVersion}. backend-derived actor caches invalidated.`,
       )
       if (versionSync.shouldReload && !isPublicAuthPath(requestUrl) && typeof window !== 'undefined') {
         window.setTimeout(() => window.location.reload(), 0)

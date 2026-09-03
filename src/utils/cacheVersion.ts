@@ -1,4 +1,4 @@
-import { listStorageKeys } from '@/utils/cacheClient'
+import { listStorageKeys, removeRawStorage } from '@/utils/cacheClient'
 import { dropLegacyUnscopedBusinessCaches } from '@/utils/cacheMigration'
 
 const BACKEND_CACHE_VERSION_KEY = 'tick_backend_cache_version'
@@ -74,22 +74,32 @@ const extractVersionFromHeaders = (headers: unknown): string | null => {
   return null
 }
 
-const clearBackendInvalidatedCaches = () => {
-  if (!canUseLocalStorage()) return
+const BACKEND_INVALIDATED_CACHE_KEY_PATTERNS = [
+  /^tick_selectedProjectId:actor-.+$/,
+  /^tick:cache:project-list:status-[01]:v1:actor-.+$/,
+  /^tick:cache:project-progress:v2:actor-.+$/,
+  /^tick:cache:task-list:v1:[^:]+:actor-.+$/,
+  /^tick:cache:task-list:all:v1:actor-.+$/,
+  /^tick:cache:task-today-ai-order:v1:actor-.+$/,
+  /^tick:cache:task-list-replan-state:v1:actor-.+$/,
+]
 
-  const invalidatedPrefixes = [
-    'tick_selectedProjectId:actor-',
-    'tick:cache:project-list:',
-    'tick:cache:project-progress:v2:actor-',
-    'tick:cache:task-list:v1:',
-    'tick:cache:task-list:all:v1:',
-    'tick:cache:task-today-ai-order:v1:',
-    'tick:cache:task-list-replan-state:v1:',
-  ]
+export const isBackendVersionAffectedCacheKey = (key: string) => (
+  BACKEND_INVALIDATED_CACHE_KEY_PATTERNS.some((pattern) => pattern.test(key))
+)
 
-  listStorageKeys()
-    .filter((key) => invalidatedPrefixes.some((prefix) => key.startsWith(prefix)))
-    .forEach((key) => window.localStorage.removeItem(key))
+export interface BackendCacheCleanupResult {
+  scanned: number
+  matched: number
+}
+
+export const clearBackendInvalidatedCaches = (): BackendCacheCleanupResult => {
+  if (!canUseLocalStorage()) return { scanned: 0, matched: 0 }
+
+  const keys = listStorageKeys()
+  const matchedKeys = keys.filter(isBackendVersionAffectedCacheKey)
+  matchedKeys.forEach(removeRawStorage)
+  return { scanned: keys.length, matched: matchedKeys.length }
 }
 
 const shouldReloadForVersion = (nextVersion: string) => {

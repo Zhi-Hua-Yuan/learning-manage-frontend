@@ -88,13 +88,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { loginApi, registerApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
-import { writeAuthToken } from '@/utils/authToken'
+import { establishAuthenticatedSession } from '@/utils/sessionLifecycle'
 
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 const loading = ref(false)
 const isRegisterMode = ref(false)
@@ -109,6 +110,13 @@ const form = ref({
   username: '',
   password: '',
   confirmPassword: '',
+})
+
+onMounted(() => {
+  if (route.query.reason !== 'password_changed') return
+
+  toast.success('密码修改成功，请使用新密码重新登录。')
+  void router.replace({ path: '/login', query: {} })
 })
 
 watch(isRegisterMode, () => {
@@ -172,9 +180,12 @@ const handleSubmit = async () => {
       password: form.value.password,
     })) as unknown as LoginResponse
 
-    writeAuthToken(res.token)
+    const session = establishAuthenticatedSession(res.token)
+    if (!session.established) {
+      throw new Error('登录响应未返回有效凭据')
+    }
 
-    router.push('/')
+    await router.replace('/')
   } catch (error: unknown) {
     // 兼容多种拦截器抛出的错误结构
     const err = error as {

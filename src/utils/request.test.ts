@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AxiosResponse } from 'axios'
+import { AxiosError, type AxiosResponse } from 'axios'
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
+  replace: vi.fn(),
   toastPush: vi.fn(),
 }))
 
@@ -10,6 +11,7 @@ vi.mock('../router', () => ({
   default: {
     currentRoute: { value: { path: '/tasks' } },
     push: mocks.push,
+    replace: mocks.replace,
   },
 }))
 
@@ -18,7 +20,10 @@ vi.mock('@/stores/toast', () => ({
 }))
 
 import request, { ApiRequestError, classifyApiError } from './request'
+import { logoutApi } from '@/api/user'
 import { clearAuthToken, writeAuthToken } from './authToken'
+import { setActiveCacheActor } from './cacheActor'
+import { resetProtectedSessionState } from './sessionLifecycle'
 
 const setResponse = (data: unknown, status = 200) => {
   request.defaults.adapter = async (config) => {
@@ -35,8 +40,10 @@ const setResponse = (data: unknown, status = 200) => {
 
 describe('request client', () => {
   beforeEach(() => {
+    resetProtectedSessionState('ACTOR_CHANGED')
     clearAuthToken()
     mocks.push.mockReset()
+    mocks.replace.mockReset()
     mocks.toastPush.mockReset()
     setResponse({ code: 0, data: null })
   })
@@ -94,7 +101,141 @@ describe('request client', () => {
     await expect(request.get('/projects')).rejects.toBeInstanceOf(ApiRequestError)
     expect(window.localStorage.getItem('token')).toBeNull()
     expect(mocks.toastPush).toHaveBeenCalledWith({ type: 'error', message: '登录已过期，请重新登录。' })
-    expect(mocks.push).toHaveBeenCalledWith('/login')
+    expect(mocks.replace).toHaveBeenCalledWith('/login')
+  })
+
+  it('clears protected actor resources and session operations on HTTP 401', async () => {
+    setActiveCacheActor('7')
+    writeAuthToken('expired-token')
+    window.localStorage.setItem('tick:cache:task-list:v1:1:actor-7', 'tasks')
+    window.localStorage.setItem('tick_aiPlannerDraft_v1:actor-7', 'draft')
+    window.localStorage.setItem('tick_themeMode', 'dark')
+    window.sessionStorage.setItem('ai:draft:confirm-operation:9:actor-7', 'operation')
+    setResponse({ code: 40100, message: '登录已失效', data: null }, 401)
+
+    await expect(request.get('/projects')).rejects.toBeInstanceOf(ApiRequestError)
+
+    expect(window.localStorage.getItem('token')).toBeNull()
+    expect(window.localStorage.getItem('tick:cache:task-list:v1:1:actor-7')).toBeNull()
+    expect(window.localStorage.getItem('tick_aiPlannerDraft_v1:actor-7')).toBeNull()
+    expect(window.sessionStorage.getItem('ai:draft:confirm-operation:9:actor-7')).toBeNull()
+    expect(window.localStorage.getItem('tick_themeMode')).toBe('dark')
+  })
+
+  it('does not terminate the session for HTTP 403 permission responses', async () => {
+    writeAuthToken('valid-token')
+    setResponse({ code: 40300, message: '没有权限', data: null }, 403)
+
+    await expect(request.get('/projects')).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      code: 40300,
+      httpStatus: 403,
+    })
+    expect(window.localStorage.getItem('token')).toBe('valid-token')
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(mocks.toastPush).not.toHaveBeenCalled()
+  })
+
+  it('does not terminate the session for an HTML 403 gateway response', async () => {
+    writeAuthToken('valid-token')
+    setResponse('<html><body>403 Forbidden</body></html>', 403)
+
+    await expect(request.get('/projects')).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      httpStatus: 403,
+    })
+    expect(window.localStorage.getItem('token')).toBe('valid-token')
+    expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it('keeps local-auth requests from terminating the active session', async () => {
+    writeAuthToken('valid-token')
+    setResponse({ code: 40100, message: '登录已失效', data: null }, 401)
+
+    await expect(request.post('/user/logout', undefined, { authFailureMode: 'LOCAL' })).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      code: 40100,
+      httpStatus: 401,
+    })
+    expect(window.localStorage.getItem('token')).toBe('valid-token')
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(mocks.toastPush).not.toHaveBeenCalled()
+  })
+
+  it('sends a captured logout credential with local auth failure handling', async () => {
+    let requestConfig: Record<string, unknown> = {}
+    request.defaults.adapter = async (config) => {
+      requestConfig = config as unknown as Record<string, unknown>
+      return {
+        data: { code: 0, data: true },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      }
+    }
+
+    await expect(logoutApi('old-token')).resolves.toBe(true)
+
+    expect(requestConfig.authFailureMode).toBe('LOCAL')
+    const headers = requestConfig.headers as Record<string, unknown> | undefined
+    expect(headers?.Authorization).toBe('Bearer old-token')
+  })
+
+  it('lets the HTTP status win when transport and business auth signals conflict', async () => {
+    writeAuthToken('valid-token')
+    setResponse({ code: 40300, message: '没有权限', data: null }, 401)
+
+    await expect(request.get('/projects')).rejects.toMatchObject({ httpStatus: 401 })
+    expect(window.localStorage.getItem('token')).toBeNull()
+    expect(mocks.replace).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the session when an HTTP 403 wraps an authentication business code', async () => {
+    writeAuthToken('valid-token')
+    setResponse({ code: 40100, message: '登录已失效', data: null }, 403)
+
+    await expect(request.get('/projects')).rejects.toMatchObject({ httpStatus: 403 })
+    expect(window.localStorage.getItem('token')).toBe('valid-token')
+    expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it('lets the HTTP status win when HTML body and transport status conflict', async () => {
+    writeAuthToken('valid-token')
+    setResponse('<html><body>401 Unauthorized</body></html>', 403)
+
+    await expect(request.get('/projects')).rejects.toMatchObject({ httpStatus: 403 })
+    expect(window.localStorage.getItem('token')).toBe('valid-token')
+    expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it('performs authentication side effects only once for concurrent HTTP 401 responses', async () => {
+    writeAuthToken('expired-token')
+    request.defaults.adapter = async (config) => {
+      throw new AxiosError(
+        'Request failed with status code 401',
+        'ERR_BAD_REQUEST',
+        config,
+        undefined,
+        {
+          data: { code: 40100, message: '登录已失效', data: null },
+          status: 401,
+          statusText: 'Unauthorized',
+          headers: {},
+          config,
+        },
+      )
+    }
+
+    const results = await Promise.allSettled([
+      request.get('/projects'),
+      request.get('/tasks'),
+    ])
+
+    expect(results.every((result) => result.status === 'rejected')).toBe(true)
+    expect(window.localStorage.getItem('token')).toBeNull()
+    expect(mocks.replace).toHaveBeenCalledTimes(1)
+    expect(mocks.toastPush).toHaveBeenCalledTimes(1)
   })
 
   it('keeps public auth errors local to the login request', async () => {

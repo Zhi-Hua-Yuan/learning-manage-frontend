@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setActiveCacheActor } from './cacheActor'
 import { writeAuthToken } from './authToken'
 import {
+  establishAuthenticatedSession,
   registerSessionResetHandler,
   resetProtectedSessionState,
   terminateAuthenticatedSession,
@@ -48,15 +49,41 @@ describe('session lifecycle cleanup kernel', () => {
   it('clears the credential for an authenticated session termination', () => {
     writeAuthToken('remove-token')
 
-    terminateAuthenticatedSession('USER_LOGOUT')
+    const result = terminateAuthenticatedSession('USER_LOGOUT')
 
+    expect(result.changed).toBe(true)
     expect(window.localStorage.getItem('token')).toBeNull()
   })
 
-  it('is idempotent', () => {
-    expect(() => {
-      terminateAuthenticatedSession('AUTHENTICATION_REQUIRED')
-      terminateAuthenticatedSession('AUTHENTICATION_REQUIRED')
-    }).not.toThrow()
+  it('is idempotent and reports only the first termination as changed', () => {
+    establishAuthenticatedSession('expired-token')
+
+    const first = terminateAuthenticatedSession('AUTHENTICATION_REQUIRED')
+    const second = terminateAuthenticatedSession('AUTHENTICATION_REQUIRED')
+
+    expect(first.changed).toBe(true)
+    expect(second.changed).toBe(false)
+    expect(second.resetHandlerErrors).toBe(0)
+  })
+
+  it('resets the previous state before establishing a replacement token', () => {
+    writeAuthToken('old-token')
+    const reset = vi.fn()
+    unregisterHandlers.push(registerSessionResetHandler(reset))
+
+    const result = establishAuthenticatedSession('new-token')
+
+    expect(result).toMatchObject({ established: true, replaced: true })
+    expect(reset).toHaveBeenCalledWith('TOKEN_REPLACED')
+    expect(window.localStorage.getItem('token')).toBe('new-token')
+  })
+
+  it('rejects an empty token without changing the current session', () => {
+    writeAuthToken('existing-token')
+
+    const result = establishAuthenticatedSession('   ')
+
+    expect(result.established).toBe(false)
+    expect(window.localStorage.getItem('token')).toBe('existing-token')
   })
 })

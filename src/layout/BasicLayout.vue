@@ -531,6 +531,7 @@
               <button
                 class="btn-danger flex-1 rounded-xl outline-none focus:outline-none"
                 type="button"
+                :disabled="isLoggingOut"
                 @click="executeLogout"
               >
                 退出登录
@@ -564,12 +565,13 @@ import { useUndoDelete } from '@/composables/useUndoDelete'
 import { useSessionResetHandler } from '@/composables/useSessionResetHandler'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { buildTeamProjectRoute, parseTaskProjectContext } from '@/router/taskProjectContext'
+import { readAuthToken } from '@/utils/authToken'
 import {
   clearSelectedProjectIdCache,
   readSelectedProjectIdCache,
   writeSelectedProjectIdCache,
 } from '@/utils/appCache'
-import { clearAuthToken } from '@/utils/authToken'
+import { terminateAuthenticatedSession } from '@/utils/sessionLifecycle'
 import {
   clearProjectProgressCache,
   readProjectListCache,
@@ -669,6 +671,7 @@ const { teams, teamProjectsByTeamId, teamsLoadState } = storeToRefs(collaboratio
 const projectList = ref<Project[]>([])
 const isUserMenuOpen = ref(false)
 const showLogoutModal = ref(false)
+const isLoggingOut = ref(false)
 const showDeleteProjectConfirm = ref(false)
 const pendingDeleteProject = ref<{ id: string; name: string } | null>(null)
 const activeProjectActionId = ref('')
@@ -1301,15 +1304,17 @@ const openLogoutModal = () => {
 }
 
 const executeLogout = async () => {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
   showLogoutModal.value = false
-  try {
-    await logoutApi()
-  } catch {
-    // force logout even when API request fails
-  }
-  collaborationStore.clearCollaborationContext()
-  clearAuthToken()
-  router.push('/login')
+  const token = readAuthToken()
+
+  // Local session termination is authoritative and must not wait for a
+  // network request. The captured token is used only by best-effort server
+  // logout so a future token blacklist can still receive the old credential.
+  terminateAuthenticatedSession('USER_LOGOUT')
+  await router.replace('/login')
+  void logoutApi(token).catch(() => undefined)
 }
 
 watch(

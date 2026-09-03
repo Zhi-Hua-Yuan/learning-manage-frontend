@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 
 import TaskList from './TaskList.vue'
+import {
+  establishAuthenticatedSession,
+  terminateAuthenticatedSession,
+} from '@/utils/sessionLifecycle'
 
 const { route, router } = vi.hoisted(() => ({
   route: {
@@ -313,5 +317,36 @@ describe('TaskList initial assignee quick create', () => {
 
     resolveCreate?.()
     await Promise.all([firstSubmission, duplicateSubmission])
+  })
+
+  it('ignores a late create response after replacing the authenticated session', async () => {
+    establishAuthenticatedSession('token-a')
+    collaborationStore.currentUser = { id: '1', username: '账号 A' }
+
+    let resolveCreate: ((value: unknown) => void) | undefined
+    taskApi.addTaskApi.mockImplementation(() => new Promise((resolve) => {
+      resolveCreate = resolve
+    }))
+
+    const wrapper = await mountTaskList('team')
+    const vm = wrapper.vm as unknown as {
+      newTaskTitle: string
+      addTask: () => Promise<void>
+    }
+    vm.newTaskTitle = '账号 A 待完成任务'
+    const pendingCreate = vm.addTask()
+    await vi.waitFor(() => expect(taskApi.addTaskApi).toHaveBeenCalledTimes(1))
+
+    terminateAuthenticatedSession('USER_LOGOUT')
+    collaborationStore.currentUser = { id: '2', username: '账号 B' }
+    establishAuthenticatedSession('token-b')
+    vm.newTaskTitle = '账号 B 正在输入'
+
+    resolveCreate?.({ data: 99 })
+    await pendingCreate
+
+    expect(vm.newTaskTitle).toBe('账号 B 正在输入')
+    wrapper.unmount()
+    terminateAuthenticatedSession('USER_LOGOUT')
   })
 })

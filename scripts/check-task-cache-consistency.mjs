@@ -31,7 +31,7 @@ const checks = [
   {
     file: taskListPath,
     label: 'Priority update flow uses the content-only endpoint and refreshes facts',
-    pattern: /await updateTaskContentApi\(\{ id: currentTask\.id, priority: val \}\)\s*\n\s*await loadTasks\(\{ forceRefresh: true \}\)/m,
+    pattern: /await updateTaskContentApi\(\{ id: currentTask\.id, priority: val \}\)[\s\S]*?await loadTasks\(\{ forceRefresh: true(?:, contextSnapshot: writeSnapshot\.context)? \}\)/m,
   },
   {
     file: taskListPath,

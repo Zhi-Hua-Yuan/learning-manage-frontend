@@ -1573,6 +1573,7 @@ import {
   writeTaskListReplanStateCache,
   writeTaskTodayAiOrderCache,
 } from '@/utils/appCache'
+import { getActiveCacheActor } from '@/utils/cacheActor'
 import {
   captureAuthSessionSnapshot,
   isAuthSessionSnapshotActive,
@@ -1671,6 +1672,14 @@ interface TaskContextSnapshot {
   contextKey: string
   projectId: string
   teamId: string
+}
+
+interface TaskWriteSnapshot {
+  context: TaskContextSnapshot
+  actorId: string | null
+  operationKey: string
+  operationRevision: number
+  taskId?: string
 }
 
 interface LoadOptions {
@@ -2278,6 +2287,7 @@ const milestoneLoadVersion = ref(0)
 const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 const todayAiOrderMetaByTaskId = ref<Record<string, TodayAiOrderMeta>>({})
 const isTaskViewMounted = ref(false)
+const taskWriteRevisions = new Map<string, number>()
 
 const captureTaskContextSnapshot = (): TaskContextSnapshot => ({
   session: captureAuthSessionSnapshot(),
@@ -2293,6 +2303,44 @@ const isTaskContextSnapshotActive = (snapshot: TaskContextSnapshot) => (
   && (snapshot.projectId === '' || selectedProjectId.value === snapshot.projectId)
   && (snapshot.teamId === '' || selectedTeamId.value === snapshot.teamId)
 )
+
+const getCurrentActorId = () => {
+  const activeActorId = getActiveCacheActor()
+  if (activeActorId) return activeActorId
+  const actorId = collaborationStore.currentUser?.id
+  return actorId === undefined || actorId === null ? null : String(actorId)
+}
+
+const captureTaskWriteSnapshot = (operationKey: string, taskId?: string): TaskWriteSnapshot => {
+  const operationRevision = (taskWriteRevisions.get(operationKey) || 0) + 1
+  taskWriteRevisions.set(operationKey, operationRevision)
+  const context = captureTaskContextSnapshot()
+  return {
+    context,
+    actorId: getCurrentActorId() || context.session.actorId,
+    operationKey,
+    operationRevision,
+    ...(taskId ? { taskId } : {}),
+  }
+}
+
+const isTaskWriteRevisionCurrent = (snapshot: TaskWriteSnapshot) =>
+  taskWriteRevisions.get(snapshot.operationKey) === snapshot.operationRevision
+
+const isTaskWriteSnapshotActive = (
+  snapshot: TaskWriteSnapshot,
+  options: { allowMissingTask?: boolean } = {},
+) => {
+  if (!isTaskWriteRevisionCurrent(snapshot)) return false
+  if (!snapshot.actorId || getCurrentActorId() !== snapshot.actorId) return false
+  if (!isTaskViewMounted.value || !isAuthSessionSnapshotActive(snapshot.context.session)) {
+    return false
+  }
+  if (!isTaskContextSnapshotActive(snapshot.context)) return false
+  if (!snapshot.taskId) return true
+  if (!selectedTask.value) return options.allowMissingTask === true
+  return selectedTask.value.id === snapshot.taskId
+}
 
 const showTodayAiReasonDialog = ref(false)
 const selectedTodayAiReason = ref<{ taskTitle: string; rank: number; reason: string } | null>(null)
@@ -3374,22 +3422,44 @@ const failClosedTaskCapabilities = (taskId: string) => {
   syncSelectedTaskFromList()
 }
 
-const recoverTaskPermissionDenial = async (taskId: string) => {
+const recoverTaskPermissionDenial = async (
+  taskId: string,
+  contextSnapshot?: TaskWriteSnapshot,
+  options: { allowMissingTask?: boolean } = {},
+) => {
+  if (
+    contextSnapshot &&
+    !isTaskWriteSnapshotActive(contextSnapshot, options)
+  ) return false
   failClosedTaskCapabilities(taskId)
-  await loadTasks({ forceRefresh: true })
+  const outcome = await loadTasks({
+    forceRefresh: true,
+    ...(contextSnapshot ? { contextSnapshot: contextSnapshot.context } : {}),
+  })
+  if (contextSnapshot && !isTaskWriteSnapshotActive(contextSnapshot, options)) {
+    return false
+  }
+  return outcome.status === 'ok'
 }
 
 const handleTaskMutationFailure = async (
   error: unknown,
   taskId: string,
   fallbackMessage: string,
+  contextSnapshot?: TaskWriteSnapshot,
 ) => {
+  if (contextSnapshot && !isTaskWriteSnapshotActive(contextSnapshot)) return false
   if (classifyApiError(error) === 'PERMISSION_DENIED') {
-    await recoverTaskPermissionDenial(taskId)
+    const refreshed = await recoverTaskPermissionDenial(taskId, contextSnapshot)
+    if (contextSnapshot && !refreshed) return false
+    if (contextSnapshot && !isTaskWriteSnapshotActive(contextSnapshot, { allowMissingTask: true })) {
+      return false
+    }
     toast.warning('任务权限已发生变化，已刷新最新权限。')
     return true
   }
 
+  if (contextSnapshot && !isTaskWriteSnapshotActive(contextSnapshot)) return false
   toast.error(fallbackMessage)
   return false
 }
@@ -3757,26 +3827,33 @@ const addTask = async () => {
     return
   }
 
+  const writeSnapshot = captureTaskWriteSnapshot('task:create')
+  const createProjectId = selectedProjectId.value
   isAddingTask.value = true
   try {
     const finalTitle = newTaskTitle.value.trim().slice(0, TASK_TITLE_MAX_LENGTH)
     await addTaskApi(
       buildTaskQuickCreatePayload({
         title: finalTitle,
-        projectId: selectedProjectId.value,
+        projectId: createProjectId,
         milestoneId: newTaskMilestoneId.value || null,
         context: createContext.kind,
         assigneeUserId: newTaskAssigneeUserId.value,
       }),
     )
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     markListReplanDirty()
     resetNewTaskDraft({ blurInput: true })
     isNewTaskMilestoneMenuOpen.value = false
-    await loadTasks({ forceRefresh: true })
+    await loadTasks({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
   } catch {
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     toast.error('添加任务失败，请检查网络后重试。')
   } finally {
-    isAddingTask.value = false
+    if (isTaskWriteRevisionCurrent(writeSnapshot)) {
+      isAddingTask.value = false
+    }
   }
 }
 
@@ -4783,10 +4860,18 @@ const submitTaskAssignment = async (payload: {
   })
 
   if (outcome.kind === 'ignored' || outcome.kind === 'stale') return
+  if (
+    !isAuthSessionSnapshotActive(sessionSnapshot) ||
+    draft.contextKey !== currentContextKey.value
+  ) return
 
   if (outcome.kind === 'error') {
     if (outcome.errorKind === 'PERMISSION_DENIED') {
       await recoverTaskPermissionDenial(draft.taskId)
+      if (
+        !isAuthSessionSnapshotActive(sessionSnapshot) ||
+        draft.contextKey !== currentContextKey.value
+      ) return
       closeTaskAssignmentDialog(false)
       toast.warning('负责人变更权限已发生变化，已刷新最新任务权限。')
       return
@@ -4909,17 +4994,26 @@ const selectPriority = async (val: number) => {
   const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'reorganize')
   if (!currentTask) return
 
+  const writeSnapshot = captureTaskWriteSnapshot(`task:${currentTask.id}:priority`, currentTask.id)
   const oldPriority = currentTask.priority
   currentTask.priority = val
   isPriorityMenuOpen.value = false
 
   try {
     await updateTaskContentApi({ id: currentTask.id, priority: val })
-    await loadTasks({ forceRefresh: true })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     markListReplanDirty()
+    await loadTasks({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
+    if (!isTaskWriteSnapshotActive(writeSnapshot, { allowMissingTask: true })) return
   } catch (error) {
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     currentTask.priority = oldPriority
-    await handleTaskMutationFailure(error, currentTask.id, '更新优先级失败，请检查网络后重试。')
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '更新优先级失败，请检查网络后重试。',
+      writeSnapshot,
+    )
   }
 }
 
@@ -4928,6 +5022,7 @@ const updateDueDate = async (nextDate: string | null) => {
   const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'editContent')
   if (!currentTask) return
 
+  const writeSnapshot = captureTaskWriteSnapshot(`task:${currentTask.id}:due-date`, currentTask.id)
   const finalDate = nextDate || null
   const oldDate = currentTask.dueDate
   const oldDateKey = normalizeTaskDueDate(oldDate) || null
@@ -4941,11 +5036,19 @@ const updateDueDate = async (nextDate: string | null) => {
 
   try {
     await updateTaskContentApi({ id: currentTask.id, dueDate: finalDate })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     markListReplanDirty()
-    await loadTasks({ forceRefresh: true })
+    await loadTasks({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
+    if (!isTaskWriteSnapshotActive(writeSnapshot, { allowMissingTask: true })) return
   } catch (error) {
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     currentTask.dueDate = oldDate
-    await handleTaskMutationFailure(error, currentTask.id, '更新日期失败，请检查网络后重试。')
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '更新日期失败，请检查网络后重试。',
+      writeSnapshot,
+    )
   }
 }
 
@@ -4966,6 +5069,7 @@ const selectMilestone = async (milestoneId: string | null) => {
   const currentTask = ensureTaskActionAllowed(selectedTask.value.id, 'reorganize')
   if (!currentTask) return
 
+  const writeSnapshot = captureTaskWriteSnapshot(`task:${currentTask.id}:milestone`, currentTask.id)
   const finalMilestoneId = milestoneId && milestoneId !== '0' ? milestoneId : null
   const oldMilestoneId = currentTask.milestoneId
   if ((oldMilestoneId ?? null) === finalMilestoneId) {
@@ -4977,10 +5081,18 @@ const selectMilestone = async (milestoneId: string | null) => {
 
   try {
     await updateTaskContentApi({ id: currentTask.id, milestoneId: finalMilestoneId })
-    await loadTasks({ forceRefresh: true })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
+    await loadTasks({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
+    if (!isTaskWriteSnapshotActive(writeSnapshot, { allowMissingTask: true })) return
   } catch (error) {
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     currentTask.milestoneId = oldMilestoneId
-    await handleTaskMutationFailure(error, currentTask.id, '更新所属阶段失败，请检查网络后重试。')
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '更新所属阶段失败，请检查网络后重试。',
+      writeSnapshot,
+    )
   }
 }
 
@@ -4993,6 +5105,7 @@ const onTextBlur = async () => {
     return
   }
 
+  const writeSnapshot = captureTaskWriteSnapshot(`task:${currentTask.id}:content`, currentTask.id)
   const previousTitle = selectedTaskTitleBaseline.value
   try {
     await updateTaskContentApi({
@@ -5000,15 +5113,23 @@ const onTextBlur = async () => {
       title: currentTask.title,
       description: currentTask.description ?? undefined,
     })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     if (currentTask.title !== previousTitle) {
       markListReplanDirty()
     }
     selectedTaskTitleBaseline.value = currentTask.title
     selectedTaskDescriptionBaseline.value = currentTask.description
-    await loadTasks({ forceRefresh: true })
+    await loadTasks({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
+    if (!isTaskWriteSnapshotActive(writeSnapshot, { allowMissingTask: true })) return
   } catch (error) {
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     console.error('保存任务失败', error)
-    await handleTaskMutationFailure(error, currentTask.id, '保存失败，请检查网络后重试。')
+    await handleTaskMutationFailure(
+      error,
+      currentTask.id,
+      '保存失败，请检查网络后重试。',
+      writeSnapshot,
+    )
   }
 }
 
@@ -5030,6 +5151,7 @@ const confirmDeleteTask = async () => {
     return
   }
   const taskToDelete = { ...latestTask }
+  const writeSnapshot = captureTaskWriteSnapshot(`task:${taskToDelete.id}:delete`, taskToDelete.id)
 
   showDeleteTaskConfirm.value = false
 
@@ -5047,10 +5169,12 @@ const confirmDeleteTask = async () => {
       await deleteTaskApi(taskToDelete.id)
     },
     onCommitSuccess: async () => {
+      if (!isTaskWriteSnapshotActive(writeSnapshot, { allowMissingTask: true })) return
       markListReplanDirty()
-      await loadTasks({ forceRefresh: true })
+      await loadTasks({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
     },
     onRollback: async () => {
+      if (!isTaskWriteSnapshotActive(writeSnapshot, { allowMissingTask: true })) return
       if (!taskList.value.some((task) => task.id === taskToDelete.id)) {
         const nextTasks = [...taskList.value]
         const insertIndex =
@@ -5063,8 +5187,13 @@ const confirmDeleteTask = async () => {
       }
     },
     onCommitError: async (error) => {
+      if (!isTaskWriteSnapshotActive(writeSnapshot, { allowMissingTask: true })) return
       if (classifyApiError(error) !== 'PERMISSION_DENIED') return
-      await recoverTaskPermissionDenial(taskToDelete.id)
+      await recoverTaskPermissionDenial(
+        taskToDelete.id,
+        writeSnapshot,
+        { allowMissingTask: true },
+      )
       return '删除权限已发生变化，已恢复任务并刷新最新权限。'
     },
   })
@@ -5072,21 +5201,26 @@ const confirmDeleteTask = async () => {
 
 const submitNewMilestone = async () => {
   const name = newMilestoneName.value.trim()
-  if (!name || !selectedProjectId.value) {
+  const projectId = selectedProjectId.value
+  if (!name || !projectId) {
     isAddingMilestone.value = false
     return
   }
 
+  const writeSnapshot = captureTaskWriteSnapshot(`milestone:create:${projectId}`)
   try {
     await addMilestoneApi({
       name,
-      projectId: selectedProjectId.value,
+      projectId,
       orderNo: milestoneList.value.length,
     })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     newMilestoneName.value = ''
     isAddingMilestone.value = false
-    await loadMilestones({ forceRefresh: true })
+    await loadMilestones({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
   } catch {
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     toast.error('创建阶段失败，请检查网络后重试。')
   }
 }
@@ -5116,11 +5250,17 @@ const saveMilestone = async (milestone: Milestone) => {
     return
   }
 
+  const writeSnapshot = captureTaskWriteSnapshot(
+    `milestone:${milestone.id}:rename`,
+  )
   try {
     await updateMilestoneApi({ ...milestone, name: newName })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     editingMilestoneId.value = ''
-    await loadMilestones({ forceRefresh: true })
+    await loadMilestones({ forceRefresh: true, contextSnapshot: writeSnapshot.context })
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
   } catch {
+    if (!isTaskWriteSnapshotActive(writeSnapshot)) return
     toast.error('重命名失败，请检查网络后重试。')
   }
 }
@@ -5143,6 +5283,7 @@ const deleteMilestone = async (id: string, name: string) => {
   const removedIndex = snapshot.findIndex((milestone) => milestone.id === id)
   const removedMilestone = snapshot.find((milestone) => milestone.id === id)
   if (!removedMilestone) return
+  const writeSnapshot = captureTaskWriteSnapshot(`milestone:${id}:delete`)
   milestoneList.value = snapshot.filter((milestone) => milestone.id !== id)
 
   undoDelete.scheduleUndoDelete({
@@ -5152,9 +5293,14 @@ const deleteMilestone = async (id: string, name: string) => {
       await deleteMilestoneApi(id)
     },
     onCommitSuccess: async () => {
-      await Promise.all([loadMilestones({ forceRefresh: true }), loadTasks({ forceRefresh: true })])
+      if (!isTaskWriteSnapshotActive(writeSnapshot)) return
+      await Promise.all([
+        loadMilestones({ forceRefresh: true, contextSnapshot: writeSnapshot.context }),
+        loadTasks({ forceRefresh: true, contextSnapshot: writeSnapshot.context }),
+      ])
     },
     onRollback: () => {
+      if (!isTaskWriteSnapshotActive(writeSnapshot)) return
       if (!milestoneList.value.some((milestone) => milestone.id === id)) {
         const next = [...milestoneList.value]
         const insertIndex =
@@ -5446,6 +5592,7 @@ const resetTaskPageForSession = () => {
   projectLoadVersion.value += 1
   taskLoadVersion.value += 1
   milestoneLoadVersion.value += 1
+  taskWriteRevisions.clear()
   isAddingTask.value = false
   isAddingMilestone.value = false
   projectList.value = []
@@ -5507,6 +5654,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  taskWriteRevisions.clear()
   resetAllTaskStatusMutations()
   isTaskViewMounted.value = false
   closeTodayAiReasonDialog()

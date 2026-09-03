@@ -1959,6 +1959,7 @@ const AI_TODAY_ORDER_MAX_LIMIT = 50
 const AI_TODAY_ORDER_DEFAULT_STRATEGY = 'balanced'
 const AI_TODAY_ORDER_DEFAULT_TIMEZONE = 'Asia/Shanghai'
 const BOARD_SLOW_THRESHOLD_MS = 1200
+const TASK_FOCUS_REFRESH_DEBOUNCE_MS = 300
 const PROJECT_CONTEXT_PREFIX = 'project:'
 const AGGREGATE_CONTEXT_PREFIX = 'aggregate:'
 const DEFAULT_BOARD_ERROR_MESSAGE = '加载失败，请稍后重试。'
@@ -2260,6 +2261,10 @@ const newTaskAssigneeUserId = ref<string | null>(null)
 const isNewTaskAssigneePickerOpen = ref(false)
 const isAddingTask = ref(false)
 const isAddingMilestone = ref(false)
+const focusRefreshPending = ref(false)
+const focusRefreshRunning = ref(false)
+let focusRefreshTimer: ReturnType<typeof setTimeout> | null = null
+let focusRefreshPromise: Promise<void> | null = null
 const newMilestoneName = ref('')
 const editingMilestoneId = ref('')
 const editMilestoneName = ref('')
@@ -2313,6 +2318,23 @@ const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 const todayAiOrderMetaByTaskId = ref<Record<string, TodayAiOrderMeta>>({})
 const isTaskViewMounted = ref(false)
 const taskWriteRevisions = new Map<string, number>()
+const activeTaskFactWrites = new Set<string>()
+const activeTaskFactWriteCount = ref(0)
+let taskFactWriteSequence = 0
+
+const beginTaskFactWrite = (operationKey: string) => {
+  const token = `${operationKey}#${++taskFactWriteSequence}`
+  activeTaskFactWrites.add(token)
+  activeTaskFactWriteCount.value = activeTaskFactWrites.size
+  let released = false
+
+  return () => {
+    if (released) return
+    released = true
+    activeTaskFactWrites.delete(token)
+    activeTaskFactWriteCount.value = activeTaskFactWrites.size
+  }
+}
 
 const captureTaskContextSnapshot = (): TaskContextSnapshot => ({
   session: captureAuthSessionSnapshot(),
@@ -3440,11 +3462,58 @@ const selectedTaskStatusMutation = computed<TaskStatusMutationState | null>(() =
   selectedTask.value ? getTaskStatusMutationState(selectedTask.value.id) : null
 ))
 
+const isSelectedTaskContentDirty = computed(() => {
+  const task = selectedTask.value
+  if (!task) return false
+  return (
+    task.title !== selectedTaskTitleBaseline.value
+    || (task.description ?? null) !== (selectedTaskDescriptionBaseline.value ?? null)
+  )
+})
+
+const isSelectedTaskMutationInFlight = computed(() => {
+  const phase = selectedTaskStatusMutation.value?.phase
+  return (
+    taskAssignmentMutationBusy.value
+    || isAddingTask.value
+    || isAddingMilestone.value
+    || activeTaskFactWriteCount.value > 0
+    || phase === 'submitting'
+    || phase === 'reconciling'
+    || phase === 'refreshing'
+  )
+})
+
 const failClosedTaskCapabilities = (taskId: string) => {
   taskList.value = taskList.value.map((task) =>
     task.id === taskId ? { ...task, capabilities: DENY_ALL_TASK_CAPABILITIES } : task,
   )
   syncSelectedTaskFromList()
+}
+
+const failClosedTaskCapabilitiesForFocusRefresh = (taskId: string) => {
+  const task = selectedTask.value?.id === taskId ? selectedTask.value : null
+  const dirtySnapshot = task && isSelectedTaskContentDirty.value
+    ? {
+        title: task.title,
+        description: task.description,
+        titleBaseline: selectedTaskTitleBaseline.value,
+        descriptionBaseline: selectedTaskDescriptionBaseline.value,
+      }
+    : null
+
+  closeTaskScopedInteractions()
+  failClosedTaskCapabilities(taskId)
+
+  // A focus event must never discard text that the user is still editing. The
+  // capability fail-closed update is safe to apply while preserving the local
+  // draft and its original baseline until the user leaves the editor.
+  if (dirtySnapshot && selectedTask.value?.id === taskId) {
+    selectedTask.value.title = dirtySnapshot.title
+    selectedTask.value.description = dirtySnapshot.description
+    selectedTaskTitleBaseline.value = dirtySnapshot.titleBaseline
+    selectedTaskDescriptionBaseline.value = dirtySnapshot.descriptionBaseline
+  }
 }
 
 const recoverTaskPermissionDenial = async (
@@ -3647,6 +3716,109 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     }
     return errorOutcome(error)
   }
+}
+
+const clearTaskFocusRefreshTimer = () => {
+  if (focusRefreshTimer === null) return
+  clearTimeout(focusRefreshTimer)
+  focusRefreshTimer = null
+}
+
+const isTaskFocusRefreshEligible = () => {
+  const session = captureAuthSessionSnapshot()
+  return (
+    session.authenticated
+    && isTaskViewMounted.value
+    && document.visibilityState !== 'hidden'
+    && Boolean(selectedTask.value)
+    && isAuthSessionSnapshotActive(session)
+  )
+}
+
+const runTaskFocusRefresh = async () => {
+  if (focusRefreshRunning.value || !focusRefreshPending.value) return
+  focusRefreshPending.value = false
+  if (!isTaskFocusRefreshEligible()) return
+
+  // Keep the request behind an in-flight write or a dirty editor. The watcher
+  // below drains the pending refresh after the write/editor settles.
+  if (isSelectedTaskMutationInFlight.value || isSelectedTaskContentDirty.value) {
+    focusRefreshPending.value = true
+    return
+  }
+
+  const contextSnapshot = captureTaskContextSnapshot()
+  const taskId = selectedTask.value?.id
+  if (!taskId || !isTaskContextSnapshotActive(contextSnapshot)) return
+
+  focusRefreshRunning.value = true
+  const refreshPromise = (async () => {
+    failClosedTaskCapabilitiesForFocusRefresh(taskId)
+
+    if (isTeamProjectContext.value) {
+      const restoreResult = await collaborationStore.restoreTeamProjectContext(
+        contextSnapshot.teamId,
+        contextSnapshot.projectId,
+        { force: true },
+      )
+      if (!isTaskContextSnapshotActive(contextSnapshot)) return
+      if (restoreResult.kind === 'team-unavailable') {
+        await recoverLostTeamProjectContext('team-lost')
+        return
+      }
+      if (restoreResult.kind === 'project-unavailable') {
+        await recoverLostTeamProjectContext('project-lost')
+        return
+      }
+      if (restoreResult.kind !== 'ready') {
+        toast.warning('任务权限暂时无法确认，当前任务已切换为只读。')
+        return
+      }
+    }
+
+    const outcome = await loadTasks({ forceRefresh: true, contextSnapshot })
+    if (!isTaskContextSnapshotActive(contextSnapshot)) return
+    if (selectedTask.value?.id !== taskId) return
+
+    if (outcome.status === 'stale') return
+    const refreshedTask = findTaskById(taskList.value, taskId)
+    if (outcome.status === 'error') {
+      failClosedTaskCapabilitiesForFocusRefresh(taskId)
+      toast.warning('任务权限暂时无法确认，当前任务已切换为只读。')
+      return
+    }
+
+    if (!refreshedTask) {
+      closeDetail()
+      toast.info('任务已不存在或当前不可访问。')
+    }
+  })()
+  focusRefreshPromise = refreshPromise
+  try {
+    await refreshPromise
+  } finally {
+    if (focusRefreshPromise === refreshPromise) focusRefreshPromise = null
+    focusRefreshRunning.value = false
+    if (focusRefreshPending.value) scheduleTaskFocusRefresh()
+  }
+}
+
+const scheduleTaskFocusRefresh = () => {
+  if (!isTaskFocusRefreshEligible()) return
+  focusRefreshPending.value = true
+  clearTaskFocusRefreshTimer()
+  focusRefreshTimer = setTimeout(() => {
+    focusRefreshTimer = null
+    void runTaskFocusRefresh()
+  }, TASK_FOCUS_REFRESH_DEBOUNCE_MS)
+}
+
+const handleTaskWindowFocus = () => {
+  scheduleTaskFocusRefresh()
+}
+
+const handleTaskVisibilityChange = () => {
+  if (document.visibilityState === 'visible') scheduleTaskFocusRefresh()
 }
 
 const loadMilestones = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
@@ -5073,6 +5245,7 @@ const selectPriority = async (val: number) => {
   const oldPriority = currentTask.priority
   currentTask.priority = val
   isPriorityMenuOpen.value = false
+  const releaseTaskFactWrite = beginTaskFactWrite(`task:${currentTask.id}:priority`)
 
   try {
     await updateTaskContentApi({ id: currentTask.id, priority: val })
@@ -5089,6 +5262,8 @@ const selectPriority = async (val: number) => {
       '更新优先级失败，请检查网络后重试。',
       writeSnapshot,
     )
+  } finally {
+    releaseTaskFactWrite()
   }
 }
 
@@ -5108,6 +5283,7 @@ const updateDueDate = async (nextDate: string | null) => {
 
   currentTask.dueDate = finalDate
   isDueDatePickerOpen.value = false
+  const releaseTaskFactWrite = beginTaskFactWrite(`task:${currentTask.id}:due-date`)
 
   try {
     await updateTaskContentApi({ id: currentTask.id, dueDate: finalDate })
@@ -5124,6 +5300,8 @@ const updateDueDate = async (nextDate: string | null) => {
       '更新日期失败，请检查网络后重试。',
       writeSnapshot,
     )
+  } finally {
+    releaseTaskFactWrite()
   }
 }
 
@@ -5153,6 +5331,7 @@ const selectMilestone = async (milestoneId: string | null) => {
   }
   currentTask.milestoneId = finalMilestoneId
   isMilestoneMenuOpen.value = false
+  const releaseTaskFactWrite = beginTaskFactWrite(`task:${currentTask.id}:milestone`)
 
   try {
     await updateTaskContentApi({ id: currentTask.id, milestoneId: finalMilestoneId })
@@ -5168,6 +5347,8 @@ const selectMilestone = async (milestoneId: string | null) => {
       '更新所属阶段失败，请检查网络后重试。',
       writeSnapshot,
     )
+  } finally {
+    releaseTaskFactWrite()
   }
 }
 
@@ -5182,6 +5363,7 @@ const onTextBlur = async () => {
 
   const writeSnapshot = captureTaskWriteSnapshot(`task:${currentTask.id}:content`, currentTask.id)
   const previousTitle = selectedTaskTitleBaseline.value
+  const releaseTaskFactWrite = beginTaskFactWrite(`task:${currentTask.id}:content`)
   try {
     await updateTaskContentApi({
       id: currentTask.id,
@@ -5205,6 +5387,8 @@ const onTextBlur = async () => {
       '保存失败，请检查网络后重试。',
       writeSnapshot,
     )
+  } finally {
+    releaseTaskFactWrite()
   }
 }
 
@@ -5601,6 +5785,13 @@ watch(
   },
 )
 
+watch(
+  [isSelectedTaskMutationInFlight, isSelectedTaskContentDirty],
+  ([busy, dirty]) => {
+    if (!busy && !dirty && focusRefreshPending.value) scheduleTaskFocusRefresh()
+  },
+)
+
 watch(taskAssignmentChangedRevision, (revision) => {
   scheduleAssignmentHistoryAutoRefresh(revision, taskAssignmentChangedTaskId.value)
 })
@@ -5677,6 +5868,10 @@ watch(showDeleteMilestoneConfirm, (next) => {
 })
 
 const resetTaskPageForSession = () => {
+  clearTaskFocusRefreshTimer()
+  focusRefreshPending.value = false
+  activeTaskFactWrites.clear()
+  activeTaskFactWriteCount.value = 0
   projectLoadVersion.value += 1
   taskLoadVersion.value += 1
   milestoneLoadVersion.value += 1
@@ -5727,6 +5922,8 @@ onMounted(async () => {
   updateViewport()
   document.addEventListener('keydown', handleCompletionQualityShortcutKeydown)
   document.addEventListener('pointerdown', handleDocumentPointerDown)
+  window.addEventListener('focus', handleTaskWindowFocus)
+  document.addEventListener('visibilitychange', handleTaskVisibilityChange)
   window.addEventListener('resize', updateViewport)
   onProjectListUpdated(handleProjectListUpdated)
   syncSelectedProject()
@@ -5742,6 +5939,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  clearTaskFocusRefreshTimer()
+  focusRefreshPending.value = false
+  activeTaskFactWrites.clear()
+  activeTaskFactWriteCount.value = 0
   taskWriteRevisions.clear()
   resetAllTaskStatusMutations()
   isTaskViewMounted.value = false
@@ -5764,6 +5965,8 @@ onBeforeUnmount(() => {
   clearBoardSlowTimer()
   document.removeEventListener('keydown', handleCompletionQualityShortcutKeydown)
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  window.removeEventListener('focus', handleTaskWindowFocus)
+  document.removeEventListener('visibilitychange', handleTaskVisibilityChange)
   stopResizeRight()
   window.removeEventListener('resize', updateViewport)
   offProjectListUpdated(handleProjectListUpdated)

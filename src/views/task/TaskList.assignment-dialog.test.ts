@@ -1,12 +1,13 @@
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 
 import TaskList from './TaskList.vue'
 import type { TeamMemberContext } from '@/types/team'
 import * as taskCache from '@/utils/taskCache'
 import { ApiRequestError } from '@/utils/request'
+import { establishAuthenticatedSession } from '@/utils/sessionLifecycle'
 
 const { route, router } = vi.hoisted(() => ({
   route: {
@@ -29,6 +30,8 @@ const taskApi = vi.hoisted(() => ({
   fetchTaskAssignmentHistoryApi: vi.fn(),
   updateTaskContentApi: vi.fn(),
 }))
+
+const mountedWrappers: Array<ReturnType<typeof mount>> = []
 
 const collaborationStore = vi.hoisted(() => ({
   currentUser: { id: '1', username: '所有者' },
@@ -129,6 +132,7 @@ const mountTaskList = async (canAssign = true) => {
       },
     },
   })
+  mountedWrappers.push(wrapper)
 
   await vi.waitFor(() => wrapper.get('[data-testid="task-status-toggle-1"]'))
   const taskTitle = wrapper
@@ -141,8 +145,13 @@ const mountTaskList = async (canAssign = true) => {
 }
 
 describe('TaskList assignment dialog integration', () => {
+  afterEach(() => {
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+  })
+
   beforeEach(async () => {
     vi.clearAllMocks()
+    establishAuthenticatedSession('task-list-test-token')
     route.query = { teamId: '10', projectId: '1' }
     const members: TeamMemberContext[] = [
       { teamId: '10', userId: '1', username: '所有者', role: 'OWNER', joinedAt: null },
@@ -660,6 +669,111 @@ describe('TaskList assignment dialog integration', () => {
     expect(taskApi.assignTaskApi).toHaveBeenCalledTimes(1)
     expect(vm.selectedTask.assigneeUserId).toBe('2')
     expect(vm.taskAssignmentChangedRevision).toBe(1)
+  })
+
+  it('refreshes the opened task on window focus and replaces assignee capabilities', async () => {
+    const wrapper = await mountTaskList()
+    const vm = wrapper.vm as unknown as {
+      selectedTask: ReturnType<typeof task>
+    }
+    let resolveRefresh!: (value: unknown) => void
+    taskApi.fetchTaskList.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveRefresh = resolve }),
+    )
+
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(taskApi.fetchTaskList).toHaveBeenCalledTimes(2), {
+      timeout: 1500,
+    })
+    expect(vm.selectedTask.capabilities.canAssign).toBe(false)
+
+    resolveRefresh({
+      data: {
+        records: [{ ...task(false), assigneeUserId: '2' }],
+        current: 1,
+        size: 100,
+        total: 1,
+      },
+    })
+    await vi.waitFor(() => expect(vm.selectedTask.assigneeUserId).toBe('2'))
+    expect(vm.selectedTask.capabilities.canAssign).toBe(false)
+  })
+
+  it('does not fail closed when a newer task refresh supersedes the focus request', async () => {
+    const wrapper = await mountTaskList()
+    const vm = wrapper.vm as unknown as {
+      selectedTask: ReturnType<typeof task>
+      loadTasks: (options: { forceRefresh: boolean }) => Promise<unknown>
+    }
+    let resolveFocus!: (value: unknown) => void
+    taskApi.fetchTaskList.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveFocus = resolve }),
+    )
+
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(taskApi.fetchTaskList).toHaveBeenCalledTimes(2), {
+      timeout: 1500,
+    })
+
+    taskApi.fetchTaskList.mockResolvedValueOnce({
+      data: { records: [{ ...task(true), assigneeUserId: '2' }], current: 1, size: 100, total: 1 },
+    })
+    await vm.loadTasks({ forceRefresh: true })
+    expect(vm.selectedTask.capabilities.canAssign).toBe(true)
+
+    resolveFocus({
+      data: { records: [{ ...task(false), assigneeUserId: '3' }], current: 1, size: 100, total: 1 },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(vm.selectedTask.assigneeUserId).toBe('2')
+    expect(vm.selectedTask.capabilities.canAssign).toBe(true)
+  })
+
+  it('force-validates team access before a focus task refresh', async () => {
+    await mountTaskList()
+    collaborationStore.restoreTeamProjectContext.mockClear()
+    taskApi.fetchTaskList.mockResolvedValueOnce({
+      data: { records: [task(true)], current: 1, size: 100, total: 1 },
+    })
+
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(taskApi.fetchTaskList).toHaveBeenCalledTimes(2), {
+      timeout: 1500,
+    })
+    expect(collaborationStore.restoreTeamProjectContext).toHaveBeenCalledWith(
+      '10',
+      '1',
+      { force: true },
+    )
+  })
+
+  it('deduplicates focus and visibility refresh triggers and closes removed detail', async () => {
+    const wrapper = await mountTaskList()
+    const vm = wrapper.vm as unknown as { selectedTask: ReturnType<typeof task> | null }
+    taskApi.fetchTaskList.mockClear()
+    taskApi.fetchTaskList.mockResolvedValueOnce({
+      data: { records: [], current: 1, size: 100, total: 0 },
+    })
+
+    window.dispatchEvent(new Event('focus'))
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => expect(taskApi.fetchTaskList).toHaveBeenCalledTimes(1), {
+      timeout: 1500,
+    })
+    await vi.waitFor(() => expect(vm.selectedTask).toBeNull())
+    expect(taskApi.fetchTaskList).toHaveBeenCalledTimes(1)
+  })
+
+  it('queues focus refresh while the opened task has unsaved text', async () => {
+    const wrapper = await mountTaskList()
+    const vm = wrapper.vm as unknown as { selectedTask: ReturnType<typeof task> }
+    vm.selectedTask.title = '本地未保存标题'
+    taskApi.fetchTaskList.mockClear()
+
+    window.dispatchEvent(new Event('focus'))
+    await new Promise((resolve) => setTimeout(resolve, 450))
+    expect(taskApi.fetchTaskList).not.toHaveBeenCalled()
   })
 
   it('keeps refresh-only recovery when the committed task is temporarily missing', async () => {

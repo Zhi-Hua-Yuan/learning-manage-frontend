@@ -280,6 +280,31 @@ describe('collaboration store', () => {
     expect(store.teamProjectsByTeamId['10']).toBeUndefined()
   })
 
+  it('keeps same-id team data isolated when a previous actor responds late', async () => {
+    const pendingPreviousActor = deferred<ReturnType<typeof projectPage>>()
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+    apiMocks.fetchTeamProjectsApi.mockReturnValueOnce(pendingPreviousActor.promise)
+    const previousRequest = store.ensureTeamProjects(10)
+
+    store.clearCollaborationContext()
+    apiMocks.getUserMeApi.mockResolvedValueOnce(userWire(2, 'Bob'))
+    apiMocks.fetchMyTeamsApi.mockResolvedValueOnce([teamWire(10, 2)])
+    await store.bootstrapCollaborationContext()
+    apiMocks.fetchTeamProjectsApi.mockResolvedValueOnce(
+      projectPage([{ ...projectWire(101, 10, 2), name: 'B project' }]),
+    )
+    await store.ensureTeamProjects(10)
+
+    pendingPreviousActor.resolve(
+      projectPage([{ ...projectWire(101, 10, 1), name: 'A project' }]),
+    )
+    await previousRequest
+
+    expect(store.currentUser?.id).toBe('2')
+    expect(store.getTeamProjects(10).map((project) => project.name)).toEqual(['B project'])
+  })
+
   it('clears scoped data and revalidates teams after permission denial', async () => {
     const store = useCollaborationStore()
     await store.bootstrapCollaborationContext()

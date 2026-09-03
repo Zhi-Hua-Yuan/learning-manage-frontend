@@ -1355,6 +1355,17 @@ watch(
   },
 )
 
+watch(
+  () => collaborationStore.teams.map((team) => team.id),
+  (teamIds) => {
+    const allowed = new Set(teamIds)
+    const nextExpanded = expandedTeamIds.value.filter((teamId) => allowed.has(teamId))
+    if (nextExpanded.length !== expandedTeamIds.value.length) {
+      expandedTeamIds.value = nextExpanded
+    }
+  },
+)
+
 watch(showDeleteProjectConfirm, (next) => {
   if (!next) {
     pendingDeleteProject.value = null

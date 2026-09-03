@@ -2080,6 +2080,23 @@ const selectedProject = computed<Project | undefined>(() => {
 const selectedTeamContext = computed(() =>
   selectedTeamId.value ? collaborationStore.getTeam(selectedTeamId.value) : null,
 )
+type TeamProjectAccessState = 'not-applicable' | 'unknown' | 'ready' | 'team-lost' | 'project-lost' | 'retryable'
+
+const teamProjectAccessState = computed<TeamProjectAccessState>(() => {
+  if (!isTeamProjectContext.value) return 'not-applicable'
+  const teamId = selectedTeamId.value
+  const projectId = selectedProjectId.value
+  if (!teamId || !projectId) return 'unknown'
+  if (collaborationStore.teamsLoadState?.status !== 'ready') return 'unknown'
+  if (!collaborationStore.getTeam(teamId)) return 'team-lost'
+
+  const bucket = collaborationStore.teamProjectsByTeamId?.[teamId]
+  if (!bucket || bucket.loadState.status === 'loading' || bucket.loadState.status === 'idle') {
+    return 'unknown'
+  }
+  if (bucket.loadState.status === 'error') return 'retryable'
+  return bucket.records.some((project) => project.id === projectId) ? 'ready' : 'project-lost'
+})
 const taskQuickCreateContext = computed<TaskQuickCreateContext>(() => {
   if (isAggregateView.value || !selectedProjectId.value) return { kind: 'unavailable' }
 
@@ -3682,6 +3699,28 @@ const replaceWithPersonalProjectFallback = async () => {
 
   selectedProjectId.value = ''
   await router.replace({ path: '/tasks' })
+}
+
+const teamAccessRecoveryRunning = ref(false)
+
+const recoverLostTeamProjectContext = async (state: TeamProjectAccessState) => {
+  if (teamAccessRecoveryRunning.value || (state !== 'team-lost' && state !== 'project-lost')) return
+  teamAccessRecoveryRunning.value = true
+  taskLoadVersion.value += 1
+  milestoneLoadVersion.value += 1
+  taskList.value = []
+  milestoneList.value = []
+  selectedTask.value = null
+  closeTaskScopedInteractions()
+  resetTaskAssignmentCandidates()
+  resetTaskAssignmentMutation()
+  resetTaskAssignmentHistory()
+  resetAllTaskStatusMutations()
+  try {
+    await replaceWithPersonalProjectFallback()
+  } finally {
+    teamAccessRecoveryRunning.value = false
+  }
 }
 
 const ensureRouteProjectContext = async (
@@ -5502,6 +5541,16 @@ watch(
     consumePendingListReplanPreview()
   },
 )
+
+watch(teamProjectAccessState, (state, previousState) => {
+  if (
+    state === previousState
+    || state === 'unknown'
+    || state === 'retryable'
+    || displayPhase.value === 'loading'
+  ) return
+  void recoverLostTeamProjectContext(state)
+})
 
 watch(
   () => selectedTask.value?.id,

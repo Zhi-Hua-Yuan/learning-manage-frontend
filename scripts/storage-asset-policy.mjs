@@ -123,8 +123,8 @@ export const storageAssetPolicy = Object.freeze([
     rationale: 'reload 防抖锁是基础设施元数据。',
   },
   {
-    id: 'S7-CACHE-015', name: 'AI confirm operation', currentStorage: 'sessionStorage', currentKey: 'ai:draft:confirm-operation:{draftId}',
-    source: 'src/views/ai/AiDraftDetail.vue', targetScope: 'SESSION_OPERATION', sensitivity: 'SENSITIVE',
+    id: 'S7-CACHE-015', name: 'AI confirm operation', currentStorage: 'sessionStorage', currentKey: 'ai:draft:confirm-operation:{draftId}:actor-{actorId}',
+    source: 'src/utils/sessionOperation.ts', targetScope: 'SESSION_OPERATION', sensitivity: 'SENSITIVE',
     persistenceAllowed: true, actorRequired: true, clearOnSessionEnd: true,
     clearOnBackendVersionChange: false, legacyAction: 'DROP', implementationTarget: 'E2',
     rationale: '幂等 operationId 绑定草稿业务上下文，不能跨账号复用。',

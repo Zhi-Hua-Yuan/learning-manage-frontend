@@ -554,7 +554,13 @@ const createUuid = () => {
 
 const getOrCreateOperationId = () => {
   const draftId = String(props.draftId || '').trim()
-  if (confirmOperationId.value) return confirmOperationId.value
+  if (confirmOperationId.value) {
+    // Actor bootstrap can lag behind draft hydration. Retry persistence on
+    // every operation attempt so a pre-bootstrap in-memory id is durable once
+    // the active actor becomes available.
+    writeSessionOperationId(draftId, confirmOperationId.value)
+    return confirmOperationId.value
+  }
 
   const stored = readStoredOperationId(draftId)
   if (stored) {

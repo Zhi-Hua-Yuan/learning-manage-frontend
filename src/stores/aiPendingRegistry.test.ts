@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from './aiPendingRegistry'
+import { resetProtectedSessionState } from '@/utils/sessionLifecycle'
 
 describe('AI pending registry', () => {
   beforeEach(() => {
@@ -59,5 +60,22 @@ describe('AI pending registry', () => {
 
     expect(Object.values(store.boards).every((entry) => entry.status === 'idle')).toBe(true)
     expect(store.boards[AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN].responsePayload).toBeNull()
+  })
+
+  it('resets all pending AI state when the protected session is reset', () => {
+    const store = useAiPendingRegistryStore()
+    const ticket = store.startRequest(AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH, {
+      reviewKey: 'review:private-1',
+    })!
+    store.resolveSuccess(ticket, { reflection: 'sensitive response' })
+
+    resetProtectedSessionState('USER_LOGOUT')
+
+    expect(store.boards[AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH]).toMatchObject({
+      status: 'idle',
+      requestMeta: null,
+      responsePayload: null,
+      errorMessage: null,
+    })
   })
 })

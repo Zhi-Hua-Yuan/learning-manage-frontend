@@ -5,6 +5,7 @@ import { createPinia } from 'pinia'
 
 import TaskList from './TaskList.vue'
 import { ApiRequestError } from '@/utils/request'
+import { resetProtectedSessionState } from '@/utils/sessionLifecycle'
 
 const { route, router } = vi.hoisted(() => ({
   route: {
@@ -218,5 +219,24 @@ describe('TaskList status mutation integration', () => {
     await vi.waitFor(() => expect(wrapper.get('[data-testid="task-status-toggle-1"]').attributes('disabled')).toBeDefined())
     expect(router.push).not.toHaveBeenCalledWith('/login')
     expect(taskApi.changeTaskStatusApi).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears milestone drafts when the protected session is reset', async () => {
+    const wrapper = await mountTaskList()
+    const addMilestoneButton = wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text().includes('添加阶段'))
+    if (!addMilestoneButton) throw new Error('add milestone button not rendered')
+
+    await addMilestoneButton.trigger('click')
+    const input = wrapper.get('input[placeholder="输入阶段名称，按回车保存"]')
+    await input.setValue('账号 A 私密阶段')
+
+    resetProtectedSessionState('USER_LOGOUT')
+    await nextTick()
+
+    expect(wrapper.find('input[placeholder="输入阶段名称，按回车保存"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('账号 A 私密阶段')
+    wrapper.unmount()
   })
 })

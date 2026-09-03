@@ -561,6 +561,7 @@ import {
 import { logoutApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { useSessionResetHandler } from '@/composables/useSessionResetHandler'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { buildTeamProjectRoute, parseTaskProjectContext } from '@/router/taskProjectContext'
 import {
@@ -1335,6 +1336,25 @@ watch(showDeleteProjectConfirm, (next) => {
     pendingDeleteProject.value = null
   }
 })
+
+const resetBasicLayoutForSession = () => {
+  projectList.value = []
+  currentUserInfo.value = {}
+  isUserMenuOpen.value = false
+  showLogoutModal.value = false
+  showDeleteProjectConfirm.value = false
+  pendingDeleteProject.value = null
+  activeProjectActionId.value = ''
+  showProjectSettingsModal.value = false
+  projectSettingsProjectId.value = ''
+  isProjectSettingsSubmitting.value = false
+  pendingProjectDeleteIds.clear()
+  resetProjectSettingsForm()
+  expandedTeamIds.value = []
+  isSidebarOpen.value = false
+}
+
+useSessionResetHandler(resetBasicLayoutForSession)
 
 onMounted(() => {
   void initializeCollaboration()

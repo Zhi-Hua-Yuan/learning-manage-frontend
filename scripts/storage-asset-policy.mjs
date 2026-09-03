@@ -140,7 +140,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'clearCollaborationContext', coverage: ['currentUser', 'load states', 'pending promises'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'AUTHENTICATION_REQUIRED'],
     staleGuard: { strategy: 'SESSION_EPOCH', tokens: ['sessionEpoch', 'startingEpoch'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'collaborationStore', rationale: '身份状态只存在当前会话内存。',
   },
   {
@@ -154,7 +154,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'clearCollaborationContext', coverage: ['teams', 'team load state', 'team promises'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'AUTHENTICATION_REQUIRED', 'TEAM_ACCESS_LOST'],
     staleGuard: { strategy: 'SESSION_EPOCH_AND_ACTOR', tokens: ['sessionEpoch', 'currentUser.id'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'collaborationStore', rationale: '团队和角色权限不能落盘。',
   },
   {
@@ -168,7 +168,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'invalidateTeamProjectsById', coverage: ['team project bucket', 'project promises', 'project revisions'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'TEAM_ACCESS_LOST', 'PROJECT_CONTEXT_CHANGE'],
     staleGuard: { strategy: 'SESSION_EPOCH_ACTOR_TEAM_REVISION', tokens: ['sessionEpoch', 'actorId', 'teamId', 'projectRevision'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'collaborationStore', rationale: '按 teamId 缓存于会话内存。',
   },
   {
@@ -182,7 +182,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'invalidateTeamMembersById', coverage: ['team member bucket', 'member promises', 'member revisions'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'TEAM_ACCESS_LOST', 'TASK_CONTEXT_CHANGE'],
     staleGuard: { strategy: 'SESSION_EPOCH_ACTOR_TEAM_REVISION', tokens: ['sessionEpoch', 'actorId', 'teamId', 'memberRevision'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'collaborationStore', rationale: '成员信息只允许按需加载到内存。',
   },
   {
@@ -196,7 +196,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'task context reset and failClosedTaskCapabilities', coverage: ['selectedTask', 'taskList capabilities', 'assignment candidates'], status: 'PARTIAL' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'TASK_CONTEXT_CHANGE', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
     staleGuard: { strategy: 'REQUEST_VERSION_PROJECT_CONTEXT', tokens: ['taskLoadVersion', 'selectedProjectId', 'currentContextKey'], status: 'PARTIAL' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'task page state', rationale: 'capability 必须来自当前账号的最新服务端事实。',
   },
   {
@@ -210,7 +210,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'reset', coverage: ['activeTaskId', 'records', 'pagination', 'phase', 'error'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'TASK_CONTEXT_CHANGE', 'DRAWER_CLOSE', 'VIEW_UNMOUNT'],
     staleGuard: { strategy: 'REQUEST_REVISION_AND_TASK_ID', tokens: ['requestRevision', 'activeTaskId'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'history drawer', rationale: '负责人历史不得持久化。',
   },
   {
@@ -224,7 +224,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'reset', coverage: ['activeTeamId', 'records', 'pagination', 'phase', 'error'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'TEAM_ACCESS_LOST', 'VIEW_UNMOUNT'],
     staleGuard: { strategy: 'REQUEST_REVISION_ACTOR_SESSION_TEAM', tokens: ['requestRevision', 'actorId', 'sessionEpoch', 'teamId'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'shared review page', rationale: '共享摘要不得写入未隔离存储。',
   },
   {
@@ -238,7 +238,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'onBeforeUnmount + resetSummaryDerivedState + resetAssociationContext', coverage: ['reflection', 'nextPlan', 'visibility', 'team', 'associations', 'summary'], status: 'PARTIAL' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'REVIEW_CONTEXT_CHANGE', 'VIEW_UNMOUNT'],
     staleGuard: { strategy: 'VIEW_ACTOR_REVIEW_EPOCHS', tokens: ['isViewMounted', 'actorIdentity', 'authorContextRequestEpoch', 'summaryRequestEpoch'], status: 'PARTIAL' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'review page form', rationale: '私人正文和计划只保存在当前页面。',
   },
   {
@@ -252,7 +252,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'resetAll', coverage: ['requestMeta', 'status', 'errorMessage', 'consumedAt'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'VIEW_UNMOUNT'],
     staleGuard: { strategy: 'REQUEST_ID_AND_PENDING_STATUS', tokens: ['requestId', 'status'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'aiPendingRegistry', rationale: 'requestMeta 可能包含业务 ID。',
   },
   {
@@ -266,7 +266,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'resetAll', coverage: ['responsePayload', 'status', 'errorMessage', 'consumedAt'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'VIEW_UNMOUNT'],
     staleGuard: { strategy: 'REQUEST_ID_AND_PENDING_STATUS', tokens: ['requestId', 'status'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'aiPendingRegistry', rationale: 'AI 完整响应不得持久化或写日志。',
   },
   {
@@ -280,7 +280,7 @@ export const storageAssetPolicy = Object.freeze([
     currentReset: { entrypoint: 'close / invalidateUnlessCurrent', coverage: ['taskId', 'projectId', 'targetAssigneeUserId', 'reason'], status: 'COMPLETE' },
     requiredResetTriggers: ['SESSION_END', 'ACTOR_CHANGE', 'TASK_CONTEXT_CHANGE', 'DIALOG_CLOSE', 'VIEW_UNMOUNT'],
     staleGuard: { strategy: 'CONTEXT_KEY_AND_TASK_ID', tokens: ['contextKey', 'taskId'], status: 'COMPLETE' },
-    resetIntegrationStatus: 'MISSING',
+    resetIntegrationStatus: 'COMPLETE',
     staleGuardRequired: true, resetTarget: 'assignment dialog', rationale: '成员选择和 reason 不得持久化或写日志。',
   },
 ])

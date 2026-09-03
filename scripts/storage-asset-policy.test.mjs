@@ -57,7 +57,7 @@ test('has a complete, closed classification for every asset', () => {
       assert.ok(Array.isArray(asset.staleGuard.tokens))
       assert.ok(asset.staleGuard.tokens.length > 0)
       assert.ok(MEMORY_RESET_STATUSES.includes(asset.staleGuard.status))
-      assert.equal(asset.resetIntegrationStatus, 'MISSING')
+      assert.equal(asset.resetIntegrationStatus, 'COMPLETE')
     }
     if (asset.targetScope === 'GLOBAL_PREFERENCE') {
       assert.equal(asset.actorRequired, false)

@@ -1527,6 +1527,7 @@ import {
   type TaskAssignmentRecoverySource,
 } from '@/composables/useTaskAssignmentMutation'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { useSessionResetHandler } from '@/composables/useSessionResetHandler'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { useToastStore } from '@/stores/toast'
@@ -4997,6 +4998,13 @@ const openAddMilestoneInput = () => {
   newMilestoneName.value = ''
 }
 
+const resetMilestoneInteraction = () => {
+  isAddingMilestone.value = false
+  newMilestoneName.value = ''
+  editingMilestoneId.value = ''
+  editMilestoneName.value = ''
+}
+
 const startEditMilestone = (milestone: Milestone) => {
   editingMilestoneId.value = milestone.id
   editMilestoneName.value = milestone.name
@@ -5335,6 +5343,48 @@ watch(showDeleteMilestoneConfirm, (next) => {
     pendingDeleteMilestone.value = null
   }
 })
+
+const resetTaskPageForSession = () => {
+  projectLoadVersion.value += 1
+  taskLoadVersion.value += 1
+  milestoneLoadVersion.value += 1
+  isAddingTask.value = false
+  isAddingMilestone.value = false
+  projectList.value = []
+  taskList.value = []
+  milestoneList.value = []
+  milestoneCacheByProject.value = {}
+  selectedTask.value = null
+  selectedTaskTitleBaseline.value = ''
+  selectedTaskDescriptionBaseline.value = null
+  todayAiOrderMetaByTaskId.value = {}
+  isListReplanDirty.value = false
+  resetListReplanRuntimeState()
+  lastListReplanReminderRequestId.value = 0
+  closeTodayAiReasonDialog()
+  closeListReplanPreviewDialog()
+  closeCompletionQualityModal()
+  showDeleteTaskConfirm.value = false
+  pendingDeleteTask.value = null
+  showDeleteMilestoneConfirm.value = false
+  pendingDeleteMilestone.value = null
+  resetNewTaskDraft({ blurInput: false })
+  resetMilestoneInteraction()
+  isPriorityMenuOpen.value = false
+  isDueDatePickerOpen.value = false
+  isMilestoneMenuOpen.value = false
+  isNewTaskMilestoneMenuOpen.value = false
+  isNewTaskFlagMenuOpen.value = false
+  clearBoardSlowTimer()
+  displayPhase.value = 'loading'
+  boardErrorMessage.value = DEFAULT_BOARD_ERROR_MESSAGE
+  closeTaskAssignmentDialog(false)
+  closeTaskAssignmentHistoryDrawer(false)
+  resetTaskAssignmentCandidates()
+  resetAllTaskStatusMutations()
+}
+
+useSessionResetHandler(resetTaskPageForSession)
 
 onMounted(async () => {
   isTaskViewMounted.value = true

@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { fetchTeamProjectsApi } from '@/api/project'
@@ -21,6 +21,7 @@ import {
   type ApiErrorKind,
 } from '@/utils/request'
 import { clearActiveCacheActor, setActiveCacheActor } from '@/utils/cacheActor'
+import { registerSessionResetHandler, resetProtectedSessionState } from '@/utils/sessionLifecycle'
 
 export type CollaborationLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -139,6 +140,11 @@ export const useCollaborationStore = defineStore('collaboration', () => {
   const memberPromises = new Map<string, Promise<TeamMemberContext[]>>()
   const projectRevisions = new Map<string, number>()
   const memberRevisions = new Map<string, number>()
+
+  const unregisterSessionReset = registerSessionResetHandler(() => {
+    clearCollaborationContext()
+  })
+  onScopeDispose(unregisterSessionReset)
 
   const teamById = computed(() => new Map(teams.value.map((team) => [team.id, team])))
 
@@ -303,7 +309,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
         }
 
         if (currentUser.value && currentUser.value.id !== nextUser.id) {
-          clearCollaborationContext()
+          resetProtectedSessionState('ACTOR_CHANGED')
         }
         setActiveCacheActor(nextUser.id)
         currentUser.value = nextUser

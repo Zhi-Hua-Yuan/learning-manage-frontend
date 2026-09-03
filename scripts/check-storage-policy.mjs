@@ -15,9 +15,9 @@ export const STORAGE_ACCESS_RULES = Object.freeze([
   indirect(['S7-CACHE-006', 'S7-CACHE-007'], 'src/utils/projectCache.ts', ['readCache', 'writeCache', 'removeCache']),
   indirect(['S7-CACHE-008', 'S7-CACHE-009'], 'src/utils/taskCache.ts', ['readCache', 'writeCache', 'removeCache', 'listStorageKeys', 'removeRawStorage']),
   { id: 'GATEWAY-CACHE-CLIENT', file: 'src/utils/cacheClient.ts', storage: 'localStorage', operations: ['getItem', 'setItem', 'removeItem', 'key', 'length'], gateway: true },
-  { id: 'GATEWAY-CACHE-SESSION-CLIENT', file: 'src/utils/cacheClient.ts', storage: 'sessionStorage', operations: ['key', 'length', 'removeItem'], gateway: true },
   { id: 'GATEWAY-CACHE-HELPERS', file: 'src/utils/cacheClient.ts', storage: 'cacheHelper', operations: ['readCache', 'writeCache', 'removeCache', 'readRawStorage', 'writeRawStorage', 'removeRawStorage', 'listStorageKeys'], gateway: true },
-  { id: 'GATEWAY-CACHE-VERSION-LIST', file: 'src/utils/cacheVersion.ts', storage: 'cacheHelper', operations: ['listStorageKeys', 'listSessionStorageKeys'], gateway: true },
+  { id: 'GATEWAY-CACHE-VERSION-LIST', file: 'src/utils/cacheVersion.ts', storage: 'cacheHelper', operations: ['listStorageKeys'], gateway: true },
+  { id: 'GATEWAY-CACHE-MIGRATION', file: 'src/utils/cacheMigration.ts', storage: 'cacheHelper', operations: ['listStorageKeys', 'removeRawStorage'], gateway: true },
   { id: 'GATEWAY-CACHE-VERSION-CLEAR', file: 'src/utils/cacheVersion.ts', storage: 'localStorage', operations: ['removeItem', 'key', 'length'], gateway: true },
 ])
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { dropLegacyBusinessCacheKeys, syncBackendCacheVersion } from './cacheVersion'
+import { syncBackendCacheVersion } from './cacheVersion'
+import { dropLegacyUnscopedBusinessCaches } from './cacheMigration'
 
 describe('backend cache version synchronization', () => {
   it('records the first version without invalidating caches', () => {
@@ -16,7 +17,7 @@ describe('backend cache version synchronization', () => {
     })
     expect(window.localStorage.getItem('tick:cache:task-list:v1:1:actor-1')).toBe('cached')
     expect(window.localStorage.getItem('tick_selectedProjectId')).toBeNull()
-    expect(window.sessionStorage.getItem('ai:draft:confirm-operation:123')).toBeNull()
+    expect(window.sessionStorage.getItem('ai:draft:confirm-operation:123')).toBe('legacy')
   })
 
   it('does nothing when the version is unchanged', () => {
@@ -53,20 +54,20 @@ describe('backend cache version synchronization', () => {
     expect(window.localStorage.getItem('tick_backend_cache_version')).toBe('2')
   })
 
-  it('drops all legacy business keys without deleting global preferences', () => {
+  it('drops all legacy localStorage business keys without deleting global preferences', () => {
     window.localStorage.setItem('tick_selectedProjectId', 'legacy')
     window.localStorage.setItem('tick:cache:project-list:status-0:v1', 'legacy')
     window.localStorage.setItem('tick_aiPlannerDraft_v1', 'legacy')
     window.localStorage.setItem('tick_themeMode', 'dark')
-    window.sessionStorage.setItem('ai:draft:confirm-operation:abc', 'legacy')
+    window.sessionStorage.setItem('ai:draft:confirm-operation:abc', 'keep-for-e2')
 
-    dropLegacyBusinessCacheKeys()
+    dropLegacyUnscopedBusinessCaches()
 
     expect(window.localStorage.getItem('tick_selectedProjectId')).toBeNull()
     expect(window.localStorage.getItem('tick:cache:project-list:status-0:v1')).toBeNull()
     expect(window.localStorage.getItem('tick_aiPlannerDraft_v1')).toBeNull()
     expect(window.localStorage.getItem('tick_themeMode')).toBe('dark')
-    expect(window.sessionStorage.getItem('ai:draft:confirm-operation:abc')).toBeNull()
+    expect(window.sessionStorage.getItem('ai:draft:confirm-operation:abc')).toBe('keep-for-e2')
   })
 
   it('prefers a recognized header over a payload version', () => {

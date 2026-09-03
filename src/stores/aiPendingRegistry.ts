@@ -1,5 +1,7 @@
-import { reactive } from 'vue'
+import { onScopeDispose, reactive } from 'vue'
 import { defineStore } from 'pinia'
+
+import { registerSessionResetHandler } from '@/utils/sessionLifecycle'
 
 export const AI_PENDING_BOARDS = {
   WEEKLY_REVIEW_POLISH: 'weekly-review-polish',
@@ -47,6 +49,11 @@ export const useAiPendingRegistryStore = defineStore('aiPendingRegistry', () => 
     [AI_PENDING_BOARDS.TASK_TODAY_AI_ORDER]: createBoardEntry(),
     [AI_PENDING_BOARDS.TASK_LIST_REPLAN_PREVIEW]: createBoardEntry(),
   })
+
+  const unregisterSessionReset = registerSessionResetHandler(() => {
+    resetAll()
+  })
+  onScopeDispose(unregisterSessionReset)
 
   const startRequest = (
     board: AiPendingBoard,

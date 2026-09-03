@@ -1,5 +1,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { onScopeDispose } from 'vue'
+
+import { registerSessionResetHandler } from '@/utils/sessionLifecycle'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -38,6 +41,17 @@ export const useToastStore = defineStore('toast', () => {
     toasts.value = toasts.value.filter((toast) => toast.id !== id)
   }
 
+  const dismissAll = () => {
+    timers.forEach((timer) => clearTimeout(timer))
+    timers.clear()
+    toasts.value = []
+  }
+
+  const unregisterSessionReset = registerSessionResetHandler(() => {
+    dismissAll()
+  })
+  onScopeDispose(unregisterSessionReset)
+
   const push = (payload: ToastPayload) => {
     const id = ++toastSeed
     const duration = payload.duration ?? 3000
@@ -75,6 +89,7 @@ export const useToastStore = defineStore('toast', () => {
     toasts,
     push,
     dismiss,
+    dismissAll,
     triggerAction,
   }
 })

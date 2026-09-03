@@ -22,6 +22,8 @@ export const useToast = () => {
       },
     })
 
+  const dismiss = (id: number) => toastStore.dismiss(id)
+
   return {
     show,
     success,
@@ -29,5 +31,6 @@ export const useToast = () => {
     info,
     warning,
     undo,
+    dismiss,
   }
 }

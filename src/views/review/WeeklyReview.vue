@@ -409,6 +409,7 @@ import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPending
 import { useCollaborationStore } from '@/stores/collaboration'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
+import { useSessionResetHandler } from '@/composables/useSessionResetHandler'
 import {
   normalizeCurrentWeeklyReviewWire,
   normalizePersistedWeeklyReviewWire,
@@ -1562,6 +1563,32 @@ watch(
     }
   },
 )
+
+const resetWeeklyReviewForSession = () => {
+  authorContextRequestEpoch += 1
+  summaryRequestEpoch += 1
+  polishContextRevision += 1
+  activeAuthorContextIdentity = null
+  currentReview.value = createEmptyReviewDetail()
+  historyReviews.value = []
+  authorFactsReady.value = false
+  reviewForm.value = createDefaultWeeklyReviewForm(0, 0)
+  formIssues.value = []
+  pendingMutation.value = null
+  isSaving.value = false
+  activeTaskProjectId.value = null
+  associationAccessMessage.value = null
+  selectedReview.value = null
+  showDetailModal.value = false
+  showSaveConfirmModal.value = false
+  showDeleteConfirmModal.value = false
+  activeReviewView.value = 'mine'
+  resetSummaryDerivedState()
+  reviewAssociations.resetContext()
+  teamSharedReviews.reset()
+}
+
+useSessionResetHandler(resetWeeklyReviewForSession)
 
 onBeforeUnmount(() => {
   isViewMounted.value = false

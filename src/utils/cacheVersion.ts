@@ -1,3 +1,5 @@
+import { listSessionStorageKeys, listStorageKeys, removeRawSessionStorage } from '@/utils/cacheClient'
+
 const BACKEND_CACHE_VERSION_KEY = 'tick_backend_cache_version'
 const BACKEND_CACHE_RELOAD_LOCK_KEY = 'tick_backend_cache_reload_lock'
 
@@ -71,17 +73,53 @@ const extractVersionFromHeaders = (headers: unknown): string | null => {
   return null
 }
 
-const clearAllTickCaches = () => {
-  if (!canUseLocalStorage()) return
+const LEGACY_LOCAL_STORAGE_KEYS = new Set([
+  'tick_selectedProjectId',
+  'tick:cache:project-progress:v2',
+  'tick_aiPlannerDraft_v1',
+])
+const LEGACY_LOCAL_STORAGE_PREFIXES = [
+  'tick:cache:project-list:',
+  'tick:cache:task-list:v1:',
+  'tick:cache:task-list:all:v1',
+  'tick:cache:task-today-ai-order:v1',
+  'tick:cache:task-list-replan-state:v1',
+]
+const LEGACY_SESSION_STORAGE_PREFIXES = ['ai:draft:confirm-operation:']
 
-  const keys: string[] = []
-  for (let i = 0; i < window.localStorage.length; i += 1) {
-    const key = window.localStorage.key(i)
-    if (key) keys.push(key)
+const matchesLegacyKey = (key: string, exactKeys: Set<string>, prefixes: string[]) => (
+  exactKeys.has(key) || prefixes.some((prefix) => key.startsWith(prefix) && !key.includes(':actor-'))
+)
+
+export const dropLegacyBusinessCacheKeys = () => {
+  if (canUseLocalStorage()) {
+    listStorageKeys()
+      .filter((key) => matchesLegacyKey(key, LEGACY_LOCAL_STORAGE_KEYS, LEGACY_LOCAL_STORAGE_PREFIXES))
+      .forEach((key) => window.localStorage.removeItem(key))
   }
 
-  keys
-    .filter((key) => key.startsWith('tick_') || key.startsWith('tick:'))
+  if (canUseSessionStorage()) {
+    listSessionStorageKeys()
+      .filter((key) => matchesLegacyKey(key, new Set(), LEGACY_SESSION_STORAGE_PREFIXES))
+      .forEach(removeRawSessionStorage)
+  }
+}
+
+const clearBackendInvalidatedCaches = () => {
+  if (!canUseLocalStorage()) return
+
+  const invalidatedPrefixes = [
+    'tick_selectedProjectId:actor-',
+    'tick:cache:project-list:',
+    'tick:cache:project-progress:v2:actor-',
+    'tick:cache:task-list:v1:',
+    'tick:cache:task-list:all:v1:',
+    'tick:cache:task-today-ai-order:v1:',
+    'tick:cache:task-list-replan-state:v1:',
+  ]
+
+  listStorageKeys()
+    .filter((key) => invalidatedPrefixes.some((prefix) => key.startsWith(prefix)))
     .forEach((key) => window.localStorage.removeItem(key))
 }
 
@@ -109,6 +147,8 @@ export const syncBackendCacheVersion = (
   const nextVersion = extractVersionFromHeaders(headers) || extractVersionFromPayload(payload)
   if (!nextVersion) return null
 
+  dropLegacyBusinessCacheKeys()
+
   const previousVersion = (window.localStorage.getItem(BACKEND_CACHE_VERSION_KEY) || '').trim()
   if (!previousVersion) {
     window.localStorage.setItem(BACKEND_CACHE_VERSION_KEY, nextVersion)
@@ -129,7 +169,7 @@ export const syncBackendCacheVersion = (
     }
   }
 
-  clearAllTickCaches()
+  clearBackendInvalidatedCaches()
   window.localStorage.setItem(BACKEND_CACHE_VERSION_KEY, nextVersion)
 
   return {
@@ -139,4 +179,3 @@ export const syncBackendCacheVersion = (
     shouldReload: shouldReloadForVersion(nextVersion),
   }
 }
-

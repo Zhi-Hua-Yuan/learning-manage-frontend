@@ -68,6 +68,25 @@ export const listStorageKeys = () => {
   return keys
 }
 
+export const listSessionStorageKeys = () => {
+  if (typeof window === 'undefined' || typeof window.sessionStorage === 'undefined') return []
+  const keys: string[] = []
+  for (let i = 0; i < window.sessionStorage.length; i++) {
+    const key = window.sessionStorage.key(i)
+    if (key) keys.push(key)
+  }
+  return keys
+}
+
+export const removeRawSessionStorage = (key: string) => {
+  if (typeof window === 'undefined' || typeof window.sessionStorage === 'undefined') return
+  try {
+    window.sessionStorage.removeItem(key)
+  } catch {
+    // Ignore storage remove errors.
+  }
+}
+
 const parseEnvelope = <T>(
   raw: string,
   entry: CacheEntry,

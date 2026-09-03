@@ -278,6 +278,10 @@ import { isApiRequestError } from '@/utils/request'
 import { clearProjectListCache, clearProjectProgressCache } from '@/utils/projectCache'
 import { emitProjectListUpdated } from '@/utils/projectEvents'
 import { clearTaskCache } from '@/utils/taskCache'
+import {
+  readSessionOperationId,
+  writeSessionOperationId,
+} from '@/utils/sessionOperation'
 
 const props = defineProps<{ draftId: string }>()
 
@@ -523,14 +527,8 @@ const loadDraft = async () => {
   }
 }
 
-const getOperationStorageKey = (draftId: string) => `ai:draft:confirm-operation:${draftId}`
-
 const readStoredOperationId = (draftId: string) => {
-  try {
-    return window.sessionStorage.getItem(getOperationStorageKey(draftId))?.trim() || ''
-  } catch {
-    return ''
-  }
+  return readSessionOperationId(draftId)
 }
 
 const createUuid = () => {
@@ -566,11 +564,7 @@ const getOrCreateOperationId = () => {
 
   const operationId = createUuid()
   confirmOperationId.value = operationId
-  try {
-    window.sessionStorage.setItem(getOperationStorageKey(draftId), operationId)
-  } catch {
-    // The in-memory value still guarantees reuse during the current page lifetime.
-  }
+  writeSessionOperationId(draftId, operationId)
   return operationId
 }
 

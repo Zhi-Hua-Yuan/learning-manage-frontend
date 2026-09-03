@@ -10,7 +10,7 @@ export const STORAGE_ACCESS_RULES = Object.freeze([
   direct('S7-CACHE-004', 'src/views/task/TaskList.vue', 'localStorage', ['getItem', 'setItem'], /tick_detailWidth/),
   direct('S7-CACHE-013', 'src/utils/cacheVersion.ts', 'localStorage', ['getItem', 'setItem'], /BACKEND_CACHE_VERSION_KEY/),
   direct('S7-CACHE-014', 'src/utils/cacheVersion.ts', 'sessionStorage', ['getItem', 'setItem'], /BACKEND_CACHE_RELOAD_LOCK_KEY/),
-  direct('S7-CACHE-015', 'src/views/ai/AiDraftDetail.vue', 'sessionStorage', ['getItem', 'setItem'], /getOperationStorageKey/),
+  direct('S7-CACHE-015', 'src/utils/sessionOperation.ts', 'sessionStorage', ['getItem', 'setItem'], /key/),
   indirect(['S7-CACHE-002', 'S7-CACHE-005', 'S7-CACHE-010', 'S7-CACHE-011', 'S7-CACHE-012'], 'src/utils/appCache.ts', ['readCache', 'writeCache', 'removeCache', 'readRawStorage']),
   indirect(['S7-CACHE-006', 'S7-CACHE-007'], 'src/utils/projectCache.ts', ['readCache', 'writeCache', 'removeCache']),
   indirect(['S7-CACHE-008', 'S7-CACHE-009'], 'src/utils/taskCache.ts', ['readCache', 'writeCache', 'removeCache', 'listStorageKeys', 'removeRawStorage']),
@@ -19,6 +19,8 @@ export const STORAGE_ACCESS_RULES = Object.freeze([
   { id: 'GATEWAY-CACHE-VERSION-LIST', file: 'src/utils/cacheVersion.ts', storage: 'cacheHelper', operations: ['listStorageKeys'], gateway: true },
   { id: 'GATEWAY-CACHE-MIGRATION', file: 'src/utils/cacheMigration.ts', storage: 'cacheHelper', operations: ['listStorageKeys', 'removeRawStorage'], gateway: true },
   { id: 'GATEWAY-CACHE-VERSION-CLEAR', file: 'src/utils/cacheVersion.ts', storage: 'localStorage', operations: ['removeItem', 'key', 'length'], gateway: true },
+  { id: 'GATEWAY-SESSION-STORAGE-CLEANUP', file: 'src/utils/sessionStorageCleanup.ts', storage: 'sessionStorage', operations: ['removeItem', 'key', 'length'], gateway: true },
+  { id: 'GATEWAY-SESSION-CLEANUP-CACHE-HELPER', file: 'src/utils/sessionStorageCleanup.ts', storage: 'cacheHelper', operations: ['listStorageKeys', 'removeRawStorage'], gateway: true },
 ])
 
 const policyById = new Map(storageAssetPolicy.map((asset) => [asset.id, asset]))

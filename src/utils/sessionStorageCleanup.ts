@@ -1,4 +1,4 @@
-import { clearAuthToken } from '@/utils/authToken'
+import { clearAuthToken, readAuthToken } from '@/utils/authToken'
 import { clearActiveCacheActor } from '@/utils/cacheActor'
 import { isLegacyUnscopedBusinessCacheKey } from '@/utils/cacheMigration'
 import {
@@ -82,6 +82,10 @@ export const clearProtectedSessionStorage = (): ProtectedStorageCleanupResult =>
 
 export const clearAuthCredential = () => {
   clearAuthToken()
+}
+
+export const readAuthCredential = () => {
+  return readAuthToken()
 }
 
 export const clearActiveSessionActor = () => {

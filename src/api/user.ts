@@ -25,7 +25,18 @@ export const loginApi = (data: LoginPayload) => request.post('/user/login', data
 export const registerApi = (data: RegisterPayload) => request.post('/user/register', data)
 
 // 3. 退出登录
-export const logoutApi = () => request.post('/user/logout')
+const toAuthorizationHeader = (token: string) => (
+  token.startsWith('Bearer ') ? token : `Bearer ${token}`
+)
+
+export const logoutApi = (token = '') => request.post(
+  '/user/logout',
+  undefined,
+  {
+    authFailureMode: 'LOCAL',
+    ...(token ? { headers: { Authorization: toAuthorizationHeader(token) } } : {}),
+  },
+)
 
 // 4. 获取当前登录用户信息
 export const getUserMeApi = () => request.get<unknown, Promise<CurrentUserWire>>('/user/me')

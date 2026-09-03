@@ -131,55 +131,6 @@
       </div>
     </div>
 
-    <transition
-      enter-active-class="ease-out duration-300"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="ease-in duration-200"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="showReLoginModal"
-        class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none"
-      >
-        <div class="fixed inset-0 bg-[var(--color-backdrop-strong)] backdrop-blur-sm transition-opacity"></div>
-
-        <div class="relative w-auto max-w-sm mx-auto my-6 z-[var(--z-modal-panel)] transform transition-all">
-          <div
-            class="surface-panel relative flex w-full flex-col overflow-hidden rounded-2xl border-0 outline-none focus:outline-none"
-          >
-            <div class="h-1 w-full bg-[var(--color-primary)]"></div>
-            <div class="p-8 pb-4 flex flex-col items-center text-center">
-              <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-primary-soft-2)]">
-                <AppIcon name="lock" class="h-8 w-8 text-[var(--color-primary)]" />
-              </div>
-              <h3 class="mb-2 text-xl font-black text-[var(--color-text-primary)]">密码修改成功</h3>
-              <p class="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                您的账户安全信息已更新，为了保障账号安全，请使用新密码重新登录系统。
-              </p>
-            </div>
-            <div class="flex items-center justify-center p-6 pt-2">
-              <button
-                class="btn-primary w-full gap-2 rounded-xl px-6 py-3 text-sm font-bold outline-none focus:outline-none"
-                type="button"
-                @click="confirmReLogin"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-                  ></path>
-                </svg>
-                前往重新登录
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
   </main>
 </template>
 
@@ -192,7 +143,7 @@ import { useRouter } from 'vue-router'
 import { getUserMeApi, updatePasswordApi, updateUserInfoApi } from '@/api/user'
 import { type ThemeMode, useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
-import { clearAuthToken } from '@/utils/authToken'
+import { terminateAuthenticatedSession } from '@/utils/sessionLifecycle'
 
 interface CurrentUserInfo {
   username?: string
@@ -205,7 +156,6 @@ const USERNAME_MAX_LENGTH = 20
 
 const router = useRouter()
 const toast = useToast()
-const showReLoginModal = ref(false)
 const { themeMode, setThemeMode } = useTheme()
 
 const themeOptions: Array<{ value: ThemeMode; label: string; bg: string; text: string }> = [
@@ -216,11 +166,6 @@ const themeOptions: Array<{ value: ThemeMode; label: string; bg: string; text: s
   { value: 'brown', label: '棕色', bg: '#8b6914', text: '#ffffff' },
   { value: 'pink', label: '粉色', bg: '#e879a9', text: '#ffffff' },
 ]
-
-const confirmReLogin = async () => {
-  clearAuthToken()
-  await router.push('/login')
-}
 
 const applyThemeMode = (mode: ThemeMode) => {
   setThemeMode(mode)
@@ -303,7 +248,11 @@ const handleUpdatePassword = async () => {
 
   try {
     await updatePasswordApi({ oldPassword, newPassword })
-    showReLoginModal.value = true
+    terminateAuthenticatedSession('PASSWORD_CHANGED')
+    await router.replace({
+      path: '/login',
+      query: { reason: 'password_changed' },
+    })
   } catch (error: unknown) {
     const backendMessage =
       error &&

@@ -1,8 +1,9 @@
 import axios from 'axios'
 import router from '../router' // 引入路由用于跳转
 import { useToastStore } from '@/stores/toast'
-import { clearAuthToken, readAuthToken } from '@/utils/authToken'
+import { readAuthToken } from '@/utils/authToken'
 import { syncBackendCacheVersion } from '@/utils/cacheVersion'
+import { terminateAuthenticatedSession } from '@/utils/sessionLifecycle'
 
 interface ApiRequestErrorOptions {
   code?: number | null
@@ -40,11 +41,17 @@ const request = axios.create({
   timeout: 300000,
 })
 
+export type AuthFailureMode = 'GLOBAL' | 'LOCAL'
+
 const isPublicAuthPath = (url: unknown) => {
   if (typeof url !== 'string' || !url) return false
   const normalized = url.toLowerCase()
   return normalized.includes('/user/login') || normalized.includes('/user/register')
 }
+
+const isLocalAuthFailureRequest = (config: { url?: string; authFailureMode?: AuthFailureMode } | null | undefined) => (
+  config?.authFailureMode === 'LOCAL' || isPublicAuthPath(config?.url)
+)
 
 const resolveBusinessMessage = (res: unknown) => {
   if (!res || typeof res !== 'object') return ''
@@ -77,23 +84,43 @@ const createApiRequestError = (
   return new ApiRequestError(message, options)
 }
 
-const isHtmlForbiddenPage = (value: unknown) => {
-  if (typeof value !== 'string') return false
-  const normalized = value.toLowerCase()
-  if (!normalized.includes('<html')) return false
-  return (
-    normalized.includes('403 forbidden') ||
-    normalized.includes('401 unauthorized') ||
-    normalized.includes('access denied') ||
-    normalized.includes('nginx')
-  )
+type HtmlAccessErrorKind = 'AUTHENTICATION_REQUIRED' | 'PERMISSION_DENIED' | null
+
+const resolvePublicAuthHtmlMessage = (kind: Exclude<HtmlAccessErrorKind, null>) => {
+  return kind === 'PERMISSION_DENIED'
+    ? '登录接口被拒绝（403），请检查网关或后端鉴权配置。'
+    : '登录接口未通过认证（401），请检查网关或后端鉴权配置。'
 }
 
-const isAuthBusinessError = (res: unknown) => {
+const classifyHtmlAccessError = (value: unknown, status: number | null): HtmlAccessErrorKind => {
+  if (typeof value !== 'string') return null
+  const normalized = value.toLowerCase()
+  if (!normalized.includes('<html')) return null
+  if (status === 401) return 'AUTHENTICATION_REQUIRED'
+  if (status === 403) return 'PERMISSION_DENIED'
+  if (normalized.includes('401 unauthorized')) return 'AUTHENTICATION_REQUIRED'
+  if (normalized.includes('403 forbidden') || normalized.includes('access denied')) {
+    return 'PERMISSION_DENIED'
+  }
+  return null
+}
+
+const isPermissionBusinessError = (res: unknown, status: number | null = null) => {
+  if (status === 401) return false
+  if (status === 403) return true
   if (!res || typeof res !== 'object') return false
   const record = res as Record<string, unknown>
   const code = Number(record.code)
-  if (Number.isFinite(code) && (code === 401 || code === 40100)) return true
+  return code === 40300 || code === 40101
+}
+
+const isAuthBusinessError = (res: unknown, status: number | null = null) => {
+  if (status === 401) return true
+  if (status === 403) return false
+  if (!res || typeof res !== 'object') return status === 401
+  const record = res as Record<string, unknown>
+  const code = Number(record.code)
+  if (Number.isFinite(code)) return code === 401 || code === 40100
 
   const message = resolveBusinessMessage(res).toLowerCase()
   if (!message) return false
@@ -110,8 +137,10 @@ const isAuthBusinessError = (res: unknown) => {
 
 export const classifyApiError = (error: unknown): ApiErrorKind => {
   if (!isApiRequestError(error)) return error instanceof TypeError ? 'VALIDATION' : 'UNKNOWN'
-  if (error.code === 40300 || error.code === 40101 || error.httpStatus === 403) return 'PERMISSION_DENIED'
-  if (error.httpStatus === 401 || error.code === 401 || error.code === 40100) return 'AUTHENTICATION_REQUIRED'
+  if (error.httpStatus === 401) return 'AUTHENTICATION_REQUIRED'
+  if (error.httpStatus === 403) return 'PERMISSION_DENIED'
+  if (error.code === 40300 || error.code === 40101) return 'PERMISSION_DENIED'
+  if (error.code === 401 || error.code === 40100) return 'AUTHENTICATION_REQUIRED'
   if (
     error.code === 50001
     || error.httpStatus === 409
@@ -126,8 +155,9 @@ export const classifyApiError = (error: unknown): ApiErrorKind => {
   return 'UNKNOWN'
 }
 
-const redirectToLogin = () => {
-  clearAuthToken()
+const handleAuthenticationRequired = () => {
+  const result = terminateAuthenticatedSession('AUTHENTICATION_REQUIRED')
+  if (!result.changed) return
 
   try {
     const toastStore = useToastStore()
@@ -137,7 +167,7 @@ const redirectToLogin = () => {
   }
 
   if (router.currentRoute.value.path !== '/login') {
-    void router.push('/login')
+    void router.replace('/login')
   }
 }
 
@@ -171,15 +201,30 @@ request.interceptors.response.use(
       }
     }
 
-    if (isHtmlForbiddenPage(res)) {
+    const htmlAccessError = classifyHtmlAccessError(res, resolveHttpStatus(response.status))
+    if (htmlAccessError) {
       if (isPublicAuthPath(requestUrl)) {
         return Promise.reject(
-          createApiRequestError('登录接口被拒绝（403），请检查网关或后端鉴权配置。', {
+          createApiRequestError(resolvePublicAuthHtmlMessage(htmlAccessError), {
+            code: null,
             httpStatus: response.status,
           }),
         )
       }
-      redirectToLogin()
+      if (isLocalAuthFailureRequest(response.config)) {
+        return Promise.reject(
+          createApiRequestError(
+            htmlAccessError === 'PERMISSION_DENIED' ? '请求被网关拒绝。' : '认证请求未通过。',
+            { httpStatus: response.status },
+          ),
+        )
+      }
+      if (htmlAccessError === 'PERMISSION_DENIED') {
+        return Promise.reject(
+          createApiRequestError('没有权限执行此操作', { httpStatus: response.status }),
+        )
+      }
+      handleAuthenticationRequired()
       return Promise.reject(
         createApiRequestError('登录已失效，请重新登录。', { httpStatus: response.status }),
       )
@@ -193,7 +238,16 @@ request.interceptors.response.use(
     const code = resolveBusinessCode(record)
     const message = resolveBusinessMessage(record)
 
-    if (isAuthBusinessError(record)) {
+    if (isPermissionBusinessError(record, resolveHttpStatus(response.status))) {
+      return Promise.reject(
+        createApiRequestError(message || '没有权限执行此操作', {
+          code,
+          httpStatus: response.status,
+        }),
+      )
+    }
+
+    if (isAuthBusinessError(record, resolveHttpStatus(response.status))) {
       if (isPublicAuthPath(requestUrl)) {
         return Promise.reject(
           createApiRequestError(message || '登录失败，请检查账号密码。', {
@@ -202,7 +256,12 @@ request.interceptors.response.use(
           }),
         )
       }
-      redirectToLogin()
+      if (isLocalAuthFailureRequest(response.config)) {
+        return Promise.reject(
+          createApiRequestError(message || '认证请求未通过。', { code, httpStatus: response.status }),
+        )
+      }
+      handleAuthenticationRequired()
       return Promise.reject(
         createApiRequestError(message || '未登录', { code, httpStatus: response.status }),
       )
@@ -226,13 +285,13 @@ request.interceptors.response.use(
       const code = resolveBusinessCode(responseData)
       const message = resolveBusinessMessage(responseData)
 
-      if (code === 40300 || code === 40101) {
+      if (isPermissionBusinessError(responseData, status)) {
         return Promise.reject(
           createApiRequestError(message || '没有权限执行此操作', { code, httpStatus: status }),
         )
       }
 
-      if (status === 401 || status === 403 || isAuthBusinessError(responseData)) {
+      if (isAuthBusinessError(responseData, status)) {
         if (isPublicAuthPath(requestUrl)) {
           return Promise.reject(
             createApiRequestError(message || '登录接口被拒绝，请检查网关或后端鉴权配置。', {
@@ -241,7 +300,12 @@ request.interceptors.response.use(
             }),
           )
         }
-        redirectToLogin()
+        if (isLocalAuthFailureRequest(error.config)) {
+          return Promise.reject(
+            createApiRequestError(message || '认证请求未通过。', { code, httpStatus: status }),
+          )
+        }
+        handleAuthenticationRequired()
         return Promise.reject(
           createApiRequestError(message || '登录已失效，请重新登录。', {
             code,
@@ -250,16 +314,30 @@ request.interceptors.response.use(
         )
       }
 
-      if (isHtmlForbiddenPage(responseData)) {
+      const htmlAccessError = classifyHtmlAccessError(responseData, status)
+      if (htmlAccessError) {
         if (isPublicAuthPath(requestUrl)) {
           return Promise.reject(
-            createApiRequestError('登录接口被拒绝（403），请检查网关或后端鉴权配置。', {
+            createApiRequestError(resolvePublicAuthHtmlMessage(htmlAccessError), {
               code,
               httpStatus: status,
             }),
           )
         }
-        redirectToLogin()
+        if (isLocalAuthFailureRequest(error.config)) {
+          return Promise.reject(
+            createApiRequestError(
+              htmlAccessError === 'PERMISSION_DENIED' ? '请求被网关拒绝。' : '认证请求未通过。',
+              { code, httpStatus: status },
+            ),
+          )
+        }
+        if (htmlAccessError === 'PERMISSION_DENIED') {
+          return Promise.reject(
+            createApiRequestError('没有权限执行此操作', { code, httpStatus: status }),
+          )
+        }
+        handleAuthenticationRequired()
         return Promise.reject(
           createApiRequestError('登录已失效，请重新登录。', {
             code,

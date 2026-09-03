@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setActiveCacheActor } from './cacheActor'
 import { writeAuthToken } from './authToken'
 import {
+  captureAuthSessionSnapshot,
   establishAuthenticatedSession,
+  isAuthSessionSnapshotActive,
   registerSessionResetHandler,
   resetProtectedSessionState,
   terminateAuthenticatedSession,
@@ -96,5 +98,26 @@ describe('session lifecycle cleanup kernel', () => {
 
     expect(result.established).toBe(false)
     expect(window.localStorage.getItem('token')).toBe('existing-token')
+  })
+
+  it('invalidates a captured snapshot after session termination', () => {
+    establishAuthenticatedSession('active-token')
+    const snapshot = captureAuthSessionSnapshot()
+
+    expect(isAuthSessionSnapshotActive(snapshot)).toBe(true)
+
+    terminateAuthenticatedSession('USER_LOGOUT')
+
+    expect(isAuthSessionSnapshotActive(snapshot)).toBe(false)
+  })
+
+  it('invalidates an actor-bound snapshot when the active actor changes', () => {
+    establishAuthenticatedSession('active-token')
+    setActiveCacheActor('7')
+    const snapshot = captureAuthSessionSnapshot()
+
+    setActiveCacheActor('8')
+
+    expect(isAuthSessionSnapshotActive(snapshot)).toBe(false)
   })
 })

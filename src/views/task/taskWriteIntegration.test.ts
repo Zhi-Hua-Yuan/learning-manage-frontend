@@ -162,4 +162,19 @@ describe('TaskList write integration contract', () => {
     )
     expect(loadTasks).toContain('任务权限校验失败，当前缓存仅供查看。')
   })
+
+  it('binds async task writeback to the captured session and board context', () => {
+    const loadTasks = extractFunctionBlock('loadTasks')
+    const loadProjects = extractFunctionBlock('loadProjects')
+    const reconcileAssignment = extractFunctionBlock('reconcileCommittedTaskAssignment')
+
+    expect(taskListSource).toContain('captureAuthSessionSnapshot()')
+    expect(taskListSource).toContain('isAuthSessionSnapshotActive')
+    expect(taskListSource).toContain('contextSnapshot?: TaskContextSnapshot')
+    expect(loadTasks).toContain('isTaskContextSnapshotActive(contextSnapshot)')
+    expect(loadProjects).toContain('isTaskContextSnapshotActive(contextSnapshot)')
+    expect(reconcileAssignment).toContain('snapshot.sessionSnapshot')
+    expect(reconcileAssignment).toContain('abandonStaleRefresh')
+    expect(reconcileAssignment).toContain('if (!isContextActive()) return abandonStaleRefresh()')
+  })
 })

@@ -1574,6 +1574,11 @@ import {
   writeTaskTodayAiOrderCache,
 } from '@/utils/appCache'
 import {
+  captureAuthSessionSnapshot,
+  isAuthSessionSnapshotActive,
+  type AuthSessionSnapshot,
+} from '@/utils/sessionLifecycle'
+import {
   isTaskCompleted,
   TASK_STATUS_DONE_BASIC,
   TASK_STATUS_DONE_EXCELLENT,
@@ -1661,14 +1666,23 @@ interface CalendarCell {
   isSelected: boolean
 }
 
+interface TaskContextSnapshot {
+  session: AuthSessionSnapshot
+  contextKey: string
+  projectId: string
+  teamId: string
+}
+
 interface LoadOptions {
   forceRefresh?: boolean
+  contextSnapshot?: TaskContextSnapshot
 }
 
 interface PendingTaskAssignmentRefresh {
   taskId: string
   projectId: string
   contextKey: string
+  sessionSnapshot: AuthSessionSnapshot
   operation: TaskAssignmentOperation
   result: TaskAssignmentResult
   cacheInvalidated: boolean
@@ -1688,6 +1702,7 @@ interface ContextLoadOptions {
   forceProjectRefresh?: boolean
   forceMilestoneRefresh?: boolean
   forceTaskRefresh?: boolean
+  contextSnapshot?: TaskContextSnapshot
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -2263,6 +2278,22 @@ const milestoneLoadVersion = ref(0)
 const milestoneCacheByProject = ref<Record<string, Milestone[]>>({})
 const todayAiOrderMetaByTaskId = ref<Record<string, TodayAiOrderMeta>>({})
 const isTaskViewMounted = ref(false)
+
+const captureTaskContextSnapshot = (): TaskContextSnapshot => ({
+  session: captureAuthSessionSnapshot(),
+  contextKey: currentContextKey.value,
+  projectId: selectedProjectId.value,
+  teamId: selectedTeamId.value,
+})
+
+const isTaskContextSnapshotActive = (snapshot: TaskContextSnapshot) => (
+  isTaskViewMounted.value
+  && isAuthSessionSnapshotActive(snapshot.session)
+  && currentContextKey.value === snapshot.contextKey
+  && (snapshot.projectId === '' || selectedProjectId.value === snapshot.projectId)
+  && (snapshot.teamId === '' || selectedTeamId.value === snapshot.teamId)
+)
+
 const showTodayAiReasonDialog = ref(false)
 const selectedTodayAiReason = ref<{ taskTitle: string; rank: number; reason: string } | null>(null)
 const isListReplanDirty = ref(false)
@@ -3249,6 +3280,14 @@ const ensureSelectedProjectFromList = async () => {
 const loadProjects = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++projectLoadVersion.value
+  const contextSnapshot = options.contextSnapshot || captureTaskContextSnapshot()
+  const isActive = () => (
+    requestVersion === projectLoadVersion.value
+    && isTaskContextSnapshotActive(contextSnapshot)
+  )
+
+  if (!isActive()) return staleOutcome()
+
   const cachedRecords = !forceRefresh ? readProjectListCache<Project>(0) : null
 
   if (cachedRecords) {
@@ -3257,22 +3296,26 @@ const loadProjects = async (options: LoadOptions = {}): Promise<LoadOutcome> => 
 
   if (cachedRecords && cachedRecords.length > 0 && !forceRefresh) {
     await ensureSelectedProjectFromList()
+    if (!isActive()) return staleOutcome()
     return okOutcome()
   }
 
   try {
     const res = await fetchProjectList({ status: 0 })
-    if (requestVersion !== projectLoadVersion.value) return staleOutcome()
+    if (!isActive()) return staleOutcome()
     const records = extractListPayload<Project>(res)
     if (!records) {
       throw new Error('project-list-shape-invalid')
     }
+    if (!isActive()) return staleOutcome()
     projectList.value = records
     writeProjectListCache(0, projectList.value)
 
     await ensureSelectedProjectFromList()
+    if (!isActive()) return staleOutcome()
     return okOutcome()
   } catch (error) {
+    if (!isActive()) return staleOutcome()
     console.error('加载项目失败', error)
     return errorOutcome(error)
   }
@@ -3398,8 +3441,14 @@ const fetchAllTasksByProject = async (projectId: string, isStale: () => boolean)
 const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++taskLoadVersion.value
-  const isStaleRequest = () => requestVersion !== taskLoadVersion.value
+  const contextSnapshot = options.contextSnapshot || captureTaskContextSnapshot()
+  const isStaleRequest = () => (
+    requestVersion !== taskLoadVersion.value
+    || !isTaskContextSnapshotActive(contextSnapshot)
+  )
   let hasCachedSnapshot = false
+
+  if (isStaleRequest()) return staleOutcome()
 
   if (isAggregateView.value) {
     if (projectList.value.length === 0) {
@@ -3480,7 +3529,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
       current: 1,
       size: 100,
     })
-    if (requestVersion !== taskLoadVersion.value) return staleOutcome()
+    if (isStaleRequest()) return staleOutcome()
     if (requestProjectId !== selectedProjectId.value) return staleOutcome()
     const rawRecords = extractListPayload<unknown>(raw)
     const records = rawRecords ? normalizeTaskRecords(rawRecords) : null
@@ -3495,7 +3544,7 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
     syncSelectedTaskFromList()
     return okOutcome()
   } catch (error) {
-    if (requestVersion !== taskLoadVersion.value) return staleOutcome()
+    if (isStaleRequest()) return staleOutcome()
     console.error('加载任务失败', error)
     if (hasCachedSnapshot) {
       toast.error('任务权限校验失败，当前缓存仅供查看。')
@@ -3508,6 +3557,14 @@ const loadTasks = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
 const loadMilestones = async (options: LoadOptions = {}): Promise<LoadOutcome> => {
   const forceRefresh = options.forceRefresh === true
   const requestVersion = ++milestoneLoadVersion.value
+  const contextSnapshot = options.contextSnapshot || captureTaskContextSnapshot()
+  const isActive = () => (
+    requestVersion === milestoneLoadVersion.value
+    && isTaskContextSnapshotActive(contextSnapshot)
+  )
+
+  if (!isActive()) return staleOutcome()
+
   if (isAggregateView.value || !selectedProjectId.value) {
     milestoneList.value = []
     return okOutcome()
@@ -3521,7 +3578,7 @@ const loadMilestones = async (options: LoadOptions = {}): Promise<LoadOutcome> =
 
   try {
     const raw = await fetchMilestoneList({ projectId: requestProjectId })
-    if (requestVersion !== milestoneLoadVersion.value) return staleOutcome()
+    if (!isActive()) return staleOutcome()
     if (requestProjectId !== selectedProjectId.value || isAggregateView.value) return staleOutcome()
     const milestones = extractListPayload<Milestone>(raw)
     if (!milestones) {
@@ -3535,7 +3592,7 @@ const loadMilestones = async (options: LoadOptions = {}): Promise<LoadOutcome> =
     }
     return okOutcome()
   } catch (error) {
-    if (requestVersion !== milestoneLoadVersion.value) return staleOutcome()
+    if (!isActive()) return staleOutcome()
     console.error('加载里程碑失败', error)
     return errorOutcome(error)
   }
@@ -3557,7 +3614,12 @@ const replaceWithPersonalProjectFallback = async () => {
   await router.replace({ path: '/tasks' })
 }
 
-const ensureRouteProjectContext = async (): Promise<LoadOutcome> => {
+const ensureRouteProjectContext = async (
+  contextSnapshot?: TaskContextSnapshot,
+): Promise<LoadOutcome> => {
+  const isActive = () => !contextSnapshot || isTaskContextSnapshotActive(contextSnapshot)
+  if (!isActive()) return staleOutcome()
+
   const context = taskProjectContext.value
   if (context.type === 'aggregate' || context.type === 'empty') return okOutcome()
 
@@ -3569,7 +3631,8 @@ const ensureRouteProjectContext = async (): Promise<LoadOutcome> => {
   if (context.type === 'personal-project') {
     if (projectList.value.some((project) => project.id === context.projectId)) return okOutcome()
 
-    const refreshOutcome = await loadProjects({ forceRefresh: true })
+    const refreshOutcome = await loadProjects({ forceRefresh: true, contextSnapshot })
+    if (!isActive()) return staleOutcome()
     if (refreshOutcome.status !== 'ok') return refreshOutcome
     if (projectList.value.some((project) => project.id === context.projectId)) return okOutcome()
 
@@ -3581,6 +3644,7 @@ const ensureRouteProjectContext = async (): Promise<LoadOutcome> => {
     context.teamId,
     context.projectId,
   )
+  if (!isActive()) return staleOutcome()
   if (restoreResult.kind === 'ready') return okOutcome()
   if (restoreResult.kind === 'retryable-error') {
     return errorOutcome(
@@ -3594,18 +3658,28 @@ const ensureRouteProjectContext = async (): Promise<LoadOutcome> => {
 
 const loadContextData = async (contextKey: string, options: ContextLoadOptions = {}) => {
   enterBoardLoading(contextKey)
+  const contextSnapshot = options.contextSnapshot || captureTaskContextSnapshot()
+  const isActive = () => (
+    isTaskContextSnapshotActive(contextSnapshot)
+    && displayContextKey.value === contextKey
+  )
+
+  if (!isActive()) return
 
   const projectContext = isProjectContextKey(contextKey)
-  const projectOutcome = await loadProjects({ forceRefresh: options.forceProjectRefresh === true })
-  if (!isCurrentDisplayContext(contextKey)) return
+  const projectOutcome = await loadProjects({
+    forceRefresh: options.forceProjectRefresh === true,
+    contextSnapshot,
+  })
+  if (!isActive()) return
 
   if (projectOutcome.status === 'error') {
     markBoardError(contextKey, projectOutcome.error)
     return
   }
 
-  const routeContextOutcome = await ensureRouteProjectContext()
-  if (!isCurrentDisplayContext(contextKey)) return
+  const routeContextOutcome = await ensureRouteProjectContext(contextSnapshot)
+  if (!isActive()) return
   if (routeContextOutcome.status === 'stale') return
   if (routeContextOutcome.status === 'error') {
     markBoardError(contextKey, routeContextOutcome.error)
@@ -3613,11 +3687,17 @@ const loadContextData = async (contextKey: string, options: ContextLoadOptions =
   }
 
   const [milestoneOutcome, taskOutcome] = await Promise.all([
-    loadMilestones({ forceRefresh: options.forceMilestoneRefresh === true }),
-    loadTasks({ forceRefresh: options.forceTaskRefresh === true }),
+    loadMilestones({
+      forceRefresh: options.forceMilestoneRefresh === true,
+      contextSnapshot,
+    }),
+    loadTasks({
+      forceRefresh: options.forceTaskRefresh === true,
+      contextSnapshot,
+    }),
   ])
 
-  if (!isCurrentDisplayContext(contextKey)) return
+  if (!isActive()) return
 
   const outcomes = [projectOutcome, routeContextOutcome, milestoneOutcome, taskOutcome]
   const failedOutcome = outcomes.find((outcome) => outcome.status === 'error')
@@ -3716,8 +3796,18 @@ const reconcileTaskStatusFacts = async (
   state: TaskStatusMutationState,
   options: { committed: boolean; failureMessage: string },
 ) => {
+  const sessionSnapshot = captureAuthSessionSnapshot()
+  const isActive = () =>
+    isAuthSessionSnapshotActive(sessionSnapshot) &&
+    state.command.contextKey === currentContextKey.value
+
+  if (!isActive()) {
+    completeTaskStatusMutation(state.command.taskId)
+    return false
+  }
+
   const outcome = await loadTasks({ forceRefresh: true })
-  if (state.command.contextKey !== currentContextKey.value) {
+  if (!isActive()) {
     completeTaskStatusMutation(state.command.taskId)
     return false
   }
@@ -3836,8 +3926,12 @@ const refreshSelectedTaskStatusFacts = async () => {
     : beginTaskStatusFactRefreshRetry(taskId)
   if (!state) return
 
+  const sessionSnapshot = captureAuthSessionSnapshot()
   const outcome = await loadTasks({ forceRefresh: true })
-  if (state.command.contextKey !== currentContextKey.value) {
+  if (
+    !isAuthSessionSnapshotActive(sessionSnapshot) ||
+    state.command.contextKey !== currentContextKey.value
+  ) {
     completeTaskStatusMutation(taskId)
     return
   }
@@ -4449,40 +4543,33 @@ const getCommittedTaskAssignmentRefreshErrorMessage = (changed: boolean) =>
     : '负责人状态已确认，但最新任务状态加载失败，请重新加载后再操作。'
 
 const reconcileCommittedTaskAssignment = async (snapshot: PendingTaskAssignmentRefresh) => {
+  const isContextActive = () =>
+    isTaskViewMounted.value &&
+    isAuthSessionSnapshotActive(snapshot.sessionSnapshot) &&
+    snapshot.contextKey === currentContextKey.value
+
+  const isActive = () => isContextActive() && selectedTask.value?.id === snapshot.taskId
+
+  const abandonStaleRefresh = () => {
+    completeTaskAssignmentMutation()
+    if (pendingTaskAssignmentRefresh.value === snapshot) {
+      pendingTaskAssignmentRefresh.value = null
+    }
+    dismissTaskAssignmentDialog(false)
+    return false
+  }
+
+  if (!isActive()) return abandonStaleRefresh()
+
   if (snapshot.result.changed && !snapshot.cacheInvalidated) {
     removeProjectTaskCaches(snapshot.projectId)
     snapshot.cacheInvalidated = true
   }
 
-  if (
-    snapshot.contextKey !== currentContextKey.value ||
-    selectedTask.value?.id !== snapshot.taskId
-  ) {
-    completeTaskAssignmentMutation()
-    if (pendingTaskAssignmentRefresh.value === snapshot) {
-      pendingTaskAssignmentRefresh.value = null
-    }
-    dismissTaskAssignmentDialog(false)
-    return false
-  }
-
   const refreshOutcome = await loadTasks({ forceRefresh: true })
-  if (snapshot.contextKey !== currentContextKey.value) {
-    completeTaskAssignmentMutation()
-    if (pendingTaskAssignmentRefresh.value === snapshot) {
-      pendingTaskAssignmentRefresh.value = null
-    }
-    dismissTaskAssignmentDialog(false)
-    return false
-  }
-
+  if (!isContextActive()) return abandonStaleRefresh()
   if (selectedTask.value && selectedTask.value.id !== snapshot.taskId) {
-    completeTaskAssignmentMutation()
-    if (pendingTaskAssignmentRefresh.value === snapshot) {
-      pendingTaskAssignmentRefresh.value = null
-    }
-    dismissTaskAssignmentDialog(false)
-    return false
+    return abandonStaleRefresh()
   }
 
   const refreshedTask = findTaskById(taskList.value, snapshot.taskId)
@@ -4539,17 +4626,26 @@ const reconcileFailedTaskAssignment = async (source: TaskAssignmentRecoverySourc
     return false
   }
 
+  const sessionSnapshot = captureAuthSessionSnapshot()
   const taskId = draft.taskId
   const projectId = draft.projectId
   const contextKey = draft.contextKey
   const targetAssigneeUserId = draft.targetAssigneeUserId
+  const isActive = () =>
+    isAuthSessionSnapshotActive(sessionSnapshot) &&
+    isCurrentTaskAssignmentRecovery(taskId, contextKey)
+
+  if (!isActive()) {
+    abandonStaleTaskAssignmentRecovery()
+    return false
+  }
 
   removeProjectTaskCaches(projectId)
   resetTaskAssignmentCandidates()
   failClosedTaskCapabilities(taskId)
 
   const refreshOutcome = await loadTasks({ forceRefresh: true })
-  if (!isCurrentTaskAssignmentRecovery(taskId, contextKey)) {
+  if (!isActive()) {
     abandonStaleTaskAssignmentRecovery()
     return false
   }
@@ -4577,7 +4673,7 @@ const reconcileFailedTaskAssignment = async (source: TaskAssignmentRecoverySourc
 
   rebaseTaskAssignmentExpectedAssignee(refreshedTask.assigneeUserId)
   const candidatesReady = await loadTaskAssignmentCandidates()
-  if (!isCurrentTaskAssignmentRecovery(taskId, contextKey)) {
+  if (!isActive()) {
     abandonStaleTaskAssignmentRecovery()
     return false
   }
@@ -4678,6 +4774,7 @@ const submitTaskAssignment = async (payload: {
   }
 
   const operation = taskAssignmentOperation.value
+  const sessionSnapshot = captureAuthSessionSnapshot()
   const outcome = await submitTaskAssignmentMutation({
     taskId: draft.taskId,
     assigneeUserId: draft.targetAssigneeUserId,
@@ -4732,6 +4829,7 @@ const submitTaskAssignment = async (payload: {
     taskId: draft.taskId,
     projectId: draft.projectId,
     contextKey: draft.contextKey,
+    sessionSnapshot,
     operation,
     result: outcome.result,
     cacheInvalidated: false,

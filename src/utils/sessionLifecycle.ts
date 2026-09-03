@@ -5,6 +5,7 @@ import {
   readAuthCredential,
   type ProtectedStorageCleanupResult,
 } from '@/utils/sessionStorageCleanup'
+import { getActiveCacheActor } from '@/utils/cacheActor'
 import { writeAuthToken } from '@/utils/authToken'
 
 export type SessionResetReason =
@@ -26,6 +27,12 @@ export interface AuthSessionEstablishResult {
   sessionRevision: number
 }
 
+export interface AuthSessionSnapshot {
+  sessionRevision: number
+  actorId: string | null
+  authenticated: boolean
+}
+
 export type AuthenticatedTerminationReason = Exclude<SessionResetReason, 'ACTOR_CHANGED'>
 
 type SessionResetHandler = (reason: SessionResetReason) => void
@@ -33,6 +40,21 @@ type SessionResetHandler = (reason: SessionResetReason) => void
 const resetHandlers = new Set<SessionResetHandler>()
 let sessionRevision = 0
 let terminatedRevision: number | null = null
+
+export const captureAuthSessionSnapshot = (): AuthSessionSnapshot => ({
+  sessionRevision,
+  actorId: getActiveCacheActor(),
+  authenticated: Boolean(readAuthCredential()),
+})
+
+export const isAuthSessionSnapshotActive = (snapshot: AuthSessionSnapshot) => {
+  const currentAuthenticated = Boolean(readAuthCredential())
+  if (snapshot.authenticated !== currentAuthenticated) return false
+  if (snapshot.sessionRevision !== sessionRevision) return false
+
+  const currentActorId = getActiveCacheActor()
+  return snapshot.actorId === null || snapshot.actorId === currentActorId
+}
 
 export const registerSessionResetHandler = (handler: SessionResetHandler) => {
   resetHandlers.add(handler)

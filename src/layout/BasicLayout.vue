@@ -571,7 +571,11 @@ import {
   readSelectedProjectIdCache,
   writeSelectedProjectIdCache,
 } from '@/utils/appCache'
-import { terminateAuthenticatedSession } from '@/utils/sessionLifecycle'
+import {
+  captureAuthSessionSnapshot,
+  isAuthSessionSnapshotActive,
+  terminateAuthenticatedSession,
+} from '@/utils/sessionLifecycle'
 import {
   clearProjectProgressCache,
   readProjectListCache,
@@ -692,6 +696,7 @@ const isResizingLeft = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
 const isSidebarOpen = ref(false)
 const expandedTeamIds = ref<string[]>([])
+const projectLoadVersion = ref(0)
 
 const isCompactViewport = computed(() => viewportWidth.value < 1024)
 const isTodayRoute = computed(() => route.path === '/tasks' && route.query.view === 'today')
@@ -1169,11 +1174,13 @@ const handleUserInfoUpdated = (event: Event) => {
   currentUserInfo.value = { ...currentUserInfo.value, ...nextUserInfo }
 }
 
-const ensureDefaultProject = async () => {
+const ensureDefaultProject = async (isActive: () => boolean = () => true) => {
+  if (!isActive()) return
   if (selectedProjectId.value || projectList.value.length === 0) return
 
   const firstProject = projectList.value[0]
   if (!firstProject) return
+  if (!isActive()) return
   const firstProjectId = firstProject.id
   writeSelectedProjectIdCache(firstProjectId)
 
@@ -1182,6 +1189,7 @@ const ensureDefaultProject = async () => {
     if (view === 'today' || view === 'week') {
       return
     }
+    if (!isActive()) return
     await router.replace({
       path: '/tasks',
       query: { ...route.query, projectId: firstProjectId },
@@ -1190,19 +1198,29 @@ const ensureDefaultProject = async () => {
 }
 
 const loadProjects = async () => {
+  const requestVersion = ++projectLoadVersion.value
+  const sessionSnapshot = captureAuthSessionSnapshot()
+  const isActive = () => (
+    requestVersion === projectLoadVersion.value
+    && isAuthSessionSnapshotActive(sessionSnapshot)
+  )
   const cachedRecords = readProjectListCache<Project>(0)
+  if (!isActive()) return
   if (cachedRecords && cachedRecords.length > 0) {
     projectList.value = filterPendingDeletedProjects(cachedRecords)
-    await ensureDefaultProject()
+    await ensureDefaultProject(isActive)
+    if (!isActive()) return
   }
 
   try {
     const res = await fetchProjectList({ status: 0 })
+    if (!isActive()) return
     const records = extractListPayload<Project>(res)
     if (!records) {
       console.error('加载项目失败：响应结构异常', res)
       return
     }
+    if (!isActive()) return
     projectList.value = filterPendingDeletedProjects(records)
     syncProjectListCache()
 
@@ -1210,8 +1228,9 @@ const loadProjects = async () => {
       closeProjectActionMenu()
     }
 
-    await ensureDefaultProject()
+    await ensureDefaultProject(isActive)
   } catch (error) {
+    if (!isActive()) return
     if (!cachedRecords) {
       console.error('加载项目失败', error)
     }
@@ -1343,6 +1362,7 @@ watch(showDeleteProjectConfirm, (next) => {
 })
 
 const resetBasicLayoutForSession = () => {
+  projectLoadVersion.value += 1
   projectList.value = []
   currentUserInfo.value = {}
   isUserMenuOpen.value = false
@@ -1372,6 +1392,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  projectLoadVersion.value += 1
   stopResizeLeft()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   offProjectListUpdated(handleProjectListUpdated)

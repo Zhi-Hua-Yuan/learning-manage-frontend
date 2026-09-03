@@ -43,10 +43,20 @@ const request = axios.create({
 
 export type AuthFailureMode = 'GLOBAL' | 'LOCAL'
 
+const PUBLIC_AUTH_PATHS = new Set(['/user/login', '/user/register'])
+
+const normalizeRequestPath = (url: string) => {
+  try {
+    const pathname = new URL(url, 'http://learningmanage.local').pathname
+    return pathname.replace(/^\/api(?=\/|$)/, '') || '/'
+  } catch {
+    return url.split(/[?#]/, 1)[0] || '/'
+  }
+}
+
 const isPublicAuthPath = (url: unknown) => {
   if (typeof url !== 'string' || !url) return false
-  const normalized = url.toLowerCase()
-  return normalized.includes('/user/login') || normalized.includes('/user/register')
+  return PUBLIC_AUTH_PATHS.has(normalizeRequestPath(url).toLowerCase())
 }
 
 const isLocalAuthFailureRequest = (config: { url?: string; authFailureMode?: AuthFailureMode } | null | undefined) => (
@@ -98,6 +108,7 @@ const classifyHtmlAccessError = (value: unknown, status: number | null): HtmlAcc
   if (!normalized.includes('<html')) return null
   if (status === 401) return 'AUTHENTICATION_REQUIRED'
   if (status === 403) return 'PERMISSION_DENIED'
+  if (status !== null && (status < 200 || status >= 300)) return null
   if (normalized.includes('401 unauthorized')) return 'AUTHENTICATION_REQUIRED'
   if (normalized.includes('403 forbidden') || normalized.includes('access denied')) {
     return 'PERMISSION_DENIED'

@@ -46,13 +46,24 @@ describe('session lifecycle cleanup kernel', () => {
     expect(window.localStorage.getItem('token')).toBe('keep-token')
   })
 
-  it('clears the credential for an authenticated session termination', () => {
+  it('PR7-T-043 clears protected state for an explicit authenticated session termination', () => {
+    setActiveCacheActor('7')
     writeAuthToken('remove-token')
+    window.localStorage.setItem('tick:cache:project-list:status-0:v1:actor-7', 'projects')
+    window.localStorage.setItem('tick:cache:task-list:v1:1:actor-7', 'tasks')
+    window.localStorage.setItem('tick_aiPlannerDraft_v1:actor-7', 'draft')
+    window.sessionStorage.setItem('ai:draft:confirm-operation:9:actor-7', 'operation')
+    window.localStorage.setItem('tick_themeMode', 'dark')
 
     const result = terminateAuthenticatedSession('USER_LOGOUT')
 
     expect(result.changed).toBe(true)
     expect(window.localStorage.getItem('token')).toBeNull()
+    expect(window.localStorage.getItem('tick:cache:project-list:status-0:v1:actor-7')).toBeNull()
+    expect(window.localStorage.getItem('tick:cache:task-list:v1:1:actor-7')).toBeNull()
+    expect(window.localStorage.getItem('tick_aiPlannerDraft_v1:actor-7')).toBeNull()
+    expect(window.sessionStorage.getItem('ai:draft:confirm-operation:9:actor-7')).toBeNull()
+    expect(window.localStorage.getItem('tick_themeMode')).toBe('dark')
   })
 
   it('is idempotent and reports only the first termination as changed', () => {

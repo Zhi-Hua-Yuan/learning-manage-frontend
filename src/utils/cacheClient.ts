@@ -1,4 +1,4 @@
-import type { CacheEntry } from '@/utils/cacheRegistry'
+import type { ResolvedCacheEntry } from '@/utils/cacheRegistry'
 
 interface CacheEnvelope<T> {
   version: number
@@ -24,7 +24,7 @@ type CacheOutcome =
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
-const logCacheOutcome = (entry: CacheEntry, action: 'read' | 'write' | 'remove', outcome: CacheOutcome) => {
+const logCacheOutcome = (entry: ResolvedCacheEntry, action: 'read' | 'write' | 'remove', outcome: CacheOutcome) => {
   if (!import.meta.env.DEV) return
   console.info(`[cache] ${action} ${entry.key} -> ${outcome}`)
 }
@@ -70,7 +70,7 @@ export const listStorageKeys = () => {
 
 const parseEnvelope = <T>(
   raw: string,
-  entry: CacheEntry,
+  entry: ResolvedCacheEntry,
   allowLegacyVersionless: boolean,
 ): { envelope: CacheEnvelope<T>; upgradedFromLegacy: boolean } | null => {
   const parsed = JSON.parse(raw) as unknown
@@ -104,7 +104,7 @@ const parseEnvelope = <T>(
   }
 }
 
-export const readCache = <T>(entry: CacheEntry, options: ReadCacheOptions = {}): T | null => {
+export const readCache = <T>(entry: ResolvedCacheEntry, options: ReadCacheOptions = {}): T | null => {
   if (!canUseStorage()) {
     logCacheOutcome(entry, 'read', 'storage_unavailable')
     return null
@@ -149,7 +149,7 @@ export const readCache = <T>(entry: CacheEntry, options: ReadCacheOptions = {}):
   }
 }
 
-export const writeCache = <T>(entry: CacheEntry, data: T) => {
+export const writeCache = <T>(entry: ResolvedCacheEntry, data: T) => {
   if (!canUseStorage()) {
     logCacheOutcome(entry, 'write', 'storage_unavailable')
     return
@@ -165,7 +165,7 @@ export const writeCache = <T>(entry: CacheEntry, data: T) => {
   logCacheOutcome(entry, 'write', 'write')
 }
 
-export const removeCache = (entry: CacheEntry) => {
+export const removeCache = (entry: ResolvedCacheEntry) => {
   removeRawStorage(entry.key)
   logCacheOutcome(entry, 'remove', 'remove')
 }

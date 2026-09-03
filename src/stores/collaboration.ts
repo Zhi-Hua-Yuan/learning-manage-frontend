@@ -20,6 +20,7 @@ import {
   classifyApiError,
   type ApiErrorKind,
 } from '@/utils/request'
+import { clearActiveCacheActor, setActiveCacheActor } from '@/utils/cacheActor'
 
 export type CollaborationLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -171,6 +172,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
 
   const clearCollaborationContext = () => {
     sessionEpoch.value += 1
+    clearActiveCacheActor()
     currentUser.value = null
     teams.value = []
     Object.keys(teamProjectsByTeamId).forEach((teamId) => delete teamProjectsByTeamId[teamId])
@@ -303,6 +305,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
         if (currentUser.value && currentUser.value.id !== nextUser.id) {
           clearCollaborationContext()
         }
+        setActiveCacheActor(nextUser.id)
         currentUser.value = nextUser
         setReady(currentUserLoadState)
 

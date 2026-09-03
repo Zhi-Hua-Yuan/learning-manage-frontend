@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiRequestError } from '@/utils/request'
+import { getActiveCacheActor } from '@/utils/cacheActor'
 import { useCollaborationStore } from './collaboration'
 
 const apiMocks = vi.hoisted(() => ({
@@ -255,6 +256,7 @@ describe('collaboration store', () => {
     await store.bootstrapCollaborationContext({ force: true })
 
     expect(store.currentUser?.id).toBe('2')
+    expect(getActiveCacheActor()).toBe('2')
     expect(store.teams.map((team) => team.id)).toEqual(['20'])
     expect(store.teamProjectsByTeamId['10']).toBeUndefined()
     expect(store.teamMembersByTeamId['10']).toBeUndefined()
@@ -306,6 +308,7 @@ describe('collaboration store', () => {
     await expect(store.ensureTeamMembers(10)).rejects.toThrow('expired')
 
     expect(store.currentUser).toBeNull()
+    expect(getActiveCacheActor()).toBeNull()
     expect(store.teams).toEqual([])
     expect(store.teamMembersByTeamId['10']).toBeUndefined()
   })

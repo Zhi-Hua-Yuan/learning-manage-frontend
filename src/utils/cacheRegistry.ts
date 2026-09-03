@@ -1,3 +1,5 @@
+import { getActiveCacheActor, scopeCacheKey } from '@/utils/cacheActor'
+
 export interface CacheEntry {
   key: string
   ttlMs: number | null
@@ -57,6 +59,35 @@ export const getTaskListCacheEntry = (projectId: string): CacheEntry => ({
   version: 2,
   owner: 'task-list',
 })
+
+export const getActorScopedCacheEntry = (
+  entry: CacheEntry,
+  actorId: unknown = getActiveCacheActor(),
+): CacheEntry | null => {
+  const key = scopeCacheKey(entry.key, actorId)
+  return key ? { ...entry, key } : null
+}
+
+export const getActorTaskListCacheEntry = (projectId: string, actorId?: unknown): CacheEntry | null =>
+  getActorScopedCacheEntry(getTaskListCacheEntry(projectId), actorId)
+
+export const getActorTaskListAllCacheEntry = (actorId?: unknown): CacheEntry | null =>
+  getActorScopedCacheEntry(getTaskListAllCacheEntry(), actorId)
+
+export const getActorProjectListCacheEntry = (status: 0 | 1, actorId?: unknown): CacheEntry | null =>
+  getActorScopedCacheEntry(getProjectListCacheEntry(status), actorId)
+
+export const getActorProjectProgressCacheEntry = (actorId?: unknown): CacheEntry | null =>
+  getActorScopedCacheEntry(CACHE_REGISTRY.projectProgress, actorId)
+
+export const getActorAiPlannerDraftCacheEntry = (actorId?: unknown): CacheEntry | null =>
+  getActorScopedCacheEntry(CACHE_REGISTRY.aiPlannerDraft, actorId)
+
+export const getActorTaskTodayAiOrderCacheEntry = (actorId?: unknown): CacheEntry | null =>
+  getActorScopedCacheEntry(CACHE_REGISTRY.taskTodayAiOrder, actorId)
+
+export const getActorTaskListReplanStateCacheEntry = (actorId?: unknown): CacheEntry | null =>
+  getActorScopedCacheEntry(CACHE_REGISTRY.taskListReplanState, actorId)
 
 export const getTaskListAllCacheEntry = (): CacheEntry => ({
   key: TASK_LIST_ALL_CACHE_KEY,

@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { readCache, writeCache } from './cacheClient'
-import type { CacheEntry } from './cacheRegistry'
+import type { GlobalCacheEntry } from './cacheRegistry'
 
-const entry: CacheEntry = {
+const entry: GlobalCacheEntry = {
   key: 'tick:test-cache:v1',
   ttlMs: 1000,
   version: 1,
   owner: 'test',
+  scope: 'GLOBAL_PREFERENCE',
 }
 
 describe('cache client', () => {

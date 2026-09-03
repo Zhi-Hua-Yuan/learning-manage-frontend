@@ -145,6 +145,7 @@ import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPending
 import { useToast } from '@/composables/useToast'
 import { isApiRequestError } from '@/utils/request'
 import { clearAiPlannerDraftCache, readAiPlannerDraftCache, writeAiPlannerDraftCache } from '@/utils/appCache'
+import { getActiveCacheActor } from '@/utils/cacheActor'
 
 interface PlannerForm {
   target: string
@@ -171,6 +172,8 @@ const aiForm = ref<PlannerForm>({
   detailed: false,
 })
 const isViewMounted = ref(false)
+const hydratedDraftActorId = ref<string | null>(null)
+const isHydratingDraft = ref(false)
 const isSlowGeneration = ref(false)
 let persistDraftTimer: ReturnType<typeof setTimeout> | null = null
 let slowGenerationTimer: ReturnType<typeof setTimeout> | null = null
@@ -227,6 +230,8 @@ const scheduleSlowGenerationHint = () => {
 }
 
 const persistPlannerDraft = () => {
+  const actorId = getActiveCacheActor()
+  if (isHydratingDraft.value || !actorId || hydratedDraftActorId.value !== actorId) return
   writeAiPlannerDraftCache<PersistedPlannerDraft>({ aiForm: { ...aiForm.value } })
 }
 
@@ -247,16 +252,24 @@ const flushPersistPlannerDraft = () => {
 }
 
 const hydrateDraftFromStorage = () => {
+  const actorId = getActiveCacheActor()
+  if (!actorId) return false
+
+  isHydratingDraft.value = true
   const cached = readAiPlannerDraftCache<PersistedPlannerDraft>()
   const form = cached?.aiForm
-  if (!form || typeof form !== 'object') return
-
-  aiForm.value = {
-    target: typeof form.target === 'string' ? form.target : '',
-    description: typeof form.description === 'string' ? form.description : '',
-    duration: typeof form.duration === 'string' ? form.duration : '',
-    detailed: form.detailed === true,
+  if (form && typeof form === 'object') {
+    aiForm.value = {
+      target: typeof form.target === 'string' ? form.target : '',
+      description: typeof form.description === 'string' ? form.description : '',
+      duration: typeof form.duration === 'string' ? form.duration : '',
+      detailed: form.detailed === true,
+    }
   }
+
+  hydratedDraftActorId.value = actorId
+  isHydratingDraft.value = false
+  return true
 }
 
 const isBreakdownPreviewResponse = (value: unknown): value is AiBreakdownPreviewResponse => {
@@ -358,5 +371,6 @@ onBeforeUnmount(() => {
   isViewMounted.value = false
   flushPersistPlannerDraft()
   clearSlowGenerationTimer()
+  hydratedDraftActorId.value = null
 })
 </script>

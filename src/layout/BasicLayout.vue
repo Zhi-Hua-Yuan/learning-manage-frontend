@@ -338,7 +338,7 @@
       ></div>
     </aside>
 
-    <router-view v-slot="{ Component }">
+    <router-view v-if="isActorReady" v-slot="{ Component }">
       <Transition name="content-fade" mode="out-in">
         <component
           :is="Component"
@@ -349,6 +349,32 @@
         />
       </Transition>
     </router-view>
+
+    <main
+      v-else
+      class="flex min-h-0 flex-1 items-center justify-center bg-[var(--color-bg-page)] px-6"
+      :class="isCompactViewport ? 'pt-14' : ''"
+      data-testid="actor-bootstrap-gate"
+    >
+      <div class="surface-panel w-full max-w-md rounded-2xl p-6 text-center">
+        <template v-if="actorGatePhase === 'loading'">
+          <p class="text-sm text-[var(--color-text-secondary)]">正在建立账号上下文…</p>
+        </template>
+        <template v-else>
+          <p class="text-sm text-[var(--color-text-secondary)]">
+            {{ actorGateError || '账号上下文暂时无法加载。' }}
+          </p>
+          <button
+            type="button"
+            class="btn-primary mt-4 rounded-xl px-4 py-2 text-sm"
+            data-testid="actor-bootstrap-retry"
+            @click="retryActorBootstrap"
+          >
+            重试
+          </button>
+        </template>
+      </div>
+    </main>
 
     <AppConfirmDialog
       v-model="showDeleteProjectConfirm"
@@ -562,6 +588,7 @@ import { logoutApi } from '@/api/user'
 import { useToast } from '@/composables/useToast'
 import { useUndoDelete } from '@/composables/useUndoDelete'
 import { useCollaborationStore } from '@/stores/collaboration'
+import { getActiveCacheActor } from '@/utils/cacheActor'
 import { buildTeamProjectRoute, parseTaskProjectContext } from '@/router/taskProjectContext'
 import {
   clearSelectedProjectIdCache,
@@ -683,6 +710,8 @@ const projectSettingsForm = ref({
 const isProjectSettingsSubmitting = ref(false)
 const projectNameInputRef = ref<HTMLInputElement | null>(null)
 const currentUserInfo = ref<CurrentUserInfo>({})
+const actorGatePhase = ref<'loading' | 'ready' | 'error'>('loading')
+const actorGateError = ref('')
 const sidebarWidth = ref(Number(localStorage.getItem('tick_sidebarWidth')) || 256)
 const isResizingLeft = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
@@ -697,6 +726,10 @@ const selectedTeamId = computed(() => (
   taskProjectContext.value.type === 'team-project' ? taskProjectContext.value.teamId : ''
 ))
 const pageTransitionKey = computed(() => route.path)
+const isActorReady = computed(() => {
+  const actorId = collaborationStore.currentUser?.id
+  return Boolean(actorId && getActiveCacheActor() === actorId && actorGatePhase.value === 'ready')
+})
 const sidebarStyle = computed(() =>
   isCompactViewport.value ? undefined : { width: `${sidebarWidth.value}px` },
 )
@@ -1146,6 +1179,8 @@ const deleteProjectConfirmTitle = computed(() => {
 })
 
 const initializeCollaboration = async () => {
+  actorGatePhase.value = 'loading'
+  actorGateError.value = ''
   try {
     const snapshot = await collaborationStore.bootstrapCollaborationContext()
     currentUserInfo.value = {
@@ -1153,8 +1188,32 @@ const initializeCollaboration = async () => {
       account: snapshot.currentUser.account,
     }
     syncExpandedTeamRoute()
+    actorGatePhase.value = 'ready'
   } catch (error) {
     console.error('初始化协作上下文失败', error)
+    if (collaborationStore.currentUser && getActiveCacheActor() === collaborationStore.currentUser.id) {
+      actorGatePhase.value = 'ready'
+      return
+    }
+    actorGatePhase.value = 'error'
+    actorGateError.value = '账号上下文加载失败，请重试。'
+  }
+}
+
+const retryActorBootstrap = async () => {
+  actorGatePhase.value = 'loading'
+  actorGateError.value = ''
+  try {
+    await collaborationStore.bootstrapCollaborationContext({ force: true })
+    if (!collaborationStore.currentUser || getActiveCacheActor() !== collaborationStore.currentUser.id) {
+      throw new Error('Authenticated actor is unavailable after retry')
+    }
+    actorGatePhase.value = 'ready'
+    await loadProjects()
+  } catch (error) {
+    console.error('重试协作上下文失败', error)
+    actorGatePhase.value = 'error'
+    actorGateError.value = '账号上下文加载失败，请重试。'
   }
 }
 
@@ -1337,8 +1396,9 @@ watch(showDeleteProjectConfirm, (next) => {
 })
 
 onMounted(() => {
-  void initializeCollaboration()
-  void loadProjects()
+  void initializeCollaboration().then(() => {
+    if (isActorReady.value) void loadProjects()
+  })
   updateViewport()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   onProjectListUpdated(handleProjectListUpdated)

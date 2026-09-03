@@ -2080,6 +2080,31 @@ const selectedProject = computed<Project | undefined>(() => {
 const selectedTeamContext = computed(() =>
   selectedTeamId.value ? collaborationStore.getTeam(selectedTeamId.value) : null,
 )
+type TeamProjectAccessState =
+  | 'not-applicable'
+  | 'unknown'
+  | 'ready'
+  | 'team-lost'
+  | 'project-candidate-missing'
+  | 'project-lost'
+  | 'retryable'
+
+const teamProjectAccessState = computed<TeamProjectAccessState>(() => {
+  if (!isTeamProjectContext.value) return 'not-applicable'
+  const teamId = selectedTeamId.value
+  const projectId = selectedProjectId.value
+  if (!teamId || !projectId) return 'unknown'
+  if (collaborationStore.teamsLoadState?.status !== 'ready') return 'unknown'
+  if (!collaborationStore.getTeam(teamId)) return 'team-lost'
+
+  const bucket = collaborationStore.teamProjectsByTeamId?.[teamId]
+  if (!bucket || bucket.loadState.status === 'loading' || bucket.loadState.status === 'idle') {
+    return 'unknown'
+  }
+  if (bucket.loadState.status === 'error') return 'retryable'
+  if (bucket.records.some((project) => project.id === projectId)) return 'ready'
+  return bucket.hasMore ? 'project-candidate-missing' : 'project-lost'
+})
 const taskQuickCreateContext = computed<TaskQuickCreateContext>(() => {
   if (isAggregateView.value || !selectedProjectId.value) return { kind: 'unavailable' }
 
@@ -3682,6 +3707,56 @@ const replaceWithPersonalProjectFallback = async () => {
 
   selectedProjectId.value = ''
   await router.replace({ path: '/tasks' })
+}
+
+const teamAccessRecoveryRunning = ref(false)
+const teamAccessValidationRunning = ref(false)
+
+const recoverLostTeamProjectContext = async (state: TeamProjectAccessState) => {
+  if (teamAccessRecoveryRunning.value || (state !== 'team-lost' && state !== 'project-lost')) return
+  teamAccessRecoveryRunning.value = true
+  taskLoadVersion.value += 1
+  milestoneLoadVersion.value += 1
+  taskList.value = []
+  milestoneList.value = []
+  selectedTask.value = null
+  closeTaskScopedInteractions()
+  resetTaskAssignmentCandidates()
+  resetTaskAssignmentMutation()
+  resetTaskAssignmentHistory()
+  resetAllTaskStatusMutations()
+  try {
+    await replaceWithPersonalProjectFallback()
+  } finally {
+    teamAccessRecoveryRunning.value = false
+  }
+}
+
+const reconcileTeamProjectAccess = async (state: TeamProjectAccessState) => {
+  if (teamAccessRecoveryRunning.value || teamAccessValidationRunning.value) return
+  if (state !== 'project-candidate-missing') {
+    await recoverLostTeamProjectContext(state)
+    return
+  }
+
+  const context = taskProjectContext.value
+  if (context.type !== 'team-project') return
+  const contextSnapshot = captureTaskContextSnapshot()
+  teamAccessValidationRunning.value = true
+  try {
+    const result = await collaborationStore.restoreTeamProjectContext(
+      context.teamId,
+      context.projectId,
+    )
+    if (!isTaskContextSnapshotActive(contextSnapshot)) return
+    if (result.kind === 'project-unavailable') {
+      await recoverLostTeamProjectContext('project-lost')
+    } else if (result.kind === 'team-unavailable') {
+      await recoverLostTeamProjectContext('team-lost')
+    }
+  } finally {
+    teamAccessValidationRunning.value = false
+  }
 }
 
 const ensureRouteProjectContext = async (
@@ -5500,6 +5575,19 @@ watch(
     }
     await loadContextData(currentContextKey.value)
     consumePendingListReplanPreview()
+  },
+)
+
+watch(
+  [teamProjectAccessState, displayPhase],
+  ([state, phase], [previousState, previousPhase]) => {
+  if (
+    (state === previousState && phase === previousPhase)
+    || state === 'unknown'
+    || state === 'retryable'
+    || phase === 'loading'
+  ) return
+  void reconcileTeamProjectAccess(state)
   },
 )
 

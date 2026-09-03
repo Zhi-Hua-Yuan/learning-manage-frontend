@@ -349,4 +349,67 @@ describe('TaskList initial assignee quick create', () => {
     wrapper.unmount()
     terminateAuthenticatedSession('USER_LOGOUT')
   })
+
+  it('does not let a late team task response overwrite the next actor task facts', async () => {
+    const taskWire = (title: string, canAssign: boolean) => ({
+      id: 1,
+      projectId: 1,
+      milestoneId: null,
+      createdByUserId: 1,
+      assigneeUserId: 1,
+      assignedByUserId: 1,
+      assignedAt: null,
+      title,
+      description: null,
+      status: 0,
+      priority: 0,
+      dueDate: null,
+      completedAt: null,
+      createTime: null,
+      updateTime: null,
+      capabilities: {
+        canEditContent: false,
+        canChangeStatus: false,
+        canReorganize: false,
+        canAssign,
+        canDelete: false,
+      },
+    })
+    const page = (record: ReturnType<typeof taskWire>) => ({
+      data: { records: [record], current: 1, size: 100, total: 1 },
+    })
+
+    establishAuthenticatedSession('token-a')
+    collaborationStore.currentUser = { id: '1', username: '账号 A' }
+    taskApi.fetchTaskList.mockResolvedValueOnce({
+      data: { records: [], current: 1, size: 100, total: 0 },
+    })
+    const wrapper = await mountTaskList('team')
+    const vm = wrapper.vm as unknown as {
+      loadTasks: (options?: { forceRefresh?: boolean }) => Promise<unknown>
+      taskList: Array<{ title: string; capabilities: { canAssign: boolean } }>
+    }
+
+    let resolveA: ((value: unknown) => void) | undefined
+    taskApi.fetchTaskList.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveA = resolve
+    }))
+    const requestA = vm.loadTasks({ forceRefresh: true })
+    await vi.waitFor(() => expect(taskApi.fetchTaskList).toHaveBeenCalledTimes(2))
+
+    terminateAuthenticatedSession('USER_LOGOUT')
+    collaborationStore.currentUser = { id: '2', username: '账号 B' }
+    establishAuthenticatedSession('token-b')
+    taskApi.fetchTaskList.mockResolvedValueOnce(page(taskWire('账号 B 的任务', false)))
+    await vm.loadTasks({ forceRefresh: true })
+
+    resolveA?.(page(taskWire('账号 A 的任务', true)))
+    await requestA
+
+    expect(vm.taskList).toHaveLength(1)
+    expect(vm.taskList[0]?.title).toBe('账号 B 的任务')
+    expect(vm.taskList[0]?.capabilities.canAssign).toBe(false)
+    wrapper.unmount()
+    terminateAuthenticatedSession('USER_LOGOUT')
+  })
 })

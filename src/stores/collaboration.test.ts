@@ -216,6 +216,24 @@ describe('collaboration store', () => {
     })
   })
 
+  it('does not treat a project on a later page as lost after a forced refresh', async () => {
+    apiMocks.fetchTeamProjectsApi
+      .mockResolvedValueOnce(projectPage([{ ...projectWire(101), name: '第一页项目' }], 1, 100, 200))
+      .mockResolvedValueOnce(projectPage([{ ...projectWire(101), name: '第一页项目' }], 1, 100, 200))
+      .mockResolvedValueOnce(projectPage([{ ...projectWire(102), name: '第二页项目' }], 2, 100, 200))
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+
+    await store.ensureTeamProjects(10)
+    await store.ensureTeamProjects(10, { force: true })
+    expect(store.teamProjectsByTeamId['10']?.hasMore).toBe(true)
+
+    await expect(store.restoreTeamProjectContext(10, 102)).resolves.toMatchObject({
+      kind: 'ready',
+      project: { id: '102', name: '第二页项目' },
+    })
+  })
+
   it('returns explicit restoration outcomes for invalid or missing context', async () => {
     const store = useCollaborationStore()
 
@@ -278,6 +296,31 @@ describe('collaboration store', () => {
 
     expect(store.currentUser?.id).toBe('2')
     expect(store.teamProjectsByTeamId['10']).toBeUndefined()
+  })
+
+  it('keeps same-id team data isolated when a previous actor responds late', async () => {
+    const pendingPreviousActor = deferred<ReturnType<typeof projectPage>>()
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+    apiMocks.fetchTeamProjectsApi.mockReturnValueOnce(pendingPreviousActor.promise)
+    const previousRequest = store.ensureTeamProjects(10)
+
+    store.clearCollaborationContext()
+    apiMocks.getUserMeApi.mockResolvedValueOnce(userWire(2, 'Bob'))
+    apiMocks.fetchMyTeamsApi.mockResolvedValueOnce([teamWire(10, 2)])
+    await store.bootstrapCollaborationContext()
+    apiMocks.fetchTeamProjectsApi.mockResolvedValueOnce(
+      projectPage([{ ...projectWire(101, 10, 2), name: 'B project' }]),
+    )
+    await store.ensureTeamProjects(10)
+
+    pendingPreviousActor.resolve(
+      projectPage([{ ...projectWire(101, 10, 1), name: 'A project' }]),
+    )
+    await previousRequest
+
+    expect(store.currentUser?.id).toBe('2')
+    expect(store.getTeamProjects(10).map((project) => project.name)).toEqual(['B project'])
   })
 
   it('clears scoped data and revalidates teams after permission denial', async () => {

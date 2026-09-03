@@ -428,6 +428,11 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     if (!options.force && bucket?.loadState.status === 'ready') {
       return Promise.resolve(bucket.records)
     }
+    if (options.force) {
+      bumpRevision(projectRevisions, teamId)
+      projectPromises.delete(teamId)
+      if (bucket) setLoading(bucket.loadState)
+    }
     return loadProjectPage(teamId, 1, true)
   }
 
@@ -450,7 +455,12 @@ export const useCollaborationStore = defineStore('collaboration', () => {
       return Promise.resolve(cached.records)
     }
     const existingPromise = memberPromises.get(teamId)
-    if (existingPromise) return existingPromise
+    if (existingPromise && !options.force) return existingPromise
+    if (options.force) {
+      bumpRevision(memberRevisions, teamId)
+      memberPromises.delete(teamId)
+      if (cached) setLoading(cached.loadState)
+    }
 
     const actorId = currentUser.value?.id
     if (!actorId) return Promise.reject(new Error('Current user context is not initialized'))
@@ -502,6 +512,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
   const restoreTeamProjectContext = async (
     rawTeamId: EntityId,
     rawProjectId: EntityId,
+    options: { force?: boolean } = {},
   ): Promise<TeamProjectRestoreResult> => {
     const teamId = normalizeEntityId(rawTeamId)
     const projectId = normalizeEntityId(rawProjectId)
@@ -514,7 +525,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
       const team = teamById.value.get(teamId)
       if (!team) return { kind: 'team-unavailable' }
 
-      let records = await ensureTeamProjects(teamId)
+      let records = await ensureTeamProjects(teamId, { force: options.force === true })
       let project = records.find((candidate) => candidate.id === projectId)
       while (!project && teamProjectsByTeamId[teamId]?.hasMore) {
         const previousPage = teamProjectsByTeamId[teamId]?.current ?? 0

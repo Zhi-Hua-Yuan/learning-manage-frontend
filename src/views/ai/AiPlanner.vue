@@ -18,6 +18,7 @@
               你的目标是什么？
             </label>
             <input
+              ref="targetInput"
               v-model="aiForm.target"
               :disabled="isGeneratingPlan"
               type="text"
@@ -110,27 +111,13 @@
         </div>
       </div>
 
-      <div
+      <AiErrorNotice
         v-if="plannerBreakdownEntry.status === 'error'"
-        class="card-base space-y-4 rounded-2xl border-[var(--color-danger)]/35 bg-[var(--color-danger-soft)]/45 p-5 sm:p-6"
-        role="alert"
-      >
-        <div class="flex items-start gap-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-danger-soft)] text-[var(--color-danger)]">
-            <AppIcon name="warning" class="h-5 w-5" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <h3 class="font-bold text-[var(--color-text-primary)]">计划草稿生成失败</h3>
-            <p class="mt-1 text-sm text-[var(--color-text-secondary)]">{{ plannerErrorMessage }}</p>
-            <p class="mt-1 text-xs text-[var(--color-text-tertiary)]">系统不会自动重试，你可以检查输入后手动重试。</p>
-          </div>
-        </div>
-        <div class="flex justify-end">
-          <button type="button" class="btn-secondary rounded-lg px-4 py-2 text-sm font-bold" @click="generatePlan">
-            重新尝试
-          </button>
-        </div>
-      </div>
+        class="card-base"
+        title="计划草稿生成失败"
+        :presentation="plannerErrorPresentation"
+        @action="handlePlannerErrorAction"
+      />
     </div>
   </main>
 </template>
@@ -139,11 +126,15 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import AiErrorNotice from '@/components/AiErrorNotice.vue'
 import { aiBreakdownPreviewApi, type AiBreakdownPreviewResponse } from '@/api/ai'
 import { useAiPendingRequest } from '@/composables/useAiPendingRequest'
 import { AI_PENDING_BOARDS, useAiPendingRegistryStore } from '@/stores/aiPendingRegistry'
 import { useToast } from '@/composables/useToast'
-import { isApiRequestError } from '@/utils/request'
+import {
+  resolveAiErrorPresentation,
+  type AiRecoveryAction,
+} from '@/utils/aiErrorPresentation'
 import { clearAiPlannerDraftCache, readAiPlannerDraftCache, writeAiPlannerDraftCache } from '@/utils/appCache'
 
 interface PlannerForm {
@@ -171,6 +162,7 @@ const aiForm = ref<PlannerForm>({
   detailed: false,
 })
 const isViewMounted = ref(false)
+const targetInput = ref<HTMLInputElement | null>(null)
 const isSlowGeneration = ref(false)
 let persistDraftTimer: ReturnType<typeof setTimeout> | null = null
 let slowGenerationTimer: ReturnType<typeof setTimeout> | null = null
@@ -179,28 +171,10 @@ const plannerBreakdownEntry = computed(
   () => aiPendingRegistry.boards[AI_PENDING_BOARDS.AI_PLANNER_BREAKDOWN],
 )
 const isGeneratingPlan = computed(() => plannerBreakdownEntry.value.status === 'pending')
-const plannerErrorMessage = computed(
-  () => plannerBreakdownEntry.value.errorMessage || 'AI 计划草稿生成失败，请稍后手动重试。',
+const plannerErrorPresentation = computed(
+  () => plannerBreakdownEntry.value.errorPresentation
+    || resolveAiErrorPresentation(null, 'AI 计划草稿生成失败，请稍后手动重试。'),
 )
-
-const resolveAiErrorMessage = (error: unknown) => {
-  if (isApiRequestError(error)) {
-    const codeMessages: Record<number, string> = {
-      40400: '请求的数据不存在，请刷新后重试。',
-      42900: 'AI 调用过于频繁，请稍后手动重试。',
-      30001: 'AI 服务暂时不可用，请稍后手动重试。',
-      30002: 'AI 服务响应超时，请稍后手动重试。',
-      30003: 'AI 返回结果格式异常，请调整输入后重试。',
-      30004: 'AI 服务配置异常，请联系管理员。',
-    }
-    const backendMessage = error.message.trim()
-    if (backendMessage && backendMessage !== '请求失败') return backendMessage
-    return (error.code !== null && codeMessages[error.code]) || 'AI 计划草稿生成失败，请稍后手动重试。'
-  }
-  return error instanceof Error && error.message
-    ? error.message
-    : 'AI 计划草稿生成失败，请稍后手动重试。'
-}
 
 const clearSlowGenerationTimer = () => {
   if (slowGenerationTimer) {
@@ -310,7 +284,7 @@ const generatePlan = async () => {
         detailed: aiForm.value.detailed,
       }),
     successMessage: 'AI 计划草稿已生成。',
-    errorMessage: resolveAiErrorMessage,
+    errorMessage: 'AI 计划草稿生成失败，请稍后手动重试。',
   })
 
   if (result.status === 'blocked') {
@@ -319,6 +293,14 @@ const generatePlan = async () => {
   }
   if (result.status !== 'success' || !isViewMounted.value) return
   await consumePendingGeneratedDraft()
+}
+
+const handlePlannerErrorAction = (action: AiRecoveryAction) => {
+  if (action === 'RETRY') {
+    void generatePlan()
+    return
+  }
+  if (action === 'EDIT_INPUT') targetInput.value?.focus()
 }
 
 const clearPlannerContent = () => {

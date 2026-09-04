@@ -19,22 +19,13 @@
         </div>
       </div>
 
-      <div
-        v-else-if="loadErrorMessage"
-        class="card-base space-y-4 rounded-2xl border-[var(--color-danger)]/35 bg-[var(--color-danger-soft)]/40 p-6 text-center"
-        role="alert"
-      >
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-danger-soft)] text-[var(--color-danger)]">
-          <AppIcon name="warning" class="h-6 w-6" />
-        </div>
-        <div>
-          <h2 class="text-lg font-bold text-[var(--color-text-primary)]">{{ loadErrorTitle }}</h2>
-          <p class="mt-2 text-sm text-[var(--color-text-secondary)]">{{ loadErrorMessage }}</p>
-        </div>
-        <button type="button" class="btn-secondary rounded-lg px-4 py-2 text-sm font-semibold" @click="loadDraft">
-          重新加载
-        </button>
-      </div>
+      <AiErrorNotice
+        v-else-if="loadErrorPresentation"
+        class="card-base"
+        :title="loadErrorTitle"
+        :presentation="loadErrorPresentation"
+        @action="loadDraft"
+      />
 
       <div
         v-else-if="validationError"
@@ -55,6 +46,14 @@
       </div>
 
       <template v-else-if="draftDetail && draftPayload">
+        <AiErrorNotice
+          v-if="operationErrorPresentation"
+          class="card-base"
+          title="草稿操作未完成"
+          :presentation="operationErrorPresentation"
+          @action="handleDraftOperationErrorAction"
+        />
+
         <section class="card-base relative overflow-hidden rounded-2xl bg-[var(--color-bg-surface)] p-5 sm:p-6">
           <div class="absolute top-0 left-0 h-1 w-full bg-[var(--color-ai)]"></div>
           <div class="flex flex-wrap items-start justify-between gap-4">
@@ -64,10 +63,10 @@
                 <span class="text-xs text-[var(--color-text-tertiary)]">草稿 ID：{{ draftDetail.draftId }}</span>
               </div>
               <h2 class="mt-4 break-words text-xl font-black text-[var(--color-text-primary)] sm:text-2xl">
-                {{ draftPayload.target }}
+                <SafeAiText :text="draftPayload.target" />
               </h2>
               <p class="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                {{ draftPayload.description || '暂无补充描述' }}
+                <SafeAiText :text="draftPayload.description || '暂无补充描述'" />
               </p>
             </div>
 
@@ -119,7 +118,7 @@
                   <span class="inline-flex h-6 min-w-[56px] items-center justify-center rounded bg-[var(--color-success)]/20 px-2 text-xs">
                     阶段 {{ milestoneIndex + 1 }}
                   </span>
-                  <span class="break-words">{{ milestone.name }}</span>
+                  <SafeAiText class="break-words" :text="milestone.name" />
                 </h3>
                 <span class="text-xs text-[var(--color-text-secondary)]">{{ milestone.tasks.length }} 个任务</span>
               </div>
@@ -132,7 +131,7 @@
                   :style="{ borderColor: getTaskBorderColor(task.priority) }"
                 >
                   <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1 break-words font-medium">{{ task.name }}</div>
+                    <SafeAiText class="min-w-0 flex-1 break-words font-medium" :text="task.name" />
                     <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
                       <span class="rounded-full px-2 py-1 text-xs font-semibold" :class="getPriorityClass(task.priority)">
                         {{ getPriorityLabel(task.priority) }}
@@ -263,6 +262,8 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AiErrorNotice from '@/components/AiErrorNotice.vue'
+import SafeAiText from '@/components/SafeAiText.vue'
 import {
   aiBreakdownConfirmApi,
   cancelAiDraftApi,
@@ -275,6 +276,7 @@ import {
 } from '@/api/ai'
 import { useToast } from '@/composables/useToast'
 import { isApiRequestError } from '@/utils/request'
+import { resolveAiErrorPresentation, type AiErrorPresentation } from '@/utils/aiErrorPresentation'
 import { clearProjectListCache, clearProjectProgressCache } from '@/utils/projectCache'
 import { emitProjectListUpdated } from '@/utils/projectEvents'
 import { clearTaskCache } from '@/utils/taskCache'
@@ -292,6 +294,8 @@ const draftDetail = ref<AiDraftDetailResponse | null>(null)
 const draftPayload = ref<AiBreakdownDraftPayload | null>(null)
 const isLoading = ref(true)
 const loadErrorMessage = ref('')
+const loadErrorPresentation = ref<AiErrorPresentation | null>(null)
+const operationErrorPresentation = ref<AiErrorPresentation | null>(null)
 const loadErrorCode = ref<number | null>(null)
 const validationError = ref('')
 const isConfirming = ref(false)
@@ -313,15 +317,6 @@ const STATUS_LABELS: Record<AiDraftStatus, string> = {
   1: '已确认',
   2: '已取消',
   3: '已过期',
-}
-
-const AI_ERROR_MESSAGES: Record<number, string> = {
-  40400: '草稿不存在或已被清理。',
-  42900: 'AI 调用过于频繁，请稍后再试。',
-  30001: 'AI 服务暂时不可用，请稍后再试。',
-  30002: 'AI 服务响应超时，请稍后再试。',
-  30003: 'AI 返回结果格式异常。',
-  30004: 'AI 服务配置异常，请联系管理员。',
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -373,12 +368,13 @@ const parseBreakdownPayload = (payloadJson: string): AiBreakdownDraftPayload | n
 }
 
 const resolveRequestErrorMessage = (error: unknown, fallback: string) => {
-  if (isApiRequestError(error)) {
-    const backendMessage = error.message.trim()
-    if (backendMessage && backendMessage !== '请求失败') return backendMessage
-    return (error.code !== null && AI_ERROR_MESSAGES[error.code]) || fallback
-  }
-  return error instanceof Error && error.message ? error.message : fallback
+  return resolveAiErrorPresentation(error, fallback).message
+}
+
+const resolveWriteSafePresentation = (error: unknown, fallback: string): AiErrorPresentation => {
+  const presentation = resolveAiErrorPresentation(error, fallback)
+  if (presentation.action === 'REFRESH_STATE') return presentation
+  return { ...presentation, action: 'NONE', actionLabel: null }
 }
 
 const loadErrorTitle = computed(() => (loadErrorCode.value === 40400 ? '草稿不存在' : '草稿加载失败'))
@@ -474,11 +470,19 @@ const loadDraft = async () => {
     isLoading.value = false
     loadErrorCode.value = 40400
     loadErrorMessage.value = '路由中缺少草稿 ID。'
+    loadErrorPresentation.value = {
+      message: loadErrorMessage.value,
+      action: 'NONE',
+      actionLabel: null,
+      retryable: false,
+      traceId: null,
+    }
     return
   }
 
   isLoading.value = true
   loadErrorMessage.value = ''
+  loadErrorPresentation.value = null
   loadErrorCode.value = null
   validationError.value = ''
 
@@ -521,6 +525,7 @@ const loadDraft = async () => {
     draftPayload.value = null
     loadErrorCode.value = isApiRequestError(error) ? error.code : null
     loadErrorMessage.value = resolveRequestErrorMessage(error, '草稿加载失败，请稍后重试。')
+    loadErrorPresentation.value = resolveAiErrorPresentation(error, loadErrorMessage.value)
   } finally {
     isLoading.value = false
     nowTimestamp.value = Date.now()
@@ -594,6 +599,7 @@ const refreshCreatedProjectData = () => {
 const confirmDraft = async () => {
   if (!canOperate.value || isMutating.value || !draftDetail.value) return
   isConfirming.value = true
+  operationErrorPresentation.value = null
 
   try {
     const result = await aiBreakdownConfirmApi({
@@ -620,7 +626,8 @@ const confirmDraft = async () => {
     await router.push({ path: '/tasks', query: { projectId: String(result.businessId) } })
   } catch (error) {
     showConfirmDialog.value = false
-    toast.error(resolveRequestErrorMessage(error, '确认草稿失败，请稍后重试。'), 5000)
+    operationErrorPresentation.value = resolveWriteSafePresentation(error, '确认草稿失败，请稍后重试。')
+    toast.error(operationErrorPresentation.value.message, 5000)
     await loadDraft()
   } finally {
     isConfirming.value = false
@@ -630,6 +637,7 @@ const confirmDraft = async () => {
 const cancelDraft = async () => {
   if (!canOperate.value || isMutating.value || !draftDetail.value) return
   isCancelling.value = true
+  operationErrorPresentation.value = null
 
   try {
     const canceled = await cancelAiDraftApi({ draftId: draftDetail.value.draftId })
@@ -642,11 +650,16 @@ const cancelDraft = async () => {
     await loadDraft()
   } catch (error) {
     showCancelDialog.value = false
-    toast.error(resolveRequestErrorMessage(error, '取消草稿失败，请稍后重试。'), 5000)
+    operationErrorPresentation.value = resolveWriteSafePresentation(error, '取消草稿失败，请稍后重试。')
+    toast.error(operationErrorPresentation.value.message, 5000)
     await loadDraft()
   } finally {
     isCancelling.value = false
   }
+}
+
+const handleDraftOperationErrorAction = () => {
+  void loadDraft()
 }
 
 const goBackToPlanner = () => router.push('/ai-planner')

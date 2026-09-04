@@ -2,6 +2,7 @@ import { onScopeDispose, reactive } from 'vue'
 import { defineStore } from 'pinia'
 
 import { registerSessionResetHandler } from '@/utils/sessionLifecycle'
+import type { AiErrorPresentation } from '@/utils/aiErrorPresentation'
 
 export const AI_PENDING_BOARDS = {
   WEEKLY_REVIEW_POLISH: 'weekly-review-polish',
@@ -24,6 +25,7 @@ export interface AiPendingEntry {
   requestMeta: Record<string, unknown> | null
   responsePayload: unknown
   errorMessage: string | null
+  errorPresentation: AiErrorPresentation | null
   updatedAt: number
   consumedAt: number | null
   lastToastedRequestId: number
@@ -35,6 +37,7 @@ const createBoardEntry = (): AiPendingEntry => ({
   requestMeta: null,
   responsePayload: null,
   errorMessage: null,
+  errorPresentation: null,
   updatedAt: 0,
   consumedAt: null,
   lastToastedRequestId: 0,
@@ -68,6 +71,7 @@ export const useAiPendingRegistryStore = defineStore('aiPendingRegistry', () => 
     entry.requestMeta = requestMeta
     entry.responsePayload = null
     entry.errorMessage = null
+    entry.errorPresentation = null
     entry.consumedAt = null
     entry.updatedAt = now()
 
@@ -81,18 +85,24 @@ export const useAiPendingRegistryStore = defineStore('aiPendingRegistry', () => 
     entry.status = 'success'
     entry.responsePayload = payload
     entry.errorMessage = null
+    entry.errorPresentation = null
     entry.consumedAt = null
     entry.updatedAt = now()
     return true
   }
 
-  const resolveError = (ticket: AiPendingTicket, message: string) => {
+  const resolveError = (
+    ticket: AiPendingTicket,
+    message: string,
+    presentation: AiErrorPresentation | null = null,
+  ) => {
     const entry = boards[ticket.board]
     if (entry.requestId !== ticket.requestId || entry.status !== 'pending') return false
 
     entry.status = 'error'
     entry.responsePayload = null
     entry.errorMessage = message
+    entry.errorPresentation = presentation
     entry.consumedAt = null
     entry.updatedAt = now()
     return true
@@ -122,6 +132,7 @@ export const useAiPendingRegistryStore = defineStore('aiPendingRegistry', () => 
     entry.requestMeta = null
     entry.responsePayload = null
     entry.errorMessage = null
+    entry.errorPresentation = null
     entry.consumedAt = null
     entry.updatedAt = now()
   }

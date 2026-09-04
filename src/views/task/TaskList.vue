@@ -117,7 +117,7 @@
       </div>
 
       <AiErrorNotice
-        v-if="activeTaskAiEntry.status === 'error'"
+        v-if="activeTaskAiErrorEntry?.status === 'error'"
         class="mb-4"
         :title="isTodayView ? 'AI 智能排序失败' : 'AI 清单重排失败'"
         :presentation="activeTaskAiErrorPresentation"
@@ -1616,6 +1616,7 @@ import {
   resolveAiErrorPresentation,
   type AiRecoveryAction,
 } from '@/utils/aiErrorPresentation'
+import { isAiListRequestContextActive } from '@/utils/aiRequestContext'
 
 interface TodayAiOrderMeta {
   rank: number
@@ -2189,11 +2190,18 @@ const isFetchingListReplanPreview = computed(
 const isUnifiedAiActionBusy = computed(() =>
   isTodayView.value ? isFetchingTodayAiOrder.value : isListReplanActionBusy.value,
 )
-const activeTaskAiEntry = computed(() =>
-  isTodayView.value ? todayAiOrderEntry.value : listReplanPreviewEntry.value,
-)
+const activeTaskAiErrorEntry = computed(() => {
+  if (isTodayView.value) return todayAiOrderEntry.value
+  const entry = listReplanPreviewEntry.value
+  if (!isAiListRequestContextActive({
+    isAggregateView: isAggregateView.value,
+    currentListId: selectedProjectId.value,
+    requestListId: entry.requestMeta?.listId,
+  })) return null
+  return entry
+})
 const activeTaskAiErrorPresentation = computed(
-  () => activeTaskAiEntry.value.errorPresentation
+  () => activeTaskAiErrorEntry.value?.errorPresentation
     || resolveAiErrorPresentation(null, 'AI 请求失败，请稍后重试。'),
 )
 const unifiedAiButtonHint = computed(() => {

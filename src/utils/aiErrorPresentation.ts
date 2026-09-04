@@ -124,6 +124,23 @@ export const resolveAiErrorPresentation = (
     }
   }
 
+  if (
+    error.code === null
+    && error.httpStatus !== null
+    && (error.httpStatus === 408
+      || error.httpStatus === 425
+      || error.httpStatus === 429
+      || error.httpStatus >= 500)
+  ) {
+    return {
+      message: 'AI 服务暂时未完成请求，页面内容已保留，请稍后手动重试。',
+      action: 'RETRY',
+      actionLabel: '重新尝试',
+      retryable: true,
+      traceId: error.traceId,
+    }
+  }
+
   return {
     message: fallbackMessage,
     action: 'NONE',

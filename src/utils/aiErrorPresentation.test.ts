@@ -50,4 +50,21 @@ describe('resolveAiErrorPresentation', () => {
       traceId: 'trace-p',
     })
   })
+
+  it('keeps transient server failures manually retryable', () => {
+    expect(
+      resolveAiErrorPresentation(
+        new ApiRequestError('upstream unavailable', {
+          httpStatus: 503,
+          traceId: 'trace-503',
+        }),
+      ),
+    ).toEqual({
+      message: 'AI 服务暂时未完成请求，页面内容已保留，请稍后手动重试。',
+      action: 'RETRY',
+      actionLabel: '重新尝试',
+      retryable: true,
+      traceId: 'trace-503',
+    })
+  })
 })

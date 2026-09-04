@@ -5,20 +5,23 @@ import { readAuthToken } from '@/utils/authToken'
 import { syncBackendCacheVersion } from '@/utils/cacheVersion'
 import { terminateAuthenticatedSession } from '@/utils/sessionLifecycle'
 
-interface ApiRequestErrorOptions {
+export interface ApiRequestErrorOptions {
   code?: number | null
   httpStatus?: number | null
+  traceId?: string | null
 }
 
 export class ApiRequestError extends Error {
   readonly code: number | null
   readonly httpStatus: number | null
+  readonly traceId: string | null
 
   constructor(message: string, options: ApiRequestErrorOptions = {}) {
     super(message)
     this.name = 'ApiRequestError'
     this.code = options.code ?? null
     this.httpStatus = options.httpStatus ?? null
+    this.traceId = options.traceId ?? null
   }
 }
 
@@ -85,6 +88,27 @@ const resolveBusinessCode = (res: unknown): number | null => {
 const resolveHttpStatus = (status: unknown): number | null => {
   const parsed = Number(status)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+const MAX_TRACE_ID_LENGTH = 128
+
+export const normalizeTraceId = (value: unknown): string | null => {
+  if (Array.isArray(value)) return normalizeTraceId(value[0])
+  if (typeof value !== 'string' && typeof value !== 'number') return null
+  const normalized = String(value).trim()
+  if (!normalized || normalized.length > MAX_TRACE_ID_LENGTH) return null
+  return normalized
+}
+
+export const resolveTraceId = (headers: unknown): string | null => {
+  if (!headers || typeof headers !== 'object') return null
+  const headerRecord = headers as Record<string, unknown> & { get?: (name: string) => unknown }
+  if (typeof headerRecord.get === 'function') {
+    const value = normalizeTraceId(headerRecord.get('x-trace-id'))
+    if (value) return value
+  }
+  const entry = Object.entries(headerRecord).find(([name]) => name.toLowerCase() === 'x-trace-id')
+  return normalizeTraceId(entry?.[1])
 }
 
 const createApiRequestError = (
@@ -201,6 +225,7 @@ request.interceptors.response.use(
   (response) => {
     const res = response.data
     const requestUrl = response.config?.url
+    const traceId = resolveTraceId(response.headers)
 
     const versionSync = syncBackendCacheVersion(response.headers, res)
     if (versionSync?.changed) {
@@ -219,6 +244,7 @@ request.interceptors.response.use(
           createApiRequestError(resolvePublicAuthHtmlMessage(htmlAccessError), {
             code: null,
             httpStatus: response.status,
+            traceId,
           }),
         )
       }
@@ -226,18 +252,18 @@ request.interceptors.response.use(
         return Promise.reject(
           createApiRequestError(
             htmlAccessError === 'PERMISSION_DENIED' ? '请求被网关拒绝。' : '认证请求未通过。',
-            { httpStatus: response.status },
+            { httpStatus: response.status, traceId },
           ),
         )
       }
       if (htmlAccessError === 'PERMISSION_DENIED') {
         return Promise.reject(
-          createApiRequestError('没有权限执行此操作', { httpStatus: response.status }),
+          createApiRequestError('没有权限执行此操作', { httpStatus: response.status, traceId }),
         )
       }
       handleAuthenticationRequired()
       return Promise.reject(
-        createApiRequestError('登录已失效，请重新登录。', { httpStatus: response.status }),
+        createApiRequestError('登录已失效，请重新登录。', { httpStatus: response.status, traceId }),
       )
     }
 
@@ -254,6 +280,7 @@ request.interceptors.response.use(
         createApiRequestError(message || '没有权限执行此操作', {
           code,
           httpStatus: response.status,
+          traceId,
         }),
       )
     }
@@ -264,17 +291,18 @@ request.interceptors.response.use(
           createApiRequestError(message || '登录失败，请检查账号密码。', {
             code,
             httpStatus: response.status,
+            traceId,
           }),
         )
       }
       if (isLocalAuthFailureRequest(response.config)) {
         return Promise.reject(
-          createApiRequestError(message || '认证请求未通过。', { code, httpStatus: response.status }),
+          createApiRequestError(message || '认证请求未通过。', { code, httpStatus: response.status, traceId }),
         )
       }
       handleAuthenticationRequired()
       return Promise.reject(
-        createApiRequestError(message || '未登录', { code, httpStatus: response.status }),
+        createApiRequestError(message || '未登录', { code, httpStatus: response.status, traceId }),
       )
     }
 
@@ -282,7 +310,7 @@ request.interceptors.response.use(
       const detail = message || `code=${String(record.code ?? 'unknown')}`
       console.error('业务报错：', detail)
       return Promise.reject(
-        createApiRequestError(message || '请求失败', { code, httpStatus: response.status }),
+        createApiRequestError(message || '请求失败', { code, httpStatus: response.status, traceId }),
       )
     }
 
@@ -295,10 +323,11 @@ request.interceptors.response.use(
       const status = resolveHttpStatus(error.response?.status)
       const code = resolveBusinessCode(responseData)
       const message = resolveBusinessMessage(responseData)
+      const traceId = resolveTraceId(error.response?.headers)
 
       if (isPermissionBusinessError(responseData, status)) {
         return Promise.reject(
-          createApiRequestError(message || '没有权限执行此操作', { code, httpStatus: status }),
+          createApiRequestError(message || '没有权限执行此操作', { code, httpStatus: status, traceId }),
         )
       }
 
@@ -308,12 +337,13 @@ request.interceptors.response.use(
             createApiRequestError(message || '登录接口被拒绝，请检查网关或后端鉴权配置。', {
               code,
               httpStatus: status,
+              traceId,
             }),
           )
         }
         if (isLocalAuthFailureRequest(error.config)) {
           return Promise.reject(
-            createApiRequestError(message || '认证请求未通过。', { code, httpStatus: status }),
+            createApiRequestError(message || '认证请求未通过。', { code, httpStatus: status, traceId }),
           )
         }
         handleAuthenticationRequired()
@@ -321,6 +351,7 @@ request.interceptors.response.use(
           createApiRequestError(message || '登录已失效，请重新登录。', {
             code,
             httpStatus: status,
+            traceId,
           }),
         )
       }
@@ -332,6 +363,7 @@ request.interceptors.response.use(
             createApiRequestError(resolvePublicAuthHtmlMessage(htmlAccessError), {
               code,
               httpStatus: status,
+              traceId,
             }),
           )
         }
@@ -339,20 +371,21 @@ request.interceptors.response.use(
           return Promise.reject(
             createApiRequestError(
               htmlAccessError === 'PERMISSION_DENIED' ? '请求被网关拒绝。' : '认证请求未通过。',
-              { code, httpStatus: status },
+              { code, httpStatus: status, traceId },
             ),
           )
         }
         if (htmlAccessError === 'PERMISSION_DENIED') {
           return Promise.reject(
-            createApiRequestError('没有权限执行此操作', { code, httpStatus: status }),
+            createApiRequestError('没有权限执行此操作', { code, httpStatus: status, traceId }),
           )
         }
         handleAuthenticationRequired()
         return Promise.reject(
           createApiRequestError('登录已失效，请重新登录。', {
-            code,
-            httpStatus: status,
+          code,
+          httpStatus: status,
+          traceId,
           }),
         )
       }
@@ -360,6 +393,7 @@ request.interceptors.response.use(
       const normalizedError = createApiRequestError(message || error.message || '网络请求失败', {
         code,
         httpStatus: status,
+        traceId,
       })
       console.error('网络请求错误：', normalizedError.message)
       return Promise.reject(normalizedError)

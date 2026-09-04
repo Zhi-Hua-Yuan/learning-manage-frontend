@@ -34,8 +34,19 @@ describe('AI pending registry', () => {
     const board = AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH
     const ticket = store.startRequest(board)!
 
-    expect(store.resolveError(ticket, 'failed')).toBe(true)
-    expect(store.boards[board]).toMatchObject({ status: 'error', errorMessage: 'failed' })
+    const presentation = {
+      message: 'failed safely',
+      action: 'RETRY' as const,
+      actionLabel: '重新尝试',
+      retryable: true,
+      traceId: 'trace-7',
+    }
+    expect(store.resolveError(ticket, presentation.message, presentation)).toBe(true)
+    expect(store.boards[board]).toMatchObject({
+      status: 'error',
+      errorMessage: 'failed safely',
+      errorPresentation: presentation,
+    })
   })
 
   it('consumes success and toast tickets once', () => {

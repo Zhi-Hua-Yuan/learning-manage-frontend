@@ -116,6 +116,14 @@
         </div>
       </div>
 
+      <AiErrorNotice
+        v-if="activeTaskAiErrorEntry?.status === 'error'"
+        class="mb-4"
+        :title="isTodayView ? 'AI 智能排序失败' : 'AI 清单重排失败'"
+        :presentation="activeTaskAiErrorPresentation"
+        @action="handleTaskAiErrorAction"
+      />
+
       <div
         v-if="!isAggregateView"
         class="relative z-[var(--z-content-sticky)] border-b border-[var(--color-border-default)] px-4 py-3 sm:px-5"
@@ -1159,7 +1167,7 @@
             <div
               class="rounded-lg border border-[var(--color-input-border)] bg-[var(--color-bg-surface)] px-3 py-3 text-sm leading-relaxed text-[var(--color-text-body)]"
             >
-              {{ selectedTodayAiReason.reason || 'AI 未返回详细理由。' }}
+              <SafeAiText :text="selectedTodayAiReason.reason || 'AI 未返回详细理由。'" />
             </div>
           </div>
           <div class="flex justify-end p-4 pt-0">
@@ -1327,7 +1335,7 @@
                 <div
                   class="mt-2 rounded-lg bg-[var(--color-bg-surface-muted)] px-2 py-1 text-xs text-[var(--color-text-body)]"
                 >
-                  {{ item.reason || 'AI 未返回调整原因。' }}
+                  <SafeAiText :text="item.reason || 'AI 未返回调整原因。'" />
                 </div>
               </div>
             </div>
@@ -1492,6 +1500,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import AiErrorNotice from '@/components/AiErrorNotice.vue'
+import SafeAiText from '@/components/SafeAiText.vue'
 import {
   aiListReplanCancelApi,
   aiListReplanConfirmApi,
@@ -1602,6 +1612,11 @@ import {
   type TaskQuickCreateContext,
 } from '@/utils/taskQuickCreate'
 import { classifyApiError } from '@/utils/request'
+import {
+  resolveAiErrorPresentation,
+  type AiRecoveryAction,
+} from '@/utils/aiErrorPresentation'
+import { isAiListRequestContextActive } from '@/utils/aiRequestContext'
 
 interface TodayAiOrderMeta {
   rank: number
@@ -2174,6 +2189,20 @@ const isFetchingListReplanPreview = computed(
 )
 const isUnifiedAiActionBusy = computed(() =>
   isTodayView.value ? isFetchingTodayAiOrder.value : isListReplanActionBusy.value,
+)
+const activeTaskAiErrorEntry = computed(() => {
+  if (isTodayView.value) return todayAiOrderEntry.value
+  const entry = listReplanPreviewEntry.value
+  if (!isAiListRequestContextActive({
+    isAggregateView: isAggregateView.value,
+    currentListId: selectedProjectId.value,
+    requestListId: entry.requestMeta?.listId,
+  })) return null
+  return entry
+})
+const activeTaskAiErrorPresentation = computed(
+  () => activeTaskAiErrorEntry.value?.errorPresentation
+    || resolveAiErrorPresentation(null, 'AI 请求失败，请稍后重试。'),
 )
 const unifiedAiButtonHint = computed(() => {
   if (isTodayView.value) {
@@ -2977,6 +3006,18 @@ const handleUnifiedAiAction = () => {
     return
   }
   void requestListReplanPreview()
+}
+
+const handleTaskAiErrorAction = (action: AiRecoveryAction) => {
+  if (action === 'RETRY') {
+    handleUnifiedAiAction()
+    return
+  }
+  if (action === 'EDIT_INPUT') {
+    toast.info('请先修改相关任务内容，再重新发起 AI 请求。')
+    return
+  }
+  if (action === 'REFRESH_STATE') void loadContextData(currentContextKey.value)
 }
 
 const getTodayAiRank = (task: TaskModel) => {

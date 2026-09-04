@@ -4,6 +4,7 @@ import {
   type AiPendingBoard,
   type AiPendingTicket,
 } from '@/stores/aiPendingRegistry'
+import { resolveAiErrorPresentation, type AiErrorPresentation } from '@/utils/aiErrorPresentation'
 
 type RequestRunStatus = 'success' | 'error' | 'blocked' | 'stale'
 
@@ -22,14 +23,7 @@ interface RequestRunResult<T> {
   payload?: T
   error?: unknown
   errorMessage?: string
-}
-
-const resolveErrorMessage = (error: unknown) => {
-  if (error && typeof error === 'object' && 'message' in error) {
-    const message = String((error as { message?: unknown }).message || '')
-    if (message) return message
-  }
-  return '请求失败'
+  errorPresentation?: AiErrorPresentation
 }
 
 export const useAiPendingRequest = () => {
@@ -58,22 +52,23 @@ export const useAiPendingRequest = () => {
         payload,
       }
     } catch (error) {
-      const message = resolveErrorMessage(error)
-      const accepted = registry.resolveError(ticket, message)
+      const toastMessage =
+        typeof options.errorMessage === 'function'
+          ? options.errorMessage(error)
+          : options.errorMessage
+      const presentation = resolveAiErrorPresentation(error, toastMessage)
+      const accepted = registry.resolveError(ticket, presentation.message, presentation)
 
       if (accepted && registry.consumeToastTicket(options.board, ticket.requestId)) {
-        const toastMessage =
-          typeof options.errorMessage === 'function'
-            ? options.errorMessage(error)
-            : options.errorMessage
-        toast.error(toastMessage)
+        toast.error(presentation.message)
       }
 
       return {
         status: accepted ? 'error' : 'stale',
         ticket,
         error,
-        errorMessage: message,
+        errorMessage: presentation.message,
+        errorPresentation: presentation,
       }
     }
   }

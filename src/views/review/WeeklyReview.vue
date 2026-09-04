@@ -197,6 +197,13 @@
                 class="focus-ring min-h-[120px] w-full resize-none rounded-xl border border-[var(--color-input-border)] bg-[var(--color-input-bg)] p-4 text-sm text-[var(--color-text-body)]"
                 placeholder="可选补充内容（如感受、问题与改进点）..."
               ></textarea>
+              <AiErrorNotice
+                v-if="weeklyPolishEntry.status === 'error'"
+                class="mt-3"
+                title="AI 润色失败"
+                :presentation="weeklyPolishErrorPresentation"
+                @action="handleWeeklyPolishErrorAction"
+              />
             </div>
 
             <div class="flex justify-end pt-2">
@@ -390,6 +397,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import AiErrorNotice from '@/components/AiErrorNotice.vue'
 import ReviewAssociationPicker from '@/components/review/ReviewAssociationPicker.vue'
 import ReviewVisibilityFields from '@/components/review/ReviewVisibilityFields.vue'
 import TeamSharedReviewFeed from '@/components/review/TeamSharedReviewFeed.vue'
@@ -436,6 +444,10 @@ import {
   unselectWeeklyReviewTask,
 } from '@/utils/weeklyReviewForm'
 import { classifyApiError } from '@/utils/request'
+import {
+  resolveAiErrorPresentation,
+  type AiRecoveryAction,
+} from '@/utils/aiErrorPresentation'
 import {
   normalizeAiPolishResponse,
   resolveWeeklyPolishTaskContext,
@@ -540,6 +552,10 @@ const polishPageInstanceId = globalThis.crypto?.randomUUID?.()
   ?? `weekly-polish-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
 const weeklyPolishEntry = computed(() => aiPendingRegistry.boards[AI_PENDING_BOARDS.WEEKLY_REVIEW_POLISH])
+const weeklyPolishErrorPresentation = computed(
+  () => weeklyPolishEntry.value.errorPresentation
+    || resolveAiErrorPresentation(null, 'AI 润色失败，请稍后重试。'),
+)
 const isPolishing = computed(() => weeklyPolishEntry.value.status === 'pending')
 const teamLoadError = computed(() => (
   collaborationStore.teamsLoadState.status === 'error'
@@ -1389,6 +1405,14 @@ const weeklyPolishErrorMessage = (error: unknown) => {
   }
   if (errorKind === 'NETWORK') return 'AI 润色请求未完成，请检查网络后重试。'
   return 'AI 润色失败，请稍后重试。'
+}
+
+const handleWeeklyPolishErrorAction = (action: AiRecoveryAction) => {
+  if (action === 'RETRY') {
+    void handleAiPolish()
+    return
+  }
+  if (action === 'REFRESH_STATE') void refreshWeeklyPolishTaskCandidates()
 }
 
 const handleAiPolish = async () => {

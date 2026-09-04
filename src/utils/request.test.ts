@@ -142,6 +142,51 @@ describe('request client', () => {
     })
   })
 
+  it('extracts a normalized trace id from a 2xx business error header', async () => {
+    request.defaults.adapter = async (config) => ({
+      data: { code: 30002, message: 'AI 服务响应超时', data: null },
+      status: 200,
+      statusText: 'OK',
+      headers: { 'X-Trace-ID': '  trace-business-7  ' },
+      config,
+    })
+
+    await expect(request.post('/ai/polish')).rejects.toMatchObject({
+      code: 30002,
+      traceId: 'trace-business-7',
+    })
+  })
+
+  it('extracts trace id from a rejected HTTP response', async () => {
+    request.defaults.adapter = async (config) => {
+      throw new AxiosError('timeout', 'ERR_BAD_REQUEST', config, undefined, {
+        data: { code: 30001, message: 'AI 服务暂时不可用', data: null },
+        status: 503,
+        statusText: 'Unavailable',
+        headers: { 'x-trace-id': 'trace-http-7' },
+        config,
+      })
+    }
+
+    await expect(request.post('/ai/polish')).rejects.toMatchObject({
+      code: 30001,
+      httpStatus: 503,
+      traceId: 'trace-http-7',
+    })
+  })
+
+  it('rejects empty and overlong trace ids instead of reading them from the body', async () => {
+    request.defaults.adapter = async (config) => ({
+      data: { code: 30001, message: 'traceId=body-value', data: null },
+      status: 200,
+      statusText: 'OK',
+      headers: { 'x-trace-id': 'x'.repeat(129) },
+      config,
+    })
+
+    await expect(request.post('/ai/polish')).rejects.toMatchObject({ traceId: null })
+  })
+
   it('clears auth state and redirects on protected auth errors', async () => {
     writeAuthToken('expired-token')
     setResponse({ code: 401, message: '登录已失效', data: null })

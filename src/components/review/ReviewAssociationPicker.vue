@@ -214,7 +214,7 @@
                 {{ task.title || `任务 #${task.id}` }}
               </span>
               <span class="mt-0.5 block text-xs text-[var(--color-text-tertiary)]">
-                任务 #{{ task.id }} · 状态 {{ task.status }}
+                任务 #{{ task.id }} · {{ getTaskStatusLabel(task.status) }}
               </span>
             </span>
           </label>
@@ -317,6 +317,14 @@ const focusProjectSelectId = `${instanceId}-focus-project`
 const focusProjectErrorId = `${instanceId}-focus-project-error`
 const taskProjectSelectId = `${instanceId}-task-project`
 const taskIdsErrorId = `${instanceId}-tasks-error`
+
+const TASK_STATUS_LABELS: Readonly<Record<number, string>> = {
+  0: '未完成',
+  1: '一般完成',
+  2: '正常完成',
+  3: '超额完成',
+}
+
 const focusProjectSelectRef = ref<HTMLSelectElement | null>(null)
 const taskListRef = ref<HTMLElement | null>(null)
 const taskSectionRef = ref<HTMLElement | null>(null)
@@ -359,6 +367,16 @@ const focusProjectDescribedBy = computed(() => (
 const taskIdsDescribedBy = computed(() => (
   taskLimitReached.value || taskIdsIssue.value ? taskIdsErrorId : undefined
 ))
+
+const getTaskStatusLabel = (status: unknown) => {
+  const statusValue = Number(status)
+
+  if (!Number.isInteger(statusValue) || Number.isNaN(statusValue)) {
+    return '未知状态'
+  }
+
+  return TASK_STATUS_LABELS[statusValue] ?? `未知状态（${status}）`
+}
 
 const handleFocusProjectChange = (event: Event) => {
   const value = (event.target as HTMLSelectElement).value

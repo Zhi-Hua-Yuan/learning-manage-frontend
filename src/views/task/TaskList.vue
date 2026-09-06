@@ -4391,6 +4391,17 @@ const selectTask = (task: TaskModel) => {
   isNewTaskMilestoneMenuOpen.value = false
 }
 
+const focusTaskFromRoute = () => {
+  const routeTaskId = typeof route.query.taskId === 'string' ? route.query.taskId.trim() : ''
+  if (!routeTaskId) return
+  const task = findTaskById(taskList.value, routeTaskId)
+  if (task) {
+    selectTask(task)
+  } else {
+    toast.warning('引用任务当前不可见或已删除。')
+  }
+}
+
 const closeDetail = () => {
   closeTaskScopedInteractions()
   selectedTask.value = null
@@ -5807,6 +5818,7 @@ watch(
       hydrateTodayAiOrderMetaFromCache()
     }
     await loadContextData(currentContextKey.value)
+    focusTaskFromRoute()
     consumePendingListReplanPreview()
   },
 )
@@ -5983,6 +5995,7 @@ onMounted(async () => {
     resetListReplanRuntimeState()
   }
   await loadContextData(currentContextKey.value)
+  focusTaskFromRoute()
   consumePendingTodayAiOrder()
   consumePendingListReplanPreview()
 })

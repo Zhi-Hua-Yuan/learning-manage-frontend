@@ -1477,6 +1477,9 @@ onMounted(async () => {
   isViewMounted.value = true
   void loadCollaborationContext()
   await loadReviewData()
+  const reviewIdRaw = router.currentRoute.value.query?.reviewId
+  const reviewId = typeof reviewIdRaw === 'string' ? reviewIdRaw.trim() : ''
+  if (reviewId) await viewDetail(reviewId)
 })
 
 watch(

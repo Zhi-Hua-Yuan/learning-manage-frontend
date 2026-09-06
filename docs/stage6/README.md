@@ -21,7 +21,7 @@ Safety boundary:
 Verification:
 
 ```text
-npm run test:ci       # 491 tests
+npm run test:ci       # 493 tests
 npm run lint:ci       # storage, AI rendering, Oxlint and ESLint
 npm run contract:test # 54 frontend API operations
 npm run build         # Vue TypeScript and production Vite build

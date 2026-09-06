@@ -158,7 +158,7 @@
     <section v-if="showReports" class="surface-panel space-y-4 rounded-2xl p-5 sm:p-6">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-lg font-black text-[var(--color-text-primary)]">历史分析报告</h2>
-        <button type="button" class="btn-secondary rounded-lg px-3 py-2 text-xs font-bold" :disabled="reportsLoading" @click="loadReports">刷新</button>
+        <button type="button" class="btn-secondary rounded-lg px-3 py-2 text-xs font-bold" :disabled="reportsLoading" @click="loadReports()">刷新</button>
       </div>
       <p v-if="reportsLoading" class="text-sm text-[var(--color-text-secondary)]">正在加载报告…</p>
       <p v-else-if="!reports.length" class="rounded-xl bg-[var(--color-bg-page)] p-4 text-sm text-[var(--color-text-secondary)]">暂无已确认报告。</p>
@@ -177,6 +177,11 @@
           {{ report.status === 'STALE' ? '数据已变化' : '当前有效' }}
         </span>
       </button>
+      <div v-if="reportPages > 1" class="flex items-center justify-center gap-3 pt-2">
+        <button type="button" class="btn-secondary rounded-lg px-3 py-2 text-xs font-bold" :disabled="reportsLoading || reportPage <= 1" @click="loadReports(reportPage - 1)">上一页</button>
+        <span class="text-xs text-[var(--color-text-secondary)]">第 {{ reportPage }} / {{ reportPages }} 页</span>
+        <button type="button" class="btn-secondary rounded-lg px-3 py-2 text-xs font-bold" :disabled="reportsLoading || reportPage >= reportPages" @click="loadReports(reportPage + 1)">下一页</button>
+      </div>
     </section>
   </main>
 </template>
@@ -229,8 +234,11 @@ const errorPresentation = ref<AiErrorPresentation | null>(null)
 const showReports = ref(false)
 const reports = ref<AnalysisReportResponse[]>([])
 const reportsLoading = ref(false)
+const reportPage = ref(1)
+const reportPages = ref(0)
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 let pollDelay = 1000
+let pollGeneration = 0
 
 const sceneOptions: Array<{ value: AgentScene; label: string }> = [
   { value: 'PROJECT_RISK', label: '项目风险' },
@@ -286,35 +294,49 @@ const submit = async () => {
   }
 }
 
-const schedulePoll = () => {
-  if (!run.value || terminalStatuses.has(run.value.status)) return
-  pollTimer = setTimeout(() => void pollRun(), pollDelay)
+const schedulePoll = (generation = pollGeneration) => {
+  if (generation !== pollGeneration || !run.value || terminalStatuses.has(run.value.status)) return
+  if (pollTimer) clearTimeout(pollTimer)
+  pollTimer = setTimeout(() => {
+    pollTimer = null
+    void pollRun(generation)
+  }, pollDelay)
   pollDelay = Math.min(pollDelay * 2, 5000)
 }
 
-const pollRun = async () => {
+const pollRun = async (generation: number) => {
   if (!run.value) return
+  const runId = run.value.runId
   try {
-    run.value = await getAgentRunApi(run.value.runId)
+    const response = await getAgentRunApi(runId)
+    if (generation !== pollGeneration || run.value?.runId !== runId) return
+    run.value = response
     if ((run.value.status === 'SUCCEEDED' || run.value.status === 'PARTIAL') && run.value.draftId) {
       await loadDraft(run.value.draftId)
       return
     }
-    schedulePoll()
+    schedulePoll(generation)
   } catch (error) {
+    if (generation !== pollGeneration || run.value?.runId !== runId) return
     errorPresentation.value = resolveAiErrorPresentation(error, 'Agent 状态查询失败。')
+    schedulePoll(generation)
   }
 }
 
 const cancelRun = async () => {
   if (!run.value || !isActiveRun.value) return
+  const runId = run.value.runId
+  clearPolling()
+  const generation = pollGeneration
   canceling.value = true
   try {
-    const response = await cancelAgentRunApi(run.value.runId)
+    const response = await cancelAgentRunApi(runId)
+    if (generation !== pollGeneration || run.value?.runId !== runId) return
     run.value = { ...run.value, status: response.status }
-    if (response.status !== 'CANCELED') schedulePoll()
+    if (response.status !== 'CANCELED') schedulePoll(generation)
   } catch (error) {
     errorPresentation.value = resolveAiErrorPresentation(error, '取消 Agent 失败。')
+    if (generation === pollGeneration && run.value?.runId === runId) schedulePoll(generation)
   } finally {
     canceling.value = false
   }
@@ -337,7 +359,7 @@ const confirmDraft = async () => {
     draft.value = null
     draftPayload.value = null
     showReports.value = true
-    await loadReports()
+    await loadReports(1)
   } catch (error) {
     errorPresentation.value = resolveAiErrorPresentation(error, '确认报告失败，请重新分析。')
   } finally {
@@ -356,10 +378,13 @@ const cancelDraft = async () => {
   }
 }
 
-const loadReports = async () => {
+const loadReports = async (page = reportPage.value) => {
   reportsLoading.value = true
   try {
-    reports.value = (await listAnalysisReportsApi({ current: 1, pageSize: 20 })).records || []
+    const response = await listAnalysisReportsApi({ current: page, pageSize: 20 })
+    reports.value = response.records || []
+    reportPage.value = response.current || page
+    reportPages.value = response.pages ?? Math.ceil(response.total / Math.max(response.size, 1))
   } catch (error) {
     errorPresentation.value = resolveAiErrorPresentation(error, '报告列表加载失败。')
   } finally {
@@ -368,11 +393,12 @@ const loadReports = async () => {
 }
 
 const clearPolling = () => {
+  pollGeneration += 1
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = null
 }
 
-watch(showReports, (value) => { if (value) void loadReports() })
+watch(showReports, (value) => { if (value) void loadReports(1) })
 onMounted(async () => {
   projectId.value = typeof route.query.projectId === 'string' ? route.query.projectId : ''
   await collaboration.bootstrapCollaborationContext().catch(() => undefined)

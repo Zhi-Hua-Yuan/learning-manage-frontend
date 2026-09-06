@@ -67,6 +67,14 @@
           class="ml-auto flex items-center gap-2"
         >
           <button
+            type="button"
+            class="rounded-md border border-[var(--color-border-default)] px-2.5 py-1 text-xs font-bold text-[var(--color-ai)] transition-colors hover:bg-[var(--color-success-soft)]"
+            title="使用只读 Agent 分析当前项目风险"
+            @click="router.push({ path: '/ai-agent', query: { projectId: selectedProjectId } })"
+          >
+            风险分析
+          </button>
+          <button
             v-if="shouldShowUnifiedAiButton && !isAggregateView"
             type="button"
             class="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
@@ -4383,6 +4391,17 @@ const selectTask = (task: TaskModel) => {
   isNewTaskMilestoneMenuOpen.value = false
 }
 
+const focusTaskFromRoute = () => {
+  const routeTaskId = typeof route.query.taskId === 'string' ? route.query.taskId.trim() : ''
+  if (!routeTaskId) return
+  const task = findTaskById(taskList.value, routeTaskId)
+  if (task) {
+    selectTask(task)
+  } else {
+    toast.warning('引用任务当前不可见或已删除。')
+  }
+}
+
 const closeDetail = () => {
   closeTaskScopedInteractions()
   selectedTask.value = null
@@ -5799,6 +5818,7 @@ watch(
       hydrateTodayAiOrderMetaFromCache()
     }
     await loadContextData(currentContextKey.value)
+    focusTaskFromRoute()
     consumePendingListReplanPreview()
   },
 )
@@ -5975,6 +5995,7 @@ onMounted(async () => {
     resetListReplanRuntimeState()
   }
   await loadContextData(currentContextKey.value)
+  focusTaskFromRoute()
   consumePendingTodayAiOrder()
   consumePendingListReplanPreview()
 })

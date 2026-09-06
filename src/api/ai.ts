@@ -174,3 +174,40 @@ export const aiListReplanConfirmApi = (data: AiListReplanConfirmRequest): Promis
 export const aiListReplanCancelApi = (data: AiListReplanCancelRequest): Promise<boolean> => {
   return request.post('/ai/list/replan/cancel', data) as Promise<boolean>
 }
+
+export interface RagAskRequest {
+  question: string
+  projectId: string | number
+}
+
+export type RagResultStatus = 'ACTIVE' | 'STALE' | 'INVALIDATED' | 'EXPIRED'
+
+export interface RagSource {
+  citationId: string
+  sourceType: 'TASK' | 'WEEKLY_REVIEW'
+  sourceId: string | number
+  title: string
+  score: number
+  vectorScore: number
+  rerankScore: number | null
+  updatedAt: string | null
+}
+
+export interface RagAnswerResponse {
+  requestId: string
+  status: RagResultStatus
+  answer: string | null
+  insufficientEvidence: boolean
+  degraded: boolean
+  degradationReason: string | null
+  knowledgeAsOf: string | null
+  sources: RagSource[]
+}
+
+export const ragAskApi = (data: RagAskRequest): Promise<RagAnswerResponse> => {
+  return request.post('/ai/rag/ask', data) as Promise<RagAnswerResponse>
+}
+
+export const getRagResultApi = (requestId: string): Promise<RagAnswerResponse> => {
+  return request.get(`/ai/rag/result/${encodeURIComponent(requestId)}`) as Promise<RagAnswerResponse>
+}

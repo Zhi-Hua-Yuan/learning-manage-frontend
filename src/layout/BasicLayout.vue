@@ -120,6 +120,19 @@
               >AI 智能规划</span
             >
           </div>
+
+          <div
+            @click="navigateTo('/ai-rag')"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="
+              route.path === '/ai-rag'
+                ? 'bg-[var(--color-success-soft)] text-[var(--color-ai)] font-medium'
+                : 'text-[var(--color-text-secondary)]'
+            "
+          >
+            <AppIcon name="sparkles" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] font-semibold leading-5">AI 项目问答</span>
+          </div>
         </div>
       </div>
 

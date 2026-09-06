@@ -43,6 +43,16 @@ const router = createRouter({
           component: () => import('@/views/ai/RagAsk.vue'),
         },
         {
+          path: 'ai-agent',
+          name: 'ai-agent',
+          component: () => import('@/views/ai/AgentWorkbench.vue'),
+        },
+        {
+          path: 'ai-report/:reportId',
+          name: 'ai-report-detail',
+          component: () => import('@/views/ai/AnalysisReportDetail.vue'),
+        },
+        {
           path: 'ai/draft/:draftId',
           name: 'ai-draft-detail',
           component: () => import('@/views/ai/AiDraftDetail.vue'),

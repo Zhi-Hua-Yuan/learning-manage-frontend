@@ -28,7 +28,7 @@ export type AiDraftStatus = 0 | 1 | 2 | 3
 
 export interface AiDraftDetailResponse {
   draftId: string
-  scene: 'task-breakdown'
+  scene: 'task-breakdown' | 'project-risk-report' | 'team-workload-report' | string
   status: AiDraftStatus
   statusText: string
   payloadJson: string
@@ -211,3 +211,86 @@ export const ragAskApi = (data: RagAskRequest): Promise<RagAnswerResponse> => {
 export const getRagResultApi = (requestId: string): Promise<RagAnswerResponse> => {
   return request.get(`/ai/rag/result/${encodeURIComponent(requestId)}`) as Promise<RagAnswerResponse>
 }
+
+export type AgentScene = 'PROJECT_RISK' | 'TEAM_WORKLOAD'
+export type AgentRunStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'PARTIAL' | 'FAILED' | 'TIMED_OUT' | 'CANCELED'
+
+export interface AgentRunCreatedResponse {
+  runId: string
+  status: AgentRunStatus
+}
+
+export interface AgentRunResponse {
+  runId: string
+  scene: AgentScene
+  status: AgentRunStatus
+  currentStep: string | null
+  completedToolCount: number
+  maxToolCount: number
+  orchestrationMode: 'TOOL_CALLING' | 'FIXED_WORKFLOW'
+  degraded: boolean
+  partialReason: string | null
+  failureType: string | null
+  draftId: string | null
+  submittedAt: string | null
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export interface AgentCancelResponse {
+  runId: string
+  status: AgentRunStatus
+  cancelRequested: boolean
+}
+
+export interface AgentReportSource {
+  citationId: string
+  sourceType: 'TASK' | 'WEEKLY_REVIEW'
+  sourceId: string | number
+  title: string
+}
+
+export interface AnalysisReportResponse {
+  reportId: string
+  reportType: AgentScene
+  projectId: string | number | null
+  teamId: string | number | null
+  status: 'ACTIVE' | 'STALE'
+  summary: string | null
+  memberMetrics: Record<string, unknown>
+  recommendations: string[]
+  sources: AgentReportSource[]
+  generatedAt: string
+}
+
+export interface AnalysisReportPage {
+  records: AnalysisReportResponse[]
+  current: number
+  size: number
+  total: number
+  pages?: number
+}
+
+export const submitProjectRiskAgentApi = (projectId: string | number, clientRequestId: string) =>
+  request.post('/ai/agent/project-risk', { projectId, clientRequestId }) as Promise<AgentRunCreatedResponse>
+
+export const submitTeamWorkloadAgentApi = (teamId: string | number, clientRequestId: string) =>
+  request.post('/ai/agent/team-workload', { teamId, clientRequestId }) as Promise<AgentRunCreatedResponse>
+
+export const getAgentRunApi = (runId: string) =>
+  request.get(`/ai/agent/run/${encodeURIComponent(runId)}`) as Promise<AgentRunResponse>
+
+export const cancelAgentRunApi = (runId: string) =>
+  request.post(`/ai/agent/run/${encodeURIComponent(runId)}/cancel`) as Promise<AgentCancelResponse>
+
+export const confirmAgentReportApi = (draftId: string, operationId: string) =>
+  request.post('/ai/agent/report/confirm', { draftId, operationId }) as Promise<AiBreakdownConfirmResponse>
+
+export const listAnalysisReportsApi = (params: Record<string, string | number | undefined> = {}) =>
+  request.get('/ai/report', { params }) as Promise<AnalysisReportPage>
+
+export const getAnalysisReportApi = (reportId: string) =>
+  request.get(`/ai/report/${encodeURIComponent(reportId)}`) as Promise<AnalysisReportResponse>
+
+export const deleteAnalysisReportApi = (reportId: string) =>
+  request.post(`/ai/report/${encodeURIComponent(reportId)}/delete`) as Promise<boolean>

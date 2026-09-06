@@ -52,7 +52,7 @@ test('exports the current API source deterministically', () => {
   const first = execFileSync(process.execPath, [exporter, '--check'], { encoding: 'utf8' })
   const second = execFileSync(process.execPath, [exporter, '--check'], { encoding: 'utf8' })
   assert.equal(first, second)
-  assert.match(first, /API contract valid: 46 operations; sha256=[0-9a-f]{64}/)
+  assert.match(first, /API contract valid: 54 operations; sha256=[0-9a-f]{64}/)
 
   const current = JSON.parse(execFileSync(process.execPath, [exporter, '--stdout'], { encoding: 'utf8' }))
   const stage0 = JSON.parse(
@@ -70,17 +70,25 @@ test('exports the current API source deterministically', () => {
     .map(key)
     .sort()
   assert.deepEqual(added, [
+    'GET /ai/agent/run/{runId}',
     'GET /ai/rag/result/{requestId}',
+    'GET /ai/report',
+    'GET /ai/report/{reportId}',
     'GET /project/team/list',
     'GET /review/team',
     'GET /task/{taskId}/assignment-history',
     'GET /team/my',
     'GET /team/{teamId}/members',
+    'POST /ai/agent/project-risk',
+    'POST /ai/agent/report/confirm',
+    'POST /ai/agent/run/{runId}/cancel',
+    'POST /ai/agent/team-workload',
     'POST /ai/rag/ask',
+    'POST /ai/report/{reportId}/delete',
     'POST /task/assign',
     'POST /task/status/change',
   ].sort())
-  assert.equal(current.operations.length, 46)
+  assert.equal(current.operations.length, 54)
   assert.equal(currentKeys.has('POST /team/leave'), false)
   assert.equal(currentKeys.has('POST /team/member/remove'), false)
 })

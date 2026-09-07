@@ -104,6 +104,7 @@ const selectedRunId = ref('')
 const selectedRunDetail = ref<CleanupRun | null>(null)
 let refreshTimer: number | null = null
 let disposed = false
+let loadGeneration = 0
 const grafanaUrl = import.meta.env.VITE_GRAFANA_URL || ''
 
 const dependencies = computed(() => Object.values(overview.value?.dependencies ?? {}))
@@ -119,21 +120,29 @@ const reviewedDryRun = computed(() => {
 })
 
 const loadAll = async () => {
+  const generation = ++loadGeneration
   loading.value = true
   errorMessage.value = ''
   try {
     const [summary, page, failurePage] = await Promise.all([fetchOpsOverviewApi(), fetchCleanupRunsApi(), fetchOpsFailuresApi()])
+    if (disposed || generation !== loadGeneration) return
     overview.value = summary
     cleanupRuns.value = page.records
     failures.value = failurePage.records
     if (selectedRunId.value) {
       const requestedRunId = selectedRunId.value
       const detail = await fetchCleanupRunApi(requestedRunId).catch(() => null)
-      if (!disposed && selectedRunId.value === requestedRunId) selectedRunDetail.value = detail
+      if (!disposed && generation === loadGeneration && selectedRunId.value === requestedRunId) {
+        selectedRunDetail.value = detail
+      }
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '运维数据加载失败'
-  } finally { loading.value = false }
+    if (!disposed && generation === loadGeneration) {
+      errorMessage.value = error instanceof Error ? error.message : '运维数据加载失败'
+    }
+  } finally {
+    if (generation === loadGeneration) loading.value = false
+  }
 }
 
 const submit = async (dryRun: boolean) => {

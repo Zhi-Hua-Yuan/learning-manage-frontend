@@ -152,4 +152,37 @@ describe('AiOperations', () => {
     expect(mocks.overview).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
   })
+
+  it('ignores an older dashboard refresh that resolves after a newer one', async () => {
+    vi.useFakeTimers()
+    mocks.runs.mockResolvedValue({ records: [run('cleanup_pending_refresh', true, 'PENDING')] })
+    const wrapper = mount(AiOperations)
+    await flushPromises()
+    let resolveOlder!: (value: Record<string, unknown>) => void
+    let resolveNewer!: (value: Record<string, unknown>) => void
+    mocks.overview
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOlder = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNewer = resolve }))
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await vi.advanceTimersByTimeAsync(5000)
+    resolveNewer({
+      from: '2026-09-06T00:00:00', to: '2026-09-07T00:00:00',
+      ai: { totalCount: 22 }, rag: { totalCount: 0 }, agent: { totalCount: 0 },
+      dependencies: {}, knowledgeQueue: {},
+    })
+    await flushPromises()
+    resolveOlder({
+      from: '2026-09-06T00:00:00', to: '2026-09-07T00:00:00',
+      ai: { totalCount: 11 }, rag: { totalCount: 0 }, agent: { totalCount: 0 },
+      dependencies: {}, knowledgeQueue: {},
+    })
+    await flushPromises()
+
+    const aiCard = wrapper.findAll('section')[0]!.findAll('article')[0]!
+    expect(aiCard.text()).toContain('22')
+    expect(aiCard.text()).not.toContain('11')
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
 })

@@ -1202,6 +1202,14 @@ const initializeCollaboration = async () => {
     }
     syncExpandedTeamRoute()
   } catch (error) {
+    const currentUser = collaborationStore.currentUser
+    if (currentUser) {
+      currentUserInfo.value = {
+        username: currentUser.username,
+        account: currentUser.account,
+        role: currentUser.role,
+      }
+    }
     console.error('初始化协作上下文失败', error)
   }
 }

@@ -55,10 +55,10 @@
 
       <section class="surface-panel rounded-2xl p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 class="font-bold text-[var(--color-text-primary)]">数据生命周期</h2><p class="text-xs text-[var(--color-text-tertiary)]">先预演，再使用新的请求 ID 提交正式清理</p></div>
+          <div><h2 class="font-bold text-[var(--color-text-primary)]">数据生命周期</h2><p class="text-xs text-[var(--color-text-tertiary)]">先预演并选择审核通过的 Dry Run，再提交与其绑定的正式清理</p></div>
           <div class="flex gap-2">
             <button class="input-base px-3 py-2 text-sm" :disabled="submitting" @click="submit(true)">运行 Dry Run</button>
-            <button class="rounded-lg bg-[var(--color-danger)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="submitting || !hasSuccessfulDryRun" @click="submit(false)">正式清理</button>
+            <button class="rounded-lg bg-[var(--color-danger)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="submitting || !reviewedDryRun" @click="submit(false)">正式清理</button>
           </div>
         </div>
         <div class="mt-4 overflow-x-auto">
@@ -89,11 +89,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCollaborationStore } from '@/stores/collaboration'
 import { cancelCleanupApi, fetchCleanupRunApi, fetchCleanupRunsApi, fetchOpsFailuresApi, fetchOpsOverviewApi, submitCleanupApi, type CleanupRun, type OpsFailure, type OpsOverview } from '@/api/ops'
+import { getUserMeApi } from '@/api/user'
+import { normalizeCurrentUserWire } from '@/types/normalization'
 
 const router = useRouter()
-const collaboration = useCollaborationStore()
 const overview = ref<OpsOverview | null>(null)
 const cleanupRuns = ref<CleanupRun[]>([])
 const failures = ref<OpsFailure[]>([])
@@ -103,6 +103,7 @@ const errorMessage = ref('')
 const selectedRunId = ref('')
 const selectedRunDetail = ref<CleanupRun | null>(null)
 let refreshTimer: number | null = null
+let disposed = false
 const grafanaUrl = import.meta.env.VITE_GRAFANA_URL || ''
 
 const dependencies = computed(() => Object.values(overview.value?.dependencies ?? {}))
@@ -111,8 +112,11 @@ const cards = computed(() => [
   { label: 'RAG 查询', value: overview.value?.rag.totalCount ?? 0, detail: `P95 ${overview.value?.rag.p95DurationMs ?? '-'} ms` },
   { label: 'Agent 运行', value: overview.value?.agent.totalCount ?? 0, detail: `P95 ${overview.value?.agent.p95DurationMs ?? '-'} ms` },
 ])
-const hasSuccessfulDryRun = computed(() => cleanupRuns.value.some((run) => run.dryRun && run.status === 'SUCCEEDED'))
 const selectedRun = computed(() => selectedRunDetail.value ?? cleanupRuns.value.find((run) => run.runId === selectedRunId.value) ?? null)
+const reviewedDryRun = computed(() => {
+  const run = selectedRun.value
+  return run?.dryRun && run.status === 'SUCCEEDED' ? run : null
+})
 
 const loadAll = async () => {
   loading.value = true
@@ -123,7 +127,9 @@ const loadAll = async () => {
     cleanupRuns.value = page.records
     failures.value = failurePage.records
     if (selectedRunId.value) {
-      selectedRunDetail.value = await fetchCleanupRunApi(selectedRunId.value).catch(() => null)
+      const requestedRunId = selectedRunId.value
+      const detail = await fetchCleanupRunApi(requestedRunId).catch(() => null)
+      if (!disposed && selectedRunId.value === requestedRunId) selectedRunDetail.value = detail
     }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '运维数据加载失败'
@@ -134,7 +140,9 @@ const submit = async (dryRun: boolean) => {
   submitting.value = true
   errorMessage.value = ''
   try {
-    await submitCleanupApi(dryRun, `ops-${dryRun ? 'dry' : 'run'}-${Date.now()}`)
+    const approvedDryRunId = dryRun ? undefined : reviewedDryRun.value?.runId
+    if (!dryRun && !approvedDryRunId) return
+    await submitCleanupApi(dryRun, `ops-${dryRun ? 'dry' : 'run'}-${Date.now()}`, approvedDryRunId)
     await loadAll()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '清理任务提交失败'
@@ -153,7 +161,9 @@ const cancel = async (runId: string) => {
 
 const selectRun = async (runId: string) => {
   selectedRunId.value = runId
-  selectedRunDetail.value = await fetchCleanupRunApi(runId).catch(() => null)
+  selectedRunDetail.value = null
+  const detail = await fetchCleanupRunApi(runId).catch(() => null)
+  if (!disposed && selectedRunId.value === runId) selectedRunDetail.value = detail
 }
 
 const statusClass = (status: string) => status === 'UP'
@@ -164,18 +174,21 @@ const statusClass = (status: string) => status === 'UP'
 const formatTime = (value: string) => value ? new Date(value).toLocaleString() : '-'
 
 onMounted(async () => {
-  const snapshot = await collaboration.bootstrapCollaborationContext().catch(() => null)
-  if (!snapshot || snapshot.currentUser.role !== 'SYSTEM_ADMIN') {
+  const currentUser = normalizeCurrentUserWire(await getUserMeApi().catch(() => null))
+  if (disposed) return
+  if (!currentUser || currentUser.role !== 'SYSTEM_ADMIN') {
     await router.replace('/tasks')
     return
   }
   await loadAll()
+  if (disposed) return
   refreshTimer = window.setInterval(() => {
     if (cleanupRuns.value.some((run) => run.status === 'PENDING' || run.status === 'RUNNING')) void loadAll()
   }, 5000)
 })
 
 onBeforeUnmount(() => {
+  disposed = true
   if (refreshTimer !== null) window.clearInterval(refreshTimer)
 })
 </script>

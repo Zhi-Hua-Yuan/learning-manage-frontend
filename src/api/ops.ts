@@ -83,8 +83,12 @@ export const fetchCleanupRunsApi = (current = 1, size = 20) =>
   request.get<unknown, Promise<PageResult<CleanupRun>>>('/admin/ai/ops/cleanup-runs', { params: { current, size } })
 export const fetchCleanupRunApi = (runId: string) =>
   request.get<unknown, Promise<CleanupRun>>(`/admin/ai/ops/cleanup-runs/${encodeURIComponent(runId)}`)
-export const submitCleanupApi = (dryRun: boolean, clientRequestId: string) =>
-  request.post<unknown, Promise<CleanupRun>>('/admin/ai/ops/cleanup-runs', { dryRun, clientRequestId })
+export const submitCleanupApi = (dryRun: boolean, clientRequestId: string, approvedDryRunId?: string) =>
+  request.post<unknown, Promise<CleanupRun>>('/admin/ai/ops/cleanup-runs', {
+    dryRun,
+    clientRequestId,
+    ...(approvedDryRunId ? { approvedDryRunId } : {}),
+  })
 export const cancelCleanupApi = (runId: string) =>
   request.post(`/admin/ai/ops/cleanup-runs/${encodeURIComponent(runId)}/cancel`)
 export const fetchOpsFailuresApi = () =>

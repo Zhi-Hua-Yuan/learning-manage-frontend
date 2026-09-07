@@ -26,6 +26,7 @@ describe('Stage 7 operations API client', () => {
     await fetchCleanupRunApi('cleanup/run')
     await fetchOpsFailuresApi()
     await submitCleanupApi(true, 'cleanup-request-1')
+    await submitCleanupApi(false, 'cleanup-request-2', 'cleanup_1234567890abcdef')
     await cancelCleanupApi('cleanup/run')
 
     expect(calls[0]).toMatchObject({ method: 'GET', url: '/admin/ai/ops/overview' })
@@ -33,6 +34,11 @@ describe('Stage 7 operations API client', () => {
     expect(calls[2]).toMatchObject({ method: 'GET', url: '/admin/ai/ops/cleanup-runs/cleanup%2Frun' })
     expect(calls[3]).toMatchObject({ method: 'GET', url: '/admin/ai/ops/failures', params: { current: 1, size: 20 } })
     expect(JSON.parse(String(calls[4]?.data))).toEqual({ dryRun: true, clientRequestId: 'cleanup-request-1' })
-    expect(calls[5]).toMatchObject({ method: 'POST', url: '/admin/ai/ops/cleanup-runs/cleanup%2Frun/cancel' })
+    expect(JSON.parse(String(calls[5]?.data))).toEqual({
+      dryRun: false,
+      clientRequestId: 'cleanup-request-2',
+      approvedDryRunId: 'cleanup_1234567890abcdef',
+    })
+    expect(calls[6]).toMatchObject({ method: 'POST', url: '/admin/ai/ops/cleanup-runs/cleanup%2Frun/cancel' })
   })
 })

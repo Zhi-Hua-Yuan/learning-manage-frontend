@@ -58,7 +58,7 @@
           <div><h2 class="font-bold text-[var(--color-text-primary)]">数据生命周期</h2><p class="text-xs text-[var(--color-text-tertiary)]">先预演并选择审核通过的 Dry Run，再提交与其绑定的正式清理</p></div>
           <div class="flex gap-2">
             <button class="input-base px-3 py-2 text-sm" :disabled="submitting" @click="submit(true)">运行 Dry Run</button>
-            <button class="rounded-lg bg-[var(--color-danger)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="submitting || !reviewedDryRun" @click="submit(false)">正式清理</button>
+            <button class="rounded-lg bg-[var(--color-danger)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="submitting || !reviewedDryRun" @click="openFormalConfirmation">正式清理</button>
           </div>
         </div>
         <div class="mt-4 overflow-x-auto">
@@ -83,6 +83,17 @@
         </div>
       </section>
     </div>
+    <AppConfirmDialog
+      v-model="showFormalConfirmation"
+      variant="danger"
+      icon-name="warning"
+      title="确认执行正式清理？"
+      :message="formalConfirmationMessage"
+      confirm-text="确认正式清理"
+      cancel-text="返回检查"
+      :loading="submitting"
+      @confirm="confirmFormalCleanup"
+    />
   </main>
 </template>
 
@@ -92,6 +103,7 @@ import { useRouter } from 'vue-router'
 import { cancelCleanupApi, fetchCleanupRunApi, fetchCleanupRunsApi, fetchOpsFailuresApi, fetchOpsOverviewApi, submitCleanupApi, type CleanupRun, type OpsFailure, type OpsOverview } from '@/api/ops'
 import { getUserMeApi } from '@/api/user'
 import { normalizeCurrentUserWire } from '@/types/normalization'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 
 const router = useRouter()
 const overview = ref<OpsOverview | null>(null)
@@ -102,9 +114,11 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const selectedRunId = ref('')
 const selectedRunDetail = ref<CleanupRun | null>(null)
+const showFormalConfirmation = ref(false)
 let refreshTimer: number | null = null
 let disposed = false
 let loadGeneration = 0
+let detailGeneration = 0
 const grafanaUrl = import.meta.env.VITE_GRAFANA_URL || ''
 
 const dependencies = computed(() => Object.values(overview.value?.dependencies ?? {}))
@@ -118,6 +132,9 @@ const reviewedDryRun = computed(() => {
   const run = selectedRun.value
   return run?.dryRun && run.status === 'SUCCEEDED' ? run : null
 })
+const formalConfirmationMessage = computed(() => reviewedDryRun.value
+  ? `Dry Run：${reviewedDryRun.value.runId}\n预计影响：${reviewedDryRun.value.estimatedCount} 行\n该操作可能永久删除过期元数据。`
+  : '')
 
 const loadAll = async () => {
   const generation = ++loadGeneration
@@ -131,8 +148,11 @@ const loadAll = async () => {
     failures.value = failurePage.records
     if (selectedRunId.value) {
       const requestedRunId = selectedRunId.value
+      const requestedDetailGeneration = ++detailGeneration
       const detail = await fetchCleanupRunApi(requestedRunId).catch(() => null)
-      if (!disposed && generation === loadGeneration && selectedRunId.value === requestedRunId) {
+      if (!disposed && generation === loadGeneration
+        && requestedDetailGeneration === detailGeneration
+        && selectedRunId.value === requestedRunId) {
         selectedRunDetail.value = detail
       }
     }
@@ -171,8 +191,20 @@ const cancel = async (runId: string) => {
 const selectRun = async (runId: string) => {
   selectedRunId.value = runId
   selectedRunDetail.value = null
+  const requestedDetailGeneration = ++detailGeneration
   const detail = await fetchCleanupRunApi(runId).catch(() => null)
-  if (!disposed && selectedRunId.value === runId) selectedRunDetail.value = detail
+  if (!disposed && requestedDetailGeneration === detailGeneration && selectedRunId.value === runId) {
+    selectedRunDetail.value = detail
+  }
+}
+
+const openFormalConfirmation = () => {
+  if (reviewedDryRun.value) showFormalConfirmation.value = true
+}
+
+const confirmFormalCleanup = async () => {
+  showFormalConfirmation.value = false
+  await submit(false)
 }
 
 const statusClass = (status: string) => status === 'UP'
@@ -198,6 +230,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   disposed = true
+  detailGeneration += 1
   if (refreshTimer !== null) window.clearInterval(refreshTimer)
 })
 </script>

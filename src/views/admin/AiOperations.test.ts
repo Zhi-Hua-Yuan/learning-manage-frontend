@@ -104,6 +104,12 @@ describe('AiOperations', () => {
     expect(formalButton?.attributes('disabled')).toBeUndefined()
     await formalButton?.trigger('click')
     await flushPromises()
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(dialog.text()).toContain(preview.runId)
+    expect(dialog.text()).toContain('预计影响：1 行')
+    const confirmButton = dialog.findAll('button').find((button) => button.text() === '确认正式清理')
+    await confirmButton?.trigger('click')
+    await flushPromises()
 
     expect(mocks.submit).toHaveBeenCalledWith(
       false,
@@ -182,6 +188,32 @@ describe('AiOperations', () => {
     const aiCard = wrapper.findAll('section')[0]!.findAll('article')[0]!
     expect(aiCard.text()).toContain('22')
     expect(aiCard.text()).not.toContain('11')
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
+
+  it('versions selection details against a newer polling response for the same run', async () => {
+    vi.useFakeTimers()
+    const pending = run('cleanup_same_run_detail', true, 'PENDING')
+    const completed = run(pending.runId, true, 'SUCCEEDED')
+    mocks.runs.mockResolvedValue({ records: [pending] })
+    let resolveSelection!: (value: ReturnType<typeof run>) => void
+    let resolvePolling!: (value: ReturnType<typeof run>) => void
+    mocks.detail
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSelection = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolvePolling = resolve }))
+    const wrapper = mount(AiOperations)
+    await flushPromises()
+    await wrapper.find('tbody tr').trigger('click')
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+    resolvePolling(completed)
+    await flushPromises()
+    resolveSelection(pending)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(`运行详情 · ${pending.runId}`)
+    expect(wrapper.findAll('button').some((button) => button.text() === '取消')).toBe(false)
     wrapper.unmount()
     vi.useRealTimers()
   })

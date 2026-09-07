@@ -69,6 +69,11 @@ const router = createRouter({
           component: () => import('@/views/setting/Settings.vue'),
         },
         {
+          path: 'teams',
+          name: 'teams',
+          component: () => import('@/views/team/TeamManagement.vue'),
+        },
+        {
           path: 'projects/archived',
           name: 'archived-projects',
           component: () => import('@/views/project/ArchivedProjects.vue'),

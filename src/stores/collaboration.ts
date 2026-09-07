@@ -2,7 +2,23 @@ import { computed, onScopeDispose, reactive, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { fetchTeamProjectsApi } from '@/api/project'
-import { fetchMyTeamsApi, fetchTeamMembersApi } from '@/api/team'
+import {
+  createTeamApi,
+  dissolveTeamApi,
+  fetchMyTeamsApi,
+  fetchTeamDissolutionCheckApi,
+  fetchTeamInviteApi,
+  fetchTeamMembersApi,
+  joinTeamApi,
+  leaveTeamApi,
+  regenerateTeamInviteApi,
+  removeTeamMemberApi,
+  transferTeamOwnershipApi,
+  updateTeamApi,
+  updateTeamMemberRoleApi,
+  type TeamCreatePayload,
+  type TeamUpdatePayload,
+} from '@/api/team'
 import { getUserMeApi } from '@/api/user'
 import type { EntityId } from '@/types/common'
 import {
@@ -14,7 +30,7 @@ import {
   normalizeTeamWire,
 } from '@/types/normalization'
 import type { ProjectContext } from '@/types/project'
-import type { TeamContext, TeamMemberContext } from '@/types/team'
+import type { TeamContext, TeamMemberContext, TeamRole } from '@/types/team'
 import type { CurrentUserContext } from '@/types/user'
 import {
   classifyApiError,
@@ -55,6 +71,30 @@ export type TeamProjectRestoreResult =
 export interface CollaborationSnapshot {
   currentUser: CurrentUserContext
   teams: TeamContext[]
+}
+
+export interface TeamInviteContext {
+  teamId: string
+  inviteCode: string
+}
+
+export interface TeamTerminationContext {
+  teamId: string
+  memberUserId: string
+  action: string
+  unassignedTaskCount: number
+  terminatedAt: string | null
+}
+
+export interface TeamDissolutionCheckContext {
+  teamId: string
+  canDissolve: boolean
+  activeProjectCount: number
+  sharedReviewCount: number
+}
+
+export interface TeamListReconciliationResult {
+  teamListRefreshed: boolean
 }
 
 const TEAM_PROJECT_PAGE_SIZE = 100
@@ -136,6 +176,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
 
   let bootstrapPromise: Promise<CollaborationSnapshot> | null = null
   let teamsPromise: Promise<TeamContext[]> | null = null
+  let teamsRevision = 0
   const projectPromises = new Map<string, Promise<ProjectContext[]>>()
   const memberPromises = new Map<string, Promise<TeamMemberContext[]>>()
   const projectRevisions = new Map<string, number>()
@@ -187,6 +228,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     resetLoadState(teamsLoadState)
     bootstrapPromise = null
     teamsPromise = null
+    teamsRevision += 1
     projectPromises.clear()
     memberPromises.clear()
     projectRevisions.clear()
@@ -240,18 +282,23 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     })
   }
 
-  const refreshMyTeams = (): Promise<TeamContext[]> => {
-    if (teamsPromise) return teamsPromise
+  const refreshMyTeams = (options: { force?: boolean } = {}): Promise<TeamContext[]> => {
+    if (teamsPromise && !options.force) return teamsPromise
+    if (options.force) {
+      teamsRevision += 1
+      teamsPromise = null
+    }
     const actorId = currentUser.value?.id
     if (!actorId) return Promise.reject(new Error('Current user context is not initialized'))
 
     const epoch = sessionEpoch.value
+    const revision = teamsRevision
     setLoading(teamsLoadState)
 
     const requestPromise = (async () => {
       try {
         const response = await fetchMyTeamsApi()
-        if (!isSessionActive(epoch, actorId)) return teams.value
+        if (!isSessionActive(epoch, actorId) || revision !== teamsRevision) return teams.value
 
         const nextTeams = normalizeTeams(response)
         pruneMissingTeams(nextTeams)
@@ -259,7 +306,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
         setReady(teamsLoadState)
         return nextTeams
       } catch (error) {
-        if (!isSessionActive(epoch, actorId)) return teams.value
+        if (!isSessionActive(epoch, actorId) || revision !== teamsRevision) return teams.value
 
         const kind = classifyApiError(error)
         if (kind === 'AUTHENTICATION_REQUIRED') {
@@ -361,8 +408,10 @@ export const useCollaborationStore = defineStore('collaboration', () => {
 
     const epoch = sessionEpoch.value
     const revision = projectRevisions.get(teamId) ?? 0
-    const bucket = teamProjectsByTeamId[teamId] ?? createProjectBucket()
-    teamProjectsByTeamId[teamId] = bucket
+    if (!teamProjectsByTeamId[teamId]) {
+      teamProjectsByTeamId[teamId] = createProjectBucket()
+    }
+    const bucket = teamProjectsByTeamId[teamId]!
     setLoading(bucket.loadState)
 
     const requestPromise = (async () => {
@@ -466,14 +515,24 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     if (!actorId) return Promise.reject(new Error('Current user context is not initialized'))
     const epoch = sessionEpoch.value
     const revision = memberRevisions.get(teamId) ?? 0
-    const bucket = cached ?? createMemberBucket()
-    teamMembersByTeamId[teamId] = bucket
+    if (!cached) {
+      teamMembersByTeamId[teamId] = createMemberBucket()
+    }
+    const bucket = teamMembersByTeamId[teamId]!
     setLoading(bucket.loadState)
+
+    const settleDiscardedRequest = () => {
+      const activeBucket = teamMembersByTeamId[teamId]
+      if (!activeBucket) return
+      if ((memberRevisions.get(teamId) ?? 0) !== revision) return
+      if (activeBucket.loadState.status === 'loading') resetLoadState(activeBucket.loadState)
+    }
 
     const requestPromise = (async () => {
       try {
         const response = await fetchTeamMembersApi(teamId)
         if (!isMemberRequestActive(teamId, epoch, actorId, revision)) {
+          settleDiscardedRequest()
           return teamMembersByTeamId[teamId]?.records ?? []
         }
 
@@ -487,6 +546,7 @@ export const useCollaborationStore = defineStore('collaboration', () => {
         return records
       } catch (error) {
         if (!isMemberRequestActive(teamId, epoch, actorId, revision)) {
+          settleDiscardedRequest()
           return teamMembersByTeamId[teamId]?.records ?? []
         }
 
@@ -579,6 +639,165 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     return teamId ? teamMembersByTeamId[teamId]?.records ?? [] : []
   }
 
+  const requireMutationActor = () => {
+    const actorId = currentUser.value?.id
+    if (!actorId) throw new Error('Current user context is not initialized')
+    return { actorId, epoch: sessionEpoch.value }
+  }
+
+  const reconcileTeamListAfterMutation = async (mutation: { actorId: string; epoch: number }) => {
+    if (!isSessionActive(mutation.epoch, mutation.actorId)) return false
+    try {
+      await refreshMyTeams({ force: true })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const normalizeInvite = (value: { teamId?: EntityId; inviteCode?: string }): TeamInviteContext => {
+    const teamId = normalizeRequiredId(value.teamId ?? '', 'teamId')
+    const inviteCode = typeof value.inviteCode === 'string' ? value.inviteCode.trim() : ''
+    if (!inviteCode) throw new TypeError('inviteCode must be a nonblank string')
+    return { teamId, inviteCode }
+  }
+
+  const normalizeTermination = (value: {
+    teamId?: EntityId
+    memberUserId?: EntityId
+    action?: string
+    unassignedTaskCount?: number
+    terminatedAt?: string
+  }): TeamTerminationContext => ({
+    teamId: normalizeRequiredId(value.teamId ?? '', 'teamId'),
+    memberUserId: normalizeRequiredId(value.memberUserId ?? '', 'memberUserId'),
+    action: typeof value.action === 'string' ? value.action : '',
+    unassignedTaskCount: Number.isInteger(value.unassignedTaskCount) && Number(value.unassignedTaskCount) >= 0
+      ? Number(value.unassignedTaskCount)
+      : 0,
+    terminatedAt: typeof value.terminatedAt === 'string' ? value.terminatedAt : null,
+  })
+
+  const createTeam = async (
+    payload: TeamCreatePayload,
+  ): Promise<TeamInviteContext & TeamListReconciliationResult> => {
+    const mutation = requireMutationActor()
+    const result = normalizeInvite(await createTeamApi(payload))
+    const teamListRefreshed = await reconcileTeamListAfterMutation(mutation)
+    return { ...result, teamListRefreshed }
+  }
+
+  const joinTeam = async (inviteCode: string) => {
+    const mutation = requireMutationActor()
+    const previousIds = new Set(teams.value.map((team) => team.id))
+    await joinTeamApi(inviteCode)
+    if (!isSessionActive(mutation.epoch, mutation.actorId)) return null
+    const refreshed = await refreshMyTeams({ force: true })
+    return refreshed.find((team) => !previousIds.has(team.id))?.id ?? null
+  }
+
+  const updateTeam = async (payload: TeamUpdatePayload) => {
+    const mutation = requireMutationActor()
+    const teamId = normalizeRequiredId(payload.teamId, 'teamId')
+    await updateTeamApi(payload)
+    if (isSessionActive(mutation.epoch, mutation.actorId)) {
+      await refreshMyTeams({ force: true })
+    }
+    return getTeam(teamId)
+  }
+
+  const loadTeamInvite = async (rawTeamId: EntityId) => normalizeInvite(
+    await fetchTeamInviteApi(normalizeRequiredId(rawTeamId, 'teamId')),
+  )
+
+  const regenerateTeamInvite = async (rawTeamId: EntityId) => normalizeInvite(
+    await regenerateTeamInviteApi(normalizeRequiredId(rawTeamId, 'teamId')),
+  )
+
+  const changeTeamMemberRole = async (
+    rawTeamId: EntityId,
+    rawTargetUserId: EntityId,
+    role: Extract<TeamRole, 'ADMIN' | 'MEMBER'>,
+  ) => {
+    const mutation = requireMutationActor()
+    const teamId = normalizeRequiredId(rawTeamId, 'teamId')
+    await updateTeamMemberRoleApi(teamId, rawTargetUserId, role)
+    if (isSessionActive(mutation.epoch, mutation.actorId) && teamById.value.has(teamId)) {
+      invalidateTeamMembersById(teamId)
+      await ensureTeamMembers(teamId, { force: true })
+    }
+  }
+
+  const removeTeamMember = async (rawTeamId: EntityId, rawTargetUserId: EntityId) => {
+    const mutation = requireMutationActor()
+    const teamId = normalizeRequiredId(rawTeamId, 'teamId')
+    const result = normalizeTermination(await removeTeamMemberApi(teamId, rawTargetUserId))
+    if (isSessionActive(mutation.epoch, mutation.actorId) && teamById.value.has(teamId)) {
+      invalidateTeamMembersById(teamId)
+      await ensureTeamMembers(teamId, { force: true })
+    }
+    return result
+  }
+
+  const leaveTeam = async (
+    rawTeamId: EntityId,
+  ): Promise<TeamTerminationContext & TeamListReconciliationResult> => {
+    const mutation = requireMutationActor()
+    const teamId = normalizeRequiredId(rawTeamId, 'teamId')
+    const result = normalizeTermination(await leaveTeamApi(teamId))
+    if (isSessionActive(mutation.epoch, mutation.actorId)) {
+      pruneTeamContextById(teamId)
+    }
+    const teamListRefreshed = await reconcileTeamListAfterMutation(mutation)
+    return { ...result, teamListRefreshed }
+  }
+
+  const transferTeamOwnership = async (rawTeamId: EntityId, rawTargetUserId: EntityId) => {
+    const mutation = requireMutationActor()
+    const teamId = normalizeRequiredId(rawTeamId, 'teamId')
+    const response = await transferTeamOwnershipApi(teamId, rawTargetUserId)
+    const newOwnerUserId = normalizeRequiredId(response.newOwnerUserId ?? '', 'newOwnerUserId')
+    if (isSessionActive(mutation.epoch, mutation.actorId)) {
+      invalidateTeamMembersById(teamId)
+      await refreshMyTeams({ force: true })
+      if (teamById.value.has(teamId)) await ensureTeamMembers(teamId, { force: true })
+    }
+    return { teamId, newOwnerUserId, transferredAt: response.transferredAt ?? null }
+  }
+
+  const checkTeamDissolution = async (rawTeamId: EntityId): Promise<TeamDissolutionCheckContext> => {
+    const teamId = normalizeRequiredId(rawTeamId, 'teamId')
+    const response = await fetchTeamDissolutionCheckApi(teamId)
+    return {
+      teamId: normalizeRequiredId(response.teamId ?? '', 'teamId'),
+      canDissolve: response.canDissolve === true,
+      activeProjectCount: Number.isInteger(response.activeProjectCount) && Number(response.activeProjectCount) >= 0
+        ? Number(response.activeProjectCount)
+        : 0,
+      sharedReviewCount: Number.isInteger(response.sharedReviewCount) && Number(response.sharedReviewCount) >= 0
+        ? Number(response.sharedReviewCount)
+        : 0,
+    }
+  }
+
+  const dissolveTeam = async (rawTeamId: EntityId) => {
+    const mutation = requireMutationActor()
+    const teamId = normalizeRequiredId(rawTeamId, 'teamId')
+    const response = await dissolveTeamApi(teamId)
+    const dissolvedTeamId = normalizeRequiredId(response.teamId ?? '', 'teamId')
+    if (isSessionActive(mutation.epoch, mutation.actorId)) {
+      pruneTeamContextById(teamId)
+      await refreshMyTeams({ force: true })
+    }
+    return {
+      teamId: dissolvedTeamId,
+      dissolvedAt: response.dissolvedAt ?? null,
+      removedMemberCount: Number.isInteger(response.removedMemberCount)
+        ? Number(response.removedMemberCount)
+        : 0,
+    }
+  }
+
   return {
     currentUser,
     teams,
@@ -600,5 +819,16 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     getTeam,
     getTeamProjects,
     getTeamMembers,
+    createTeam,
+    joinTeam,
+    updateTeam,
+    loadTeamInvite,
+    regenerateTeamInvite,
+    changeTeamMemberRole,
+    removeTeamMember,
+    leaveTeam,
+    transferTeamOwnership,
+    checkTeamDissolution,
+    dissolveTeam,
   }
 })

@@ -31,4 +31,13 @@ describe('router authentication guard', () => {
 
     expect(router.currentRoute.value.path).toBe('/dashboard')
   }, 20000)
+
+  it('exposes the authenticated team management route', async () => {
+    writeAuthToken('valid-token')
+
+    await router.push('/teams?teamId=7')
+
+    expect(router.currentRoute.value.name).toBe('teams')
+    expect(router.currentRoute.value.query.teamId).toBe('7')
+  })
 })

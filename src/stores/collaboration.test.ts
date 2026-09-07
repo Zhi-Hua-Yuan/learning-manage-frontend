@@ -10,12 +10,34 @@ const apiMocks = vi.hoisted(() => ({
   fetchMyTeamsApi: vi.fn(),
   fetchTeamProjectsApi: vi.fn(),
   fetchTeamMembersApi: vi.fn(),
+  createTeamApi: vi.fn(),
+  joinTeamApi: vi.fn(),
+  updateTeamApi: vi.fn(),
+  fetchTeamInviteApi: vi.fn(),
+  regenerateTeamInviteApi: vi.fn(),
+  updateTeamMemberRoleApi: vi.fn(),
+  leaveTeamApi: vi.fn(),
+  removeTeamMemberApi: vi.fn(),
+  transferTeamOwnershipApi: vi.fn(),
+  fetchTeamDissolutionCheckApi: vi.fn(),
+  dissolveTeamApi: vi.fn(),
 }))
 
 vi.mock('@/api/user', () => ({ getUserMeApi: apiMocks.getUserMeApi }))
 vi.mock('@/api/team', () => ({
   fetchMyTeamsApi: apiMocks.fetchMyTeamsApi,
   fetchTeamMembersApi: apiMocks.fetchTeamMembersApi,
+  createTeamApi: apiMocks.createTeamApi,
+  joinTeamApi: apiMocks.joinTeamApi,
+  updateTeamApi: apiMocks.updateTeamApi,
+  fetchTeamInviteApi: apiMocks.fetchTeamInviteApi,
+  regenerateTeamInviteApi: apiMocks.regenerateTeamInviteApi,
+  updateTeamMemberRoleApi: apiMocks.updateTeamMemberRoleApi,
+  leaveTeamApi: apiMocks.leaveTeamApi,
+  removeTeamMemberApi: apiMocks.removeTeamMemberApi,
+  transferTeamOwnershipApi: apiMocks.transferTeamOwnershipApi,
+  fetchTeamDissolutionCheckApi: apiMocks.fetchTeamDissolutionCheckApi,
+  dissolveTeamApi: apiMocks.dissolveTeamApi,
 }))
 vi.mock('@/api/project', () => ({ fetchTeamProjectsApi: apiMocks.fetchTeamProjectsApi }))
 
@@ -74,6 +96,17 @@ describe('collaboration store', () => {
     apiMocks.fetchTeamMembersApi.mockResolvedValue([
       { userId: 1, username: 'Alice', role: 'OWNER', joinTime: '2026-08-01T00:00:00Z' },
     ])
+    apiMocks.createTeamApi.mockResolvedValue({ teamId: 11, inviteCode: 'ABCDEFGH' })
+    apiMocks.joinTeamApi.mockResolvedValue(true)
+    apiMocks.updateTeamApi.mockResolvedValue(teamWire(10))
+    apiMocks.fetchTeamInviteApi.mockResolvedValue({ teamId: 10, inviteCode: 'ABCDEFGH' })
+    apiMocks.regenerateTeamInviteApi.mockResolvedValue({ teamId: 10, inviteCode: 'BCDEFGHJ' })
+    apiMocks.updateTeamMemberRoleApi.mockResolvedValue(true)
+    apiMocks.leaveTeamApi.mockResolvedValue({ teamId: 10, memberUserId: 1, action: 'MEMBER_LEFT', unassignedTaskCount: 0 })
+    apiMocks.removeTeamMemberApi.mockResolvedValue({ teamId: 10, memberUserId: 2, action: 'MEMBER_REMOVED', unassignedTaskCount: 1 })
+    apiMocks.transferTeamOwnershipApi.mockResolvedValue({ teamId: 10, previousOwnerUserId: 1, newOwnerUserId: 2 })
+    apiMocks.fetchTeamDissolutionCheckApi.mockResolvedValue({ teamId: 10, canDissolve: true, activeProjectCount: 0, sharedReviewCount: 0 })
+    apiMocks.dissolveTeamApi.mockResolvedValue({ teamId: 10, removedMemberCount: 2 })
   })
 
   it('bootstraps user before teams without eagerly loading projects or members', async () => {
@@ -384,6 +417,42 @@ describe('collaboration store', () => {
     expect(store.teamProjectsByTeamId['10']).toBeUndefined()
   })
 
+  it('settles a discarded member request instead of leaving its bucket loading forever', async () => {
+    const pendingMembers = deferred<Array<{ userId: number; username: string; role: string }>>()
+    apiMocks.fetchTeamMembersApi.mockReturnValueOnce(pendingMembers.promise)
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+    const request = store.ensureTeamMembers(10)
+
+    store.currentUser = { ...store.currentUser!, id: '2' }
+    pendingMembers.resolve([{ userId: 1, username: 'Alice', role: 'OWNER' }])
+    await request
+
+    expect(store.teamMembersByTeamId['10']?.loadState.status).toBe('idle')
+  })
+
+  it('keeps a newer forced member refresh loading when an older request returns', async () => {
+    const older = deferred<Array<{ userId: number; username: string; role: string }>>()
+    const newer = deferred<Array<{ userId: number; username: string; role: string }>>()
+    apiMocks.fetchTeamMembersApi.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise)
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+
+    const olderRequest = store.ensureTeamMembers(10)
+    const newerRequest = store.ensureTeamMembers(10, { force: true })
+    older.resolve([{ userId: 1, username: 'Old', role: 'OWNER' }])
+    await olderRequest
+    expect(store.teamMembersByTeamId['10']?.loadState.status).toBe('loading')
+
+    newer.resolve([
+      { userId: 1, username: 'Alice', role: 'OWNER' },
+      { userId: 2, username: 'Bob', role: 'MEMBER' },
+    ])
+    await newerRequest
+    expect(store.getTeamMembers(10).map((value) => value.username)).toEqual(['Alice', 'Bob'])
+    expect(store.teamMembersByTeamId['10']?.loadState.status).toBe('ready')
+  })
+
   it('fails closed on an invalid current-user response', async () => {
     apiMocks.getUserMeApi.mockResolvedValueOnce({ id: 'unsafe' })
     const store = useCollaborationStore()
@@ -403,5 +472,65 @@ describe('collaboration store', () => {
 
     expect(localStorageSpy).not.toHaveBeenCalled()
     localStorageSpy.mockRestore()
+  })
+
+  it('refreshes team context after creation and keeps the invite in the return value only', async () => {
+    apiMocks.fetchMyTeamsApi
+      .mockResolvedValueOnce([teamWire(10)])
+      .mockResolvedValueOnce([teamWire(10), teamWire(11)])
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+
+    const result = await store.createTeam({ name: 'New team', description: '' })
+
+    expect(result).toEqual({ teamId: '11', inviteCode: 'ABCDEFGH', teamListRefreshed: true })
+    expect(store.teams.map((team) => team.id)).toEqual(['10', '11'])
+    expect(JSON.stringify(store.$state)).not.toContain('ABCDEFGH')
+  })
+
+  it('prunes team resources after leaving and ignores an older team-list response', async () => {
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+    await store.ensureTeamProjects(10)
+    await store.ensureTeamMembers(10)
+
+    const stale = deferred<ReturnType<typeof teamWire>[]>()
+    apiMocks.fetchMyTeamsApi.mockReturnValueOnce(stale.promise).mockResolvedValueOnce([])
+    const staleRefresh = store.refreshMyTeams({ force: true })
+    await store.leaveTeam(10)
+    stale.resolve([teamWire(10)])
+    await staleRefresh
+
+    expect(store.getTeam(10)).toBeNull()
+    expect(store.teamProjectsByTeamId['10']).toBeUndefined()
+    expect(store.teamMembersByTeamId['10']).toBeUndefined()
+  })
+
+  it('preserves a successful team creation when the follow-up list refresh fails', async () => {
+    apiMocks.fetchMyTeamsApi
+      .mockResolvedValueOnce([teamWire(10)])
+      .mockRejectedValueOnce(new ApiRequestError('refresh failed'))
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+
+    const result = await store.createTeam({ name: 'Created once', description: '' })
+
+    expect(result).toEqual({ teamId: '11', inviteCode: 'ABCDEFGH', teamListRefreshed: false })
+    expect(apiMocks.createTeamApi).toHaveBeenCalledTimes(1)
+    expect(store.teams.map((team) => team.id)).toEqual(['10'])
+  })
+
+  it('preserves a successful leave and prunes the team when list reconciliation fails', async () => {
+    apiMocks.fetchMyTeamsApi
+      .mockResolvedValueOnce([teamWire(10)])
+      .mockRejectedValueOnce(new ApiRequestError('refresh failed'))
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+
+    const result = await store.leaveTeam(10)
+
+    expect(result).toMatchObject({ teamId: '10', teamListRefreshed: false })
+    expect(apiMocks.leaveTeamApi).toHaveBeenCalledTimes(1)
+    expect(store.getTeam(10)).toBeNull()
   })
 })

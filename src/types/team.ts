@@ -34,3 +34,41 @@ export interface TeamMemberContext {
   role: TeamRole
   joinedAt: string | null
 }
+
+export interface TeamCreateResultWire {
+  teamId?: EntityId
+  inviteCode?: string
+}
+
+export interface TeamInviteWire {
+  teamId?: EntityId
+  inviteCode?: string
+}
+
+export interface TeamMembershipTerminationWire {
+  teamId?: EntityId
+  memberUserId?: EntityId
+  action?: string
+  unassignedTaskCount?: number
+  terminatedAt?: string
+}
+
+export interface TeamOwnershipTransferWire {
+  teamId?: EntityId
+  previousOwnerUserId?: EntityId
+  newOwnerUserId?: EntityId
+  transferredAt?: string
+}
+
+export interface TeamDissolutionCheckWire {
+  teamId?: EntityId
+  canDissolve?: boolean
+  activeProjectCount?: number
+  sharedReviewCount?: number
+}
+
+export interface TeamDissolutionWire {
+  teamId?: EntityId
+  dissolvedAt?: string
+  removedMemberCount?: number
+}

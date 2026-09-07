@@ -4,14 +4,28 @@
       <span id="team-navigation-heading" class="text-xs font-medium text-[var(--color-text-tertiary)]">
         团队
       </span>
-      <button
-        v-if="teamsLoadState.status === 'error'"
-        type="button"
-        class="text-xs text-[var(--color-primary)] hover:underline"
-        @click="emit('retry-teams')"
-      >
-        重试
-      </button>
+      <div class="flex items-center gap-1">
+        <button
+          v-if="teamsLoadState.status === 'error'"
+          type="button"
+          class="px-1 text-xs text-[var(--color-primary)] hover:underline"
+          @click="emit('retry-teams')"
+        >
+          重试
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-menu-hover)]"
+          aria-label="管理团队"
+          title="管理团队"
+          @click="emit('manage-teams')"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6v.1h-4V21a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 00.3-1.9A1.7 1.7 0 003 14H3v-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.6V3h4v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.6 1h.1v4H21a1.7 1.7 0 00-1.6 1z" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div
@@ -36,7 +50,11 @@
       v-else-if="teamsLoadState.status === 'ready' && teams.length === 0"
       class="px-3 py-2 text-xs leading-5 text-[var(--color-text-tertiary)]"
     >
-      暂无团队
+      <span>暂无团队</span>
+      <span class="mt-2 flex gap-3">
+        <button type="button" class="text-[var(--color-primary)] hover:underline" @click="emit('create-team')">创建</button>
+        <button type="button" class="text-[var(--color-primary)] hover:underline" @click="emit('join-team')">加入</button>
+      </span>
     </p>
 
     <div v-else class="space-y-1">
@@ -152,6 +170,9 @@ const emit = defineEmits<{
   'retry-projects': [teamId: string]
   'load-more-projects': [teamId: string]
   'select-project': [selection: { teamId: string; projectId: string }]
+  'manage-teams': []
+  'create-team': []
+  'join-team': []
 }>()
 
 const isExpanded = (teamId: string) => props.expandedTeamIds.includes(teamId)

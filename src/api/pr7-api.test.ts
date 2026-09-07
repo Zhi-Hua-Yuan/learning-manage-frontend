@@ -18,7 +18,21 @@ vi.mock('@/stores/toast', () => ({
 }))
 
 import request, { ApiRequestError, classifyApiError } from '@/utils/request'
-import { fetchTeamMembersApi, fetchMyTeamsApi } from './team'
+import {
+  createTeamApi,
+  dissolveTeamApi,
+  fetchMyTeamsApi,
+  fetchTeamDissolutionCheckApi,
+  fetchTeamInviteApi,
+  fetchTeamMembersApi,
+  joinTeamApi,
+  leaveTeamApi,
+  regenerateTeamInviteApi,
+  removeTeamMemberApi,
+  transferTeamOwnershipApi,
+  updateTeamApi,
+  updateTeamMemberRoleApi,
+} from './team'
 import { fetchTeamProjectsApi } from './project'
 import {
   addTaskApi,
@@ -92,6 +106,51 @@ describe('PR7 B2 API clients', () => {
 
   it('rejects invalid dynamic IDs before issuing a request', () => {
     expect(() => fetchTeamMembersApi('not-an-id')).toThrow(TypeError)
+  })
+
+  it('calls every team lifecycle endpoint without losing large IDs', async () => {
+    const hugeId = '900719925474099312345'
+
+    let read = mockSuccess({ teamId: hugeId, inviteCode: 'ABCDEFGH' })
+    await createTeamApi({ name: '研发组', description: '描述' })
+    expect(read()).toMatchObject({ method: 'POST', url: '/team/create' })
+    expect(parseBody(read()?.data)).toEqual({ name: '研发组', description: '描述' })
+
+    read = mockSuccess(true)
+    await joinTeamApi('ABCDEFGH')
+    expect(parseBody(read()?.data)).toEqual({ inviteCode: 'ABCDEFGH' })
+
+    read = mockSuccess({ id: hugeId })
+    await updateTeamApi({ teamId: hugeId, name: '新名称', description: '' })
+    expect(parseBody(read()?.data)).toEqual({ teamId: hugeId, name: '新名称', description: '' })
+
+    read = mockSuccess({ teamId: hugeId, inviteCode: 'ABCDEFGH' })
+    await fetchTeamInviteApi(hugeId)
+    expect(read()).toMatchObject({ method: 'GET', url: `/team/${hugeId}/invite` })
+    await regenerateTeamInviteApi(hugeId)
+    expect(read()).toMatchObject({ method: 'POST', url: `/team/${hugeId}/invite/regenerate` })
+
+    read = mockSuccess(true)
+    await updateTeamMemberRoleApi(hugeId, '22', 'ADMIN')
+    expect(parseBody(read()?.data)).toEqual({ teamId: hugeId, targetUserId: '22', role: 'ADMIN' })
+
+    read = mockSuccess({ teamId: hugeId, memberUserId: '11', unassignedTaskCount: 0 })
+    await leaveTeamApi(hugeId)
+    expect(read()).toMatchObject({ method: 'POST', url: `/team/${hugeId}/leave` })
+
+    read = mockSuccess({ teamId: hugeId, memberUserId: '22', unassignedTaskCount: 1 })
+    await removeTeamMemberApi(hugeId, '22')
+    expect(parseBody(read()?.data)).toEqual({ teamId: hugeId, targetUserId: '22' })
+
+    read = mockSuccess({ teamId: hugeId, newOwnerUserId: '22' })
+    await transferTeamOwnershipApi(hugeId, '22')
+    expect(parseBody(read()?.data)).toEqual({ teamId: hugeId, targetUserId: '22' })
+
+    read = mockSuccess({ teamId: hugeId, canDissolve: true })
+    await fetchTeamDissolutionCheckApi(hugeId)
+    expect(read()).toMatchObject({ method: 'GET', url: `/team/${hugeId}/dissolution-check` })
+    await dissolveTeamApi(hugeId)
+    expect(read()).toMatchObject({ method: 'POST', url: `/team/${hugeId}/dissolve` })
   })
 
   it('sends team project filters with explicit pagination', async () => {

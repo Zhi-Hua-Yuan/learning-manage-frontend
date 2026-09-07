@@ -303,6 +303,9 @@
           @retry-projects="retryTeamProjects"
           @load-more-projects="loadMoreTeamProjects"
           @select-project="selectTeamProject"
+          @manage-teams="openTeamManagement"
+          @create-team="openTeamManagementAction('create')"
+          @join-team="openTeamManagementAction('join')"
         />
       </div>
 
@@ -823,6 +826,15 @@ const selectTeamProject = async (selection: { teamId: string; projectId: string 
   closeProjectActionMenu()
   await router.push(buildTeamProjectRoute(selection.teamId, selection.projectId))
   closeSidebar()
+}
+
+const openTeamManagement = async () => {
+  await navigateTo('/teams')
+}
+
+const openTeamManagementAction = async (action: 'create' | 'join') => {
+  if (isCompactViewport.value) isSidebarOpen.value = false
+  await router.push({ path: '/teams', query: { action } })
 }
 
 const syncExpandedTeamRoute = () => {

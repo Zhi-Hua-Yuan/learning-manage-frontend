@@ -452,6 +452,8 @@ describe('classifyApiError', () => {
 
   it('preserves the existing authentication, permission and server classifications', () => {
     expect(classifyApiError(new ApiRequestError('冲突', { code: 40900 }))).toBe('CONFLICT')
+    expect(classifyApiError(new ApiRequestError('团队仍有关联数据', { code: 41001 }))).toBe('CONFLICT')
+    expect(classifyApiError(new ApiRequestError('团队状态已变化', { code: 41002 }))).toBe('CONFLICT')
     expect(classifyApiError(new ApiRequestError('无权限', {
       code: 40300,
       httpStatus: 403,

@@ -48,6 +48,11 @@ const router = createRouter({
           component: () => import('@/views/ai/AgentWorkbench.vue'),
         },
         {
+          path: 'admin/ai-ops',
+          name: 'ai-operations',
+          component: () => import('@/views/admin/AiOperations.vue'),
+        },
+        {
           path: 'ai-report/:reportId',
           name: 'ai-report-detail',
           component: () => import('@/views/ai/AnalysisReportDetail.vue'),

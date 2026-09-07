@@ -146,6 +146,16 @@
             <AppIcon name="sparkles" class="h-4 w-4" />
             <span class="flex-1 text-[13px] font-semibold leading-5">AI 风险与负载</span>
           </div>
+
+          <div
+            v-if="isSystemAdmin"
+            @click="navigateTo('/admin/ai-ops')"
+            class="interactive-row flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2"
+            :class="route.path === '/admin/ai-ops' ? 'is-active font-medium' : 'text-[var(--color-text-secondary)]'"
+          >
+            <AppIcon name="dashboard" class="h-4 w-4" />
+            <span class="flex-1 text-[13px] font-semibold leading-5">AI 生产运维</span>
+          </div>
         </div>
       </div>
 
@@ -625,6 +635,7 @@ interface Project {
 interface CurrentUserInfo {
   username?: string
   account?: string
+  role?: string
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
@@ -727,6 +738,7 @@ const projectLoadVersion = ref(0)
 const isCompactViewport = computed(() => viewportWidth.value < 1024)
 const isTodayRoute = computed(() => route.path === '/tasks' && route.query.view === 'today')
 const isWeekRoute = computed(() => route.path === '/tasks' && route.query.view === 'week')
+const isSystemAdmin = computed(() => currentUserInfo.value.role === 'SYSTEM_ADMIN')
 const taskProjectContext = computed(() => parseTaskProjectContext(route.query))
 const selectedTeamId = computed(() => (
   taskProjectContext.value.type === 'team-project' ? taskProjectContext.value.teamId : ''
@@ -1186,6 +1198,7 @@ const initializeCollaboration = async () => {
     currentUserInfo.value = {
       username: snapshot.currentUser.username,
       account: snapshot.currentUser.account,
+      role: snapshot.currentUser.role,
     }
     syncExpandedTeamRoute()
   } catch (error) {

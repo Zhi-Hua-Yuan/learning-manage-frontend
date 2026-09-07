@@ -93,6 +93,10 @@ export interface TeamDissolutionCheckContext {
   sharedReviewCount: number
 }
 
+export interface TeamListReconciliationResult {
+  teamListRefreshed: boolean
+}
+
 const TEAM_PROJECT_PAGE_SIZE = 100
 
 const createLoadState = (): CollaborationLoadState => ({
@@ -641,6 +645,16 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     return { actorId, epoch: sessionEpoch.value }
   }
 
+  const reconcileTeamListAfterMutation = async (mutation: { actorId: string; epoch: number }) => {
+    if (!isSessionActive(mutation.epoch, mutation.actorId)) return false
+    try {
+      await refreshMyTeams({ force: true })
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const normalizeInvite = (value: { teamId?: EntityId; inviteCode?: string }): TeamInviteContext => {
     const teamId = normalizeRequiredId(value.teamId ?? '', 'teamId')
     const inviteCode = typeof value.inviteCode === 'string' ? value.inviteCode.trim() : ''
@@ -664,13 +678,13 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     terminatedAt: typeof value.terminatedAt === 'string' ? value.terminatedAt : null,
   })
 
-  const createTeam = async (payload: TeamCreatePayload) => {
+  const createTeam = async (
+    payload: TeamCreatePayload,
+  ): Promise<TeamInviteContext & TeamListReconciliationResult> => {
     const mutation = requireMutationActor()
     const result = normalizeInvite(await createTeamApi(payload))
-    if (isSessionActive(mutation.epoch, mutation.actorId)) {
-      await refreshMyTeams({ force: true })
-    }
-    return result
+    const teamListRefreshed = await reconcileTeamListAfterMutation(mutation)
+    return { ...result, teamListRefreshed }
   }
 
   const joinTeam = async (inviteCode: string) => {
@@ -725,15 +739,17 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     return result
   }
 
-  const leaveTeam = async (rawTeamId: EntityId) => {
+  const leaveTeam = async (
+    rawTeamId: EntityId,
+  ): Promise<TeamTerminationContext & TeamListReconciliationResult> => {
     const mutation = requireMutationActor()
     const teamId = normalizeRequiredId(rawTeamId, 'teamId')
     const result = normalizeTermination(await leaveTeamApi(teamId))
     if (isSessionActive(mutation.epoch, mutation.actorId)) {
       pruneTeamContextById(teamId)
-      await refreshMyTeams({ force: true })
     }
-    return result
+    const teamListRefreshed = await reconcileTeamListAfterMutation(mutation)
+    return { ...result, teamListRefreshed }
   }
 
   const transferTeamOwnership = async (rawTeamId: EntityId, rawTargetUserId: EntityId) => {

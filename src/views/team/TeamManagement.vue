@@ -121,7 +121,7 @@
                 <p class="text-sm font-bold text-[var(--color-text-primary)]">退出团队</p>
                 <p class="mt-1 text-xs text-[var(--color-text-secondary)]">退出后将无法访问团队内容，名下未完成任务会被取消负责人。</p>
               </div>
-              <button type="button" class="btn-danger shrink-0" @click="showLeaveConfirm = true">退出团队</button>
+              <button type="button" class="btn-danger shrink-0" @click="openLeaveConfirm">退出团队</button>
             </div>
             <div v-else class="mt-4 space-y-4">
               <div class="rounded-xl border border-[var(--color-input-border)] p-4">
@@ -241,6 +241,7 @@ const joinCode = ref('')
 const transferTargetId = ref('')
 const dissolveName = ref('')
 const pendingMemberId = ref('')
+const pendingLeaveTeamId = ref('')
 const pendingRemoveMember = ref<TeamMemberContext | null>(null)
 const invites = reactive<Record<string, string>>({})
 const dissolutionCheck = ref<TeamDissolutionCheckContext | null>(null)
@@ -305,6 +306,11 @@ const openCreate = () => { createForm.name = ''; createForm.description = ''; sh
 const closeCreate = () => { if (!submitting.value) showCreateModal.value = false }
 const openJoin = () => { joinCode.value = ''; showJoinModal.value = true }
 const closeJoin = () => { if (!submitting.value) showJoinModal.value = false }
+const openLeaveConfirm = () => {
+  if (!selectedTeamId.value) return
+  pendingLeaveTeamId.value = selectedTeamId.value
+  showLeaveConfirm.value = true
+}
 const openEdit = () => {
   if (!selectedTeam.value) return
   editForm.name = selectedTeam.value.name
@@ -319,10 +325,19 @@ const submitCreate = async () => {
   try {
     const result = await collaboration.createTeam({ name, description: createForm.description.trim() })
     showCreateModal.value = false
-    await replaceTeamQuery(result.teamId)
     createdInvite.value = result.inviteCode
     invites[result.teamId] = result.inviteCode
-    toast.success('团队创建成功。')
+    if (result.teamListRefreshed) {
+      try {
+        await replaceTeamQuery(result.teamId)
+      } catch {
+        toast.warning('团队已创建，但页面未能切换到新团队。邀请码已保留。')
+        return
+      }
+      toast.success('团队创建成功。')
+    } else {
+      toast.warning('团队已创建，但团队列表同步失败。邀请码已保留，请稍后重新加载列表。')
+    }
   } catch (error) { toast.error(errorMessage(error, '创建团队失败，请稍后重试。')) }
   finally { submitting.value = false }
 }
@@ -401,13 +416,24 @@ const executeRemove = async () => {
 }
 
 const executeLeave = async () => {
-  if (!selectedTeamId.value) return
+  const leavingTeamId = pendingLeaveTeamId.value
+  if (!leavingTeamId) return
   submitting.value = true
   try {
-    const result = await collaboration.leaveTeam(selectedTeamId.value)
+    const result = await collaboration.leaveTeam(leavingTeamId)
     showLeaveConfirm.value = false
+    pendingLeaveTeamId.value = ''
     toast.success(result.unassignedTaskCount > 0 ? `已退出团队，${result.unassignedTaskCount} 项任务已取消负责人。` : '已退出团队。')
-    syncSelection()
+    if (!result.teamListRefreshed) {
+      toast.warning('退出已生效，但团队列表同步失败，请稍后重新加载。')
+    }
+    if (selectedTeamId.value === leavingTeamId) {
+      try {
+        await replaceTeamQuery(teams.value[0]?.id ?? '')
+      } catch {
+        toast.warning('退出已生效，但页面未能切换团队，请重新进入团队管理页。')
+      }
+    }
   } catch (error) { toast.error(errorMessage(error, '退出团队失败。')); await retryTeams() }
   finally { submitting.value = false }
 }
@@ -444,6 +470,9 @@ watch(
   syncSelection,
   { immediate: true },
 )
+watch(showLeaveConfirm, (visible) => {
+  if (!visible && !submitting.value) pendingLeaveTeamId.value = ''
+})
 watch(
   [
     () => currentUser.value?.id ?? '',

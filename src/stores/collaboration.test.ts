@@ -483,7 +483,7 @@ describe('collaboration store', () => {
 
     const result = await store.createTeam({ name: 'New team', description: '' })
 
-    expect(result).toEqual({ teamId: '11', inviteCode: 'ABCDEFGH' })
+    expect(result).toEqual({ teamId: '11', inviteCode: 'ABCDEFGH', teamListRefreshed: true })
     expect(store.teams.map((team) => team.id)).toEqual(['10', '11'])
     expect(JSON.stringify(store.$state)).not.toContain('ABCDEFGH')
   })
@@ -504,5 +504,33 @@ describe('collaboration store', () => {
     expect(store.getTeam(10)).toBeNull()
     expect(store.teamProjectsByTeamId['10']).toBeUndefined()
     expect(store.teamMembersByTeamId['10']).toBeUndefined()
+  })
+
+  it('preserves a successful team creation when the follow-up list refresh fails', async () => {
+    apiMocks.fetchMyTeamsApi
+      .mockResolvedValueOnce([teamWire(10)])
+      .mockRejectedValueOnce(new ApiRequestError('refresh failed'))
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+
+    const result = await store.createTeam({ name: 'Created once', description: '' })
+
+    expect(result).toEqual({ teamId: '11', inviteCode: 'ABCDEFGH', teamListRefreshed: false })
+    expect(apiMocks.createTeamApi).toHaveBeenCalledTimes(1)
+    expect(store.teams.map((team) => team.id)).toEqual(['10'])
+  })
+
+  it('preserves a successful leave and prunes the team when list reconciliation fails', async () => {
+    apiMocks.fetchMyTeamsApi
+      .mockResolvedValueOnce([teamWire(10)])
+      .mockRejectedValueOnce(new ApiRequestError('refresh failed'))
+    const store = useCollaborationStore()
+    await store.bootstrapCollaborationContext()
+
+    const result = await store.leaveTeam(10)
+
+    expect(result).toMatchObject({ teamId: '10', teamListRefreshed: false })
+    expect(apiMocks.leaveTeamApi).toHaveBeenCalledTimes(1)
+    expect(store.getTeam(10)).toBeNull()
   })
 })

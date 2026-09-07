@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TeamMemberContext, TeamRole } from '@/types/team'
+import teamManagementSource from './TeamManagement.vue?raw'
 import {
   canChangeTeamMemberRole,
   canLoadTeamMembers,
@@ -44,5 +45,13 @@ describe('team management permission presentation', () => {
     expect(getTeamMemberSummary('error', 0)).toBe('成员加载失败')
     expect(getTeamMemberSummary('ready', 2)).toBe('2 名有效成员')
     expect(getTeamMemberSummary('ready', 0)).toBe('0 名有效成员')
+  })
+
+  it('binds leave confirmation to the captured team and closes it after commit', () => {
+    expect(teamManagementSource).toContain('const leavingTeamId = pendingLeaveTeamId.value')
+    expect(teamManagementSource).toMatch(
+      /await collaboration\.leaveTeam\(leavingTeamId\)[\s\S]*showLeaveConfirm\.value = false/,
+    )
+    expect(teamManagementSource).not.toContain('collaboration.leaveTeam(selectedTeamId.value)')
   })
 })

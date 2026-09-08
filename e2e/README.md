@@ -8,6 +8,8 @@ available through the repository's `/api` proxy at `127.0.0.1:8123`.
 Run the Chromium desktop/mobile suite plus Firefox/WebKit smoke tests:
 
 ```bash
+npm ci
+npx playwright install chromium firefox webkit
 npm run test:e2e
 ```
 

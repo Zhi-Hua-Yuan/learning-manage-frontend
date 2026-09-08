@@ -41,7 +41,10 @@ test('BUG-AUDIT-004 并发创建项目应生成唯一且连续的排序号', asy
   const auditProjects = (listed.body.data.records ?? []).filter(({ name }) => name?.startsWith(prefix))
   const orderNumbers = auditProjects.map(({ orderNo }) => orderNo)
   expect(auditProjects).toHaveLength(12)
+  expect(orderNumbers.every((orderNo) => Number.isInteger(orderNo))).toBe(true)
   expect(new Set(orderNumbers).size).toBe(12)
+  expect([...orderNumbers].sort((left, right) => (left ?? 0) - (right ?? 0)))
+    .toEqual(Array.from({ length: 12 }, (_, index) => index))
 })
 
 test('BUG-AUDIT-005 删除末尾里程碑后应能创建替代里程碑', async ({ request }, testInfo) => {

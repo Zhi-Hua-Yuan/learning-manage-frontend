@@ -29,8 +29,20 @@ describe('Stage 6 Agent API client', () => {
     clearAuthToken()
     request.defaults.adapter = async (config) => {
       calls.push({ method: config.method?.toUpperCase(), url: config.url, data: config.data, params: config.params })
+      let data: unknown = {}
+      if (config.url === '/ai/agent/report/confirm') {
+        data = { success: true, idempotentReplay: false, businessId: '2098698814079639554' }
+      } else if (config.url === '/ai/report') {
+        data = { records: [], current: '1', size: '20', total: '0', pages: '0' }
+      } else if (config.url?.startsWith('/ai/report/')) {
+        data = {
+          reportId: 'report-1', reportType: 'PROJECT_RISK', projectId: '2098698814079639554',
+          teamId: null, status: 'ACTIVE', summary: 'Summary', memberMetrics: {},
+          recommendations: [], sources: [], generatedAt: '2026-09-12T17:08:11',
+        }
+      }
       const response: AxiosResponse = {
-        data: { code: 0, data: {} }, status: 200, statusText: 'OK', headers: {}, config,
+        data: { code: 0, data }, status: 200, statusText: 'OK', headers: {}, config,
       }
       return response
     }
@@ -50,10 +62,14 @@ describe('Stage 6 Agent API client', () => {
   })
 
   it('keeps confirmation and report operations explicit', async () => {
-    await confirmAgentReportApi('draft-1', 'operation-1')
-    await listAnalysisReportsApi({ current: 1, pageSize: 20 })
-    await getAnalysisReportApi('report/1')
+    const confirmation = await confirmAgentReportApi('draft-1', 'operation-1')
+    const page = await listAnalysisReportsApi({ current: 1, pageSize: 20 })
+    const report = await getAnalysisReportApi('report/1')
     await deleteAnalysisReportApi('report/1')
+
+    expect(confirmation.businessId).toBe('2098698814079639554')
+    expect(page).toMatchObject({ current: 1, size: 20, total: 0, pages: 0 })
+    expect(report.projectId).toBe('2098698814079639554')
 
     expect(JSON.parse(String(calls[0]?.data))).toEqual({ draftId: 'draft-1', operationId: 'operation-1' })
     expect(calls[0]).toMatchObject({ method: 'POST', url: '/ai/agent/report/confirm' })

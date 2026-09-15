@@ -129,7 +129,7 @@ describe('useTaskAssignmentMutation', () => {
     expect(mutation.phase.value).toBe('idle')
 
     mutation.reset()
-    vi.mocked(assignTaskApi).mockRejectedValueOnce(new ApiRequestError('conflict', { code: 50001 }))
+    vi.mocked(assignTaskApi).mockRejectedValueOnce(new ApiRequestError('conflict', { code: 40901 }))
     const conflict = await mutation.submit({
       taskId: '101',
       assigneeUserId: '2',

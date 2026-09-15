@@ -67,7 +67,7 @@ describe('useTaskStatusMutation', () => {
 
   it('keeps conflict commands non-retryable and classifies permission errors', async () => {
     vi.mocked(changeTaskStatusApi)
-      .mockRejectedValueOnce(new ApiRequestError('conflict', { code: 50001 }))
+      .mockRejectedValueOnce(new ApiRequestError('conflict', { code: 40901 }))
       .mockRejectedValueOnce(new ApiRequestError('denied', { code: 40300 }))
     const mutation = useTaskStatusMutation()
 

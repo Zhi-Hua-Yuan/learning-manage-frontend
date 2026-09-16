@@ -22,7 +22,10 @@ describe('Stage 6 Agent rendering safety', () => {
     expect(agentWorkbenchSource).toContain('pollGeneration')
     expect(agentWorkbenchSource).toContain('schedulePoll(generation)')
     expect(agentWorkbenchSource).toContain('generation !== pollGeneration')
-    expect(agentWorkbenchSource).toContain("resolveAiErrorPresentation(error, 'Agent 状态查询失败。')")
+    expect(agentWorkbenchSource).toContain("presentAgentError(error, 'Agent 状态查询失败。', 'POLL')")
+    expect(agentWorkbenchSource).toContain("presentAgentError(error, '分析已经完成，但草稿加载失败。', 'DRAFT')")
+    expect(agentWorkbenchSource).toContain('@action="handleAgentErrorAction"')
+    expect(agentWorkbenchSource).toContain('clearAgentError()')
   })
 
   it('paginates reports and consumes citation target identifiers', () => {

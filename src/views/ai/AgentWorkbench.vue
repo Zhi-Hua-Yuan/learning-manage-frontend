@@ -13,7 +13,12 @@
       </button>
     </header>
 
-    <AiErrorNotice v-if="errorPresentation" :presentation="errorPresentation" title="Agent 操作失败" />
+    <AiErrorNotice
+      v-if="errorPresentation"
+      :presentation="errorPresentation"
+      title="Agent 操作失败"
+      @action="handleAgentErrorAction"
+    />
 
     <section v-if="!showReports" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
       <div class="surface-panel space-y-5 rounded-2xl p-5 sm:p-6">
@@ -207,16 +212,9 @@ import {
 } from '@/api/ai'
 import { useCollaborationStore } from '@/stores/collaboration'
 import { resolveAiErrorPresentation, type AiErrorPresentation } from '@/utils/aiErrorPresentation'
+import { parseAgentDraftPayload, type AgentDraftPayload } from '@/utils/agentDraftPayload'
 
-interface DraftPayload {
-  sourceRunId: string
-  reportType: AgentScene
-  sourceDataVersion: number
-  riskLevel?: string | null
-  managerSummary?: string | null
-  publicSummary?: string | null
-  recommendations?: string[]
-}
+type RetryTarget = 'SUBMIT' | 'POLL' | 'DRAFT' | 'REPORTS' | null
 
 const route = useRoute()
 const router = useRouter()
@@ -229,8 +227,9 @@ const canceling = ref(false)
 const confirming = ref(false)
 const run = ref<AgentRunResponse | null>(null)
 const draft = ref<AiDraftDetailResponse | null>(null)
-const draftPayload = ref<DraftPayload | null>(null)
+const draftPayload = ref<AgentDraftPayload | null>(null)
 const errorPresentation = ref<AiErrorPresentation | null>(null)
+const retryTarget = ref<RetryTarget>(null)
 const showReports = ref(false)
 const reports = ref<AnalysisReportResponse[]>([])
 const reportsLoading = ref(false)
@@ -270,11 +269,21 @@ const uuid = () => typeof globalThis.crypto?.randomUUID === 'function'
   ? globalThis.crypto.randomUUID()
   : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 
+const clearAgentError = () => {
+  errorPresentation.value = null
+  retryTarget.value = null
+}
+
+const presentAgentError = (error: unknown, fallbackMessage: string, target: RetryTarget) => {
+  errorPresentation.value = resolveAiErrorPresentation(error, fallbackMessage)
+  retryTarget.value = target
+}
+
 const submit = async () => {
   if (!canSubmit.value) return
   clearPolling()
   submitting.value = true
-  errorPresentation.value = null
+  clearAgentError()
   draft.value = null
   draftPayload.value = null
   try {
@@ -288,7 +297,7 @@ const submit = async () => {
     pollDelay = 1000
     schedulePoll()
   } catch (error) {
-    errorPresentation.value = resolveAiErrorPresentation(error, 'Agent 提交失败，请稍后重试。')
+    presentAgentError(error, 'Agent 提交失败，请稍后重试。', 'SUBMIT')
   } finally {
     submitting.value = false
   }
@@ -307,20 +316,33 @@ const schedulePoll = (generation = pollGeneration) => {
 const pollRun = async (generation: number) => {
   if (!run.value) return
   const runId = run.value.runId
+  let response: AgentRunResponse
   try {
-    const response = await getAgentRunApi(runId)
-    if (generation !== pollGeneration || run.value?.runId !== runId) return
-    run.value = response
-    if ((run.value.status === 'SUCCEEDED' || run.value.status === 'PARTIAL') && run.value.draftId) {
-      await loadDraft(run.value.draftId)
-      return
-    }
-    schedulePoll(generation)
+    response = await getAgentRunApi(runId)
   } catch (error) {
     if (generation !== pollGeneration || run.value?.runId !== runId) return
-    errorPresentation.value = resolveAiErrorPresentation(error, 'Agent 状态查询失败。')
+    presentAgentError(error, 'Agent 状态查询失败。', 'POLL')
     schedulePoll(generation)
+    return
   }
+
+  if (generation !== pollGeneration || run.value?.runId !== runId) return
+  run.value = response
+  clearAgentError()
+
+  if ((response.status === 'SUCCEEDED' || response.status === 'PARTIAL') && response.draftId) {
+    try {
+      await loadDraft(response.draftId)
+      if (generation !== pollGeneration || run.value?.runId !== runId) return
+      clearAgentError()
+    } catch (error) {
+      if (generation !== pollGeneration || run.value?.runId !== runId) return
+      presentAgentError(error, '分析已经完成，但草稿加载失败。', 'DRAFT')
+    }
+    return
+  }
+
+  schedulePoll(generation)
 }
 
 const cancelRun = async () => {
@@ -335,7 +357,7 @@ const cancelRun = async () => {
     run.value = { ...run.value, status: response.status }
     if (response.status !== 'CANCELED') schedulePoll(generation)
   } catch (error) {
-    errorPresentation.value = resolveAiErrorPresentation(error, '取消 Agent 失败。')
+    presentAgentError(error, '取消 Agent 失败。', 'POLL')
     if (generation === pollGeneration && run.value?.runId === runId) schedulePoll(generation)
   } finally {
     canceling.value = false
@@ -345,15 +367,55 @@ const cancelRun = async () => {
 const loadDraft = async (draftId: string) => {
   const detail = await getAiDraftDetailApi(draftId)
   if (!['project-risk-report', 'team-workload-report'].includes(detail.scene)) throw new Error('草稿场景不匹配')
-  const parsed = JSON.parse(detail.payloadJson) as DraftPayload
-  if (!parsed.sourceRunId || !parsed.reportType || !Number.isFinite(parsed.sourceDataVersion)) throw new Error('草稿结构不合法')
+  const parsed = parseAgentDraftPayload(detail.payloadJson)
+  if (!parsed) throw new Error('草稿结构不合法')
   draft.value = detail
   draftPayload.value = parsed
+}
+
+const retryLoadDraft = async () => {
+  const runId = run.value?.runId
+  const draftId = run.value?.draftId
+  if (!runId || !draftId) return
+
+  clearAgentError()
+  try {
+    await loadDraft(draftId)
+    if (run.value?.runId !== runId) return
+    clearAgentError()
+  } catch (error) {
+    if (run.value?.runId !== runId) return
+    presentAgentError(error, '草稿重新加载失败。', 'DRAFT')
+  }
+}
+
+const retryPoll = () => {
+  if (!run.value || terminalStatuses.has(run.value.status)) return
+  if (pollTimer) clearTimeout(pollTimer)
+  pollTimer = null
+  void pollRun(pollGeneration)
+}
+
+const handleAgentErrorAction = () => {
+  if (retryTarget.value === 'DRAFT') {
+    void retryLoadDraft()
+    return
+  }
+  if (retryTarget.value === 'POLL') {
+    retryPoll()
+    return
+  }
+  if (retryTarget.value === 'REPORTS') {
+    void loadReports()
+    return
+  }
+  if (retryTarget.value === 'SUBMIT') void submit()
 }
 
 const confirmDraft = async () => {
   if (!draft.value || confirming.value) return
   confirming.value = true
+  clearAgentError()
   try {
     await confirmAgentReportApi(draft.value.draftId, uuid())
     draft.value = null
@@ -361,7 +423,7 @@ const confirmDraft = async () => {
     showReports.value = true
     await loadReports(1)
   } catch (error) {
-    errorPresentation.value = resolveAiErrorPresentation(error, '确认报告失败，请重新分析。')
+    presentAgentError(error, '确认报告失败，请重新分析。', 'DRAFT')
   } finally {
     confirming.value = false
   }
@@ -369,12 +431,13 @@ const confirmDraft = async () => {
 
 const cancelDraft = async () => {
   if (!draft.value) return
+  clearAgentError()
   try {
     await cancelAiDraftApi({ draftId: draft.value.draftId })
     draft.value = null
     draftPayload.value = null
   } catch (error) {
-    errorPresentation.value = resolveAiErrorPresentation(error, '取消草稿失败。')
+    presentAgentError(error, '取消草稿失败。', 'DRAFT')
   }
 }
 
@@ -385,8 +448,9 @@ const loadReports = async (page = reportPage.value) => {
     reports.value = response.records || []
     reportPage.value = response.current || page
     reportPages.value = response.pages ?? Math.ceil(response.total / Math.max(response.size, 1))
+    clearAgentError()
   } catch (error) {
-    errorPresentation.value = resolveAiErrorPresentation(error, '报告列表加载失败。')
+    presentAgentError(error, '报告列表加载失败。', 'REPORTS')
   } finally {
     reportsLoading.value = false
   }

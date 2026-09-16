@@ -177,7 +177,7 @@ export const classifyApiError = (error: unknown): ApiErrorKind => {
   if (error.code === 40300 || error.code === 40101) return 'PERMISSION_DENIED'
   if (error.code === 401 || error.code === 40100) return 'AUTHENTICATION_REQUIRED'
   if (
-    error.code === 50001
+    error.code === 40901
     || error.code === 41001
     || error.code === 41002
     || error.httpStatus === 409

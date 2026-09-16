@@ -439,14 +439,10 @@ describe('request client', () => {
 })
 
 describe('classifyApiError', () => {
-  it('classifies assignment operation errors as conflicts before generic server errors', () => {
+  it('classifies resource state conflicts before generic server errors', () => {
     expect(classifyApiError(new ApiRequestError('负责人已变化', {
-      code: 50001,
-      httpStatus: 200,
-    }))).toBe('CONFLICT')
-    expect(classifyApiError(new ApiRequestError('负责人已被其他请求更新', {
-      code: 50001,
-      httpStatus: 500,
+      code: 40901,
+      httpStatus: 409,
     }))).toBe('CONFLICT')
   })
 
@@ -462,6 +458,10 @@ describe('classifyApiError', () => {
     expect(classifyApiError(new ApiRequestError('参数错误', { code: 40000 }))).toBe('VALIDATION')
     expect(classifyApiError(new ApiRequestError('系统错误', {
       code: 50000,
+      httpStatus: 500,
+    }))).toBe('SERVER')
+    expect(classifyApiError(new ApiRequestError('操作失败', {
+      code: 50001,
       httpStatus: 500,
     }))).toBe('SERVER')
   })

@@ -193,7 +193,7 @@ describe('TaskList status mutation integration', () => {
 
   it('refreshes facts without replaying the POST after a CAS conflict', async () => {
     taskApi.changeTaskStatusApi.mockRejectedValue(
-      new ApiRequestError('status changed', { code: 50001 }),
+      new ApiRequestError('status changed', { code: 40901 }),
     )
     const wrapper = await mountTaskList()
     taskApi.fetchTaskList.mockResolvedValue(page(task(3)))

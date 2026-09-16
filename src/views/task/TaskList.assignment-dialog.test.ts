@@ -361,7 +361,7 @@ describe('TaskList assignment dialog integration', () => {
 
   it('rebases a CAS conflict and resubmits only after explicit confirmation', async () => {
     taskApi.assignTaskApi
-      .mockRejectedValueOnce(new ApiRequestError('负责人已变化', { code: 50001 }))
+      .mockRejectedValueOnce(new ApiRequestError('负责人已变化', { code: 40901 }))
       .mockResolvedValueOnce({
         taskId: 1,
         changed: true,
@@ -427,7 +427,7 @@ describe('TaskList assignment dialog integration', () => {
 
   it('does not resubmit when conflict reconciliation finds the target already applied', async () => {
     taskApi.assignTaskApi.mockRejectedValueOnce(
-      new ApiRequestError('负责人已变化', { code: 50001 }),
+      new ApiRequestError('负责人已变化', { code: 40901 }),
     )
     const wrapper = await mountTaskList()
     await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')
@@ -485,7 +485,7 @@ describe('TaskList assignment dialog integration', () => {
 
   it('retries only fact reconciliation when conflict recovery cannot load the task', async () => {
     taskApi.assignTaskApi.mockRejectedValueOnce(
-      new ApiRequestError('负责人已变化', { code: 50001 }),
+      new ApiRequestError('负责人已变化', { code: 40901 }),
     )
     const wrapper = await mountTaskList()
     await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')
@@ -516,7 +516,7 @@ describe('TaskList assignment dialog integration', () => {
 
   it('preserves but disables a target that leaves the team during conflict recovery', async () => {
     taskApi.assignTaskApi.mockRejectedValueOnce(
-      new ApiRequestError('负责人已变化', { code: 50001 }),
+      new ApiRequestError('负责人已变化', { code: 40901 }),
     )
     const wrapper = await mountTaskList()
     await wrapper.get('[data-testid="task-assignee-change"]').trigger('click')

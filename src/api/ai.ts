@@ -1,4 +1,6 @@
 import request from '../utils/request'
+import type { EntityId, NumericLike, WirePage } from '../types/common'
+import { normalizeEntityId, normalizeNumeric, normalizePage } from '../types/normalization'
 
 export interface AiBreakdownTaskDraft {
   name: string
@@ -52,10 +54,30 @@ export interface AiBreakdownConfirmRequest {
   projectGoal?: string
 }
 
-export interface AiBreakdownConfirmResponse {
+interface AiDraftConfirmWireResponse {
   success: boolean
   idempotentReplay: boolean
-  businessId: number
+  businessId: EntityId | null
+}
+
+export type AiDraftConfirmResponse =
+  | { success: true; idempotentReplay: boolean; businessId: string }
+  | { success: false; idempotentReplay: boolean; businessId: null }
+
+export const normalizeAiDraftConfirmResponse = (
+  wire: AiDraftConfirmWireResponse | null | undefined,
+): AiDraftConfirmResponse => {
+  if (!wire || typeof wire.success !== 'boolean' || typeof wire.idempotentReplay !== 'boolean') {
+    throw new Error('确认接口响应结构不合法')
+  }
+
+  if (!wire.success) {
+    return { success: false, idempotentReplay: wire.idempotentReplay, businessId: null }
+  }
+
+  const businessId = normalizeEntityId(wire.businessId)
+  if (!businessId) throw new Error('确认接口返回了无效的业务 ID')
+  return { success: true, idempotentReplay: wire.idempotentReplay, businessId }
 }
 
 export interface AiDraftCancelRequest {
@@ -75,10 +97,11 @@ export const getAiDraftDetailApi = (draftId: string): Promise<AiDraftDetailRespo
 }
 
 // 确认任务拆解草稿并创建项目
-export const aiBreakdownConfirmApi = (
+export const aiBreakdownConfirmApi = async (
   data: AiBreakdownConfirmRequest,
-): Promise<AiBreakdownConfirmResponse> => {
-  return request.post('/ai/breakdown/confirm', data) as Promise<AiBreakdownConfirmResponse>
+): Promise<AiDraftConfirmResponse> => {
+  const wire = await request.post('/ai/breakdown/confirm', data) as AiDraftConfirmWireResponse
+  return normalizeAiDraftConfirmResponse(wire)
 }
 
 // 取消 AI 草稿
@@ -246,15 +269,15 @@ export interface AgentCancelResponse {
 export interface AgentReportSource {
   citationId: string
   sourceType: 'TASK' | 'WEEKLY_REVIEW'
-  sourceId: string | number
+  sourceId: string
   title: string
 }
 
 export interface AnalysisReportResponse {
   reportId: string
   reportType: AgentScene
-  projectId: string | number | null
-  teamId: string | number | null
+  projectId: string | null
+  teamId: string | null
   status: 'ACTIVE' | 'STALE'
   summary: string | null
   memberMetrics: Record<string, unknown>
@@ -268,7 +291,57 @@ export interface AnalysisReportPage {
   current: number
   size: number
   total: number
-  pages?: number
+  pages: number
+}
+
+interface AgentReportSourceWire extends Omit<AgentReportSource, 'sourceId'> {
+  sourceId: EntityId
+}
+
+interface AnalysisReportResponseWire extends Omit<AnalysisReportResponse, 'projectId' | 'teamId' | 'sources'> {
+  projectId: EntityId | null
+  teamId: EntityId | null
+  sources: AgentReportSourceWire[]
+}
+
+interface AnalysisReportPageWire extends WirePage<AnalysisReportResponseWire> {
+  pages?: NumericLike
+}
+
+const normalizeNullableReportId = (value: EntityId | null, fieldName: string): string | null => {
+  if (value === null) return null
+  const normalized = normalizeEntityId(value)
+  if (!normalized) throw new Error(`报告接口返回了无效的${fieldName}`)
+  return normalized
+}
+
+const normalizeAgentReportSource = (wire: AgentReportSourceWire): AgentReportSource => {
+  const sourceId = normalizeEntityId(wire.sourceId)
+  if (!sourceId) throw new Error('报告接口返回了无效的来源 ID')
+  return { ...wire, sourceId }
+}
+
+export const normalizeAnalysisReportResponse = (
+  wire: AnalysisReportResponseWire,
+): AnalysisReportResponse => ({
+  ...wire,
+  projectId: normalizeNullableReportId(wire.projectId, '项目 ID'),
+  teamId: normalizeNullableReportId(wire.teamId, '团队 ID'),
+  sources: Array.isArray(wire.sources) ? wire.sources.map(normalizeAgentReportSource) : [],
+})
+
+export const normalizeAnalysisReportPage = (
+  wire: AnalysisReportPageWire | null | undefined,
+): AnalysisReportPage => {
+  const page = normalizePage(wire)
+  const fallbackPages = page.total === 0 ? 0 : Math.ceil(page.total / page.size)
+  return {
+    records: page.records.map(normalizeAnalysisReportResponse),
+    current: page.current,
+    size: page.size,
+    total: page.total,
+    pages: normalizeNumeric(wire?.pages, fallbackPages, 0),
+  }
 }
 
 export const submitProjectRiskAgentApi = (projectId: string | number, clientRequestId: string) =>
@@ -283,14 +356,22 @@ export const getAgentRunApi = (runId: string) =>
 export const cancelAgentRunApi = (runId: string) =>
   request.post(`/ai/agent/run/${encodeURIComponent(runId)}/cancel`) as Promise<AgentCancelResponse>
 
-export const confirmAgentReportApi = (draftId: string, operationId: string) =>
-  request.post('/ai/agent/report/confirm', { draftId, operationId }) as Promise<AiBreakdownConfirmResponse>
+export const confirmAgentReportApi = async (draftId: string, operationId: string): Promise<AiDraftConfirmResponse> => {
+  const wire = await request.post('/ai/agent/report/confirm', { draftId, operationId }) as AiDraftConfirmWireResponse
+  return normalizeAiDraftConfirmResponse(wire)
+}
 
-export const listAnalysisReportsApi = (params: Record<string, string | number | undefined> = {}) =>
-  request.get('/ai/report', { params }) as Promise<AnalysisReportPage>
+export const listAnalysisReportsApi = async (
+  params: Record<string, string | number | undefined> = {},
+): Promise<AnalysisReportPage> => {
+  const wire = await request.get('/ai/report', { params }) as AnalysisReportPageWire
+  return normalizeAnalysisReportPage(wire)
+}
 
-export const getAnalysisReportApi = (reportId: string) =>
-  request.get(`/ai/report/${encodeURIComponent(reportId)}`) as Promise<AnalysisReportResponse>
+export const getAnalysisReportApi = async (reportId: string): Promise<AnalysisReportResponse> => {
+  const wire = await request.get(`/ai/report/${encodeURIComponent(reportId)}`) as AnalysisReportResponseWire
+  return normalizeAnalysisReportResponse(wire)
+}
 
 export const deleteAnalysisReportApi = (reportId: string) =>
   request.post(`/ai/report/${encodeURIComponent(reportId)}/delete`) as Promise<boolean>

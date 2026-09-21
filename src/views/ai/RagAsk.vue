@@ -44,7 +44,16 @@
           :disabled="!canSubmit"
           @click="submit"
         >
-          {{ loading ? '正在检索…' : '获取有依据的回答' }}
+          {{ loading ? stageLabel : '获取有依据的回答' }}
+        </button>
+        <button
+          v-if="loading"
+          type="button"
+          data-testid="rag-cancel"
+          class="btn-secondary rounded-lg px-4 py-2.5 text-sm font-bold"
+          @click="cancel"
+        >
+          取消
         </button>
       </div>
     </section>
@@ -123,11 +132,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AiErrorNotice from '@/components/AiErrorNotice.vue'
 import SafeAiText from '@/components/SafeAiText.vue'
-import { ragAskApi, type RagAnswerResponse, type RagSource } from '@/api/ai'
+import {
+  ragAskApi,
+  ragAskStreamApi,
+  RagStreamError,
+  type RagAnswerResponse,
+  type RagSource,
+  type RagStreamStage,
+} from '@/api/ai'
 import { readSelectedProjectIdCache, writeSelectedProjectIdCache } from '@/utils/appCache'
 import { resolveAiErrorPresentation, type AiErrorPresentation, type AiRecoveryAction } from '@/utils/aiErrorPresentation'
 
@@ -136,8 +152,11 @@ const router = useRouter()
 const projectId = ref('')
 const question = ref('')
 const loading = ref(false)
+const streamStage = ref<RagStreamStage | null>(null)
+const streamRequestId = ref<string | null>(null)
 const result = ref<RagAnswerResponse | null>(null)
 const errorPresentation = ref<AiErrorPresentation | null>(null)
+let abortController: AbortController | null = null
 
 const canSubmit = computed(() => (
   !loading.value
@@ -155,25 +174,55 @@ const statusLabel = computed(() => {
   }[result.value.status]
 })
 
+const stageLabel = computed(() => ({
+  RETRIEVING: '正在检索资料…',
+  RERANKING: '正在重排证据…',
+  GENERATING: '正在生成回答…',
+  VERIFYING: '正在校验引用…',
+} as Record<string, string>)[streamStage.value || ''] || '正在处理…')
+
 const submit = async () => {
   if (!canSubmit.value) return
   loading.value = true
+  streamStage.value = null
+  streamRequestId.value = null
+  abortController?.abort()
+  abortController = new AbortController()
   errorPresentation.value = null
   result.value = null
   const normalizedProjectId = projectId.value.trim()
   try {
-    const response = await ragAskApi({
-      projectId: normalizedProjectId,
-      question: question.value.trim(),
-    })
+    const request = { projectId: normalizedProjectId, question: question.value.trim() }
+    let response: RagAnswerResponse
+    try {
+      response = await ragAskStreamApi(request, {
+        onAccepted: event => { streamRequestId.value = event.requestId },
+        onStage: event => { streamStage.value = event.stage },
+      }, abortController.signal)
+    } catch (streamError) {
+      const canFallback = streamError instanceof RagStreamError
+        && !streamError.accepted
+        && streamError.fallbackEligible
+      if (!canFallback) throw streamError
+      response = await ragAskApi(request)
+    }
     result.value = response
     writeSelectedProjectIdCache(normalizedProjectId)
     await router.replace({ query: { ...route.query, projectId: normalizedProjectId, requestId: response.requestId } })
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return
     errorPresentation.value = resolveAiErrorPresentation(error, '项目问答失败，请稍后重试。')
   } finally {
     loading.value = false
+    streamStage.value = null
+    abortController = null
   }
+}
+
+const cancel = () => {
+  abortController?.abort()
+  loading.value = false
+  streamStage.value = null
 }
 
 const handleRecovery = (action: AiRecoveryAction) => {
@@ -198,4 +247,6 @@ onMounted(() => {
   const routeProjectId = typeof route.query.projectId === 'string' ? route.query.projectId : ''
   projectId.value = routeProjectId || readSelectedProjectIdCache() || ''
 })
+
+onBeforeUnmount(() => abortController?.abort())
 </script>

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   ask: vi.fn(),
+  stream: vi.fn(),
   replace: vi.fn(),
   push: vi.fn(),
   readProject: vi.fn(),
@@ -18,7 +19,11 @@ vi.mock('vue-router', async (importOriginal) => {
   }
 })
 
-vi.mock('@/api/ai', () => ({ ragAskApi: mocks.ask }))
+vi.mock('@/api/ai', () => ({
+  ragAskApi: mocks.ask,
+  ragAskStreamApi: mocks.stream,
+  RagStreamError: class RagStreamError extends Error {},
+}))
 
 vi.mock('@/utils/appCache', () => ({
   readSelectedProjectIdCache: mocks.readProject,
@@ -30,7 +35,7 @@ import RagAsk from '@/views/ai/RagAsk.vue'
 describe('RagAsk', () => {
   beforeEach(() => {
     mocks.readProject.mockReturnValue('10')
-    mocks.ask.mockResolvedValue({
+    const response = {
       requestId: 'request-1',
       status: 'ACTIVE',
       answer: '<script>alert(1)</script>结论 [S1]',
@@ -48,6 +53,12 @@ describe('RagAsk', () => {
         rerankScore: 0.9,
         updatedAt: null,
       }],
+    }
+    mocks.ask.mockResolvedValue(response)
+    mocks.stream.mockImplementation(async (_request: unknown, handlers: { onAccepted?: (event: { requestId: string }) => void; onStage?: (event: { stage: string }) => void }) => {
+      handlers.onAccepted?.({ requestId: 'stream-request-1' })
+      handlers.onStage?.({ stage: 'RETRIEVING' })
+      return response
     })
   })
 
@@ -57,7 +68,11 @@ describe('RagAsk', () => {
     await wrapper.get('[data-testid="rag-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mocks.ask).toHaveBeenCalledWith({ projectId: '10', question: '为什么延期' })
+    expect(mocks.stream).toHaveBeenCalledWith(
+      { projectId: '10', question: '为什么延期' },
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
     expect(wrapper.get('[data-testid="rag-answer"]').text()).toContain('<script>alert(1)</script>')
     expect(wrapper.find('script').exists()).toBe(false)
     expect(wrapper.find('img[src="x"]').exists()).toBe(false)

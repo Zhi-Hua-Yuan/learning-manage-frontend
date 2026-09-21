@@ -111,7 +111,7 @@ export const resolveTraceId = (headers: unknown): string | null => {
   return normalizeTraceId(entry?.[1])
 }
 
-const createApiRequestError = (
+export const createApiRequestError = (
   message: string,
   options: ApiRequestErrorOptions = {},
 ): ApiRequestError => {
@@ -192,7 +192,7 @@ export const classifyApiError = (error: unknown): ApiErrorKind => {
   return 'UNKNOWN'
 }
 
-const handleAuthenticationRequired = () => {
+export const handleAuthenticationRequired = () => {
   const result = terminateAuthenticatedSession('AUTHENTICATION_REQUIRED')
   if (!result.changed) return
 

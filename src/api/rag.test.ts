@@ -9,7 +9,7 @@ vi.mock('../router', () => ({
 vi.mock('@/stores/toast', () => ({ useToastStore: () => ({ push: mocks.toastPush }) }))
 
 import request from '@/utils/request'
-import { getRagResultApi, ragAskApi } from '@/api/ai'
+import { getRagResultApi, ragAskApi, ragAskStreamApi } from '@/api/ai'
 import { clearAuthToken } from '@/utils/authToken'
 
 describe('RAG API client', () => {
@@ -41,5 +41,40 @@ describe('RAG API client', () => {
       method: 'GET',
       url: '/ai/rag/result/request%2Fwith%20space',
     })
+  })
+
+  it('parses fragmented SSE events and returns only the validated complete payload', async () => {
+    const chunks = [
+      'event: accepted\ndata: {"requestId":"stream-1"}\n\n',
+      'event: stage\ndata: {"requestId":"stream-1","stage":"RETRIEVING","attempt":1}\n\n',
+      'event: complete\ndata: {"requestId":"stream-1","status":"ACTIVE","answer":"ok","sources":[]}\n\n',
+    ]
+    let index = 0
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/event-stream' }),
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (index >= chunks.length) return { done: true, value: undefined }
+            const value = new TextEncoder().encode(chunks[index++])
+            return { done: false, value }
+          },
+          releaseLock: vi.fn(),
+        }),
+      },
+    }))
+    const accepted = vi.fn()
+    const stage = vi.fn()
+
+    const result = await ragAskStreamApi(
+      { question: '为什么延期', projectId: '10' },
+      { onAccepted: accepted, onStage: stage },
+    )
+
+    expect(accepted).toHaveBeenCalledWith({ requestId: 'stream-1' })
+    expect(stage).toHaveBeenCalledWith({ requestId: 'stream-1', stage: 'RETRIEVING', attempt: 1 })
+    expect(result.requestId).toBe('stream-1')
   })
 })

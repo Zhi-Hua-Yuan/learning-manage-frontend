@@ -1,4 +1,5 @@
-import request from '../utils/request'
+import request, { ApiRequestError, handleAuthenticationRequired } from '../utils/request'
+import { readAuthToken } from '../utils/authToken'
 import type { EntityId, NumericLike, WirePage } from '../types/common'
 import { normalizeEntityId, normalizeNumeric, normalizePage } from '../types/normalization'
 
@@ -229,6 +230,183 @@ export interface RagAnswerResponse {
 
 export const ragAskApi = (data: RagAskRequest): Promise<RagAnswerResponse> => {
   return request.post('/ai/rag/ask', data) as Promise<RagAnswerResponse>
+}
+
+export type RagStreamStage = 'RETRIEVING' | 'RERANKING' | 'GENERATING' | 'VERIFYING'
+
+export interface RagStreamStageEvent {
+  requestId: string
+  stage: RagStreamStage
+  attempt: number
+}
+
+export interface RagStreamAcceptedEvent {
+  requestId: string
+}
+
+export class RagStreamError extends ApiRequestError {
+  readonly accepted: boolean
+  readonly fallbackEligible: boolean
+
+  constructor(message: string, accepted: boolean, fallbackEligible: boolean, options = {}) {
+    super(message, options)
+    this.name = 'RagStreamError'
+    this.accepted = accepted
+    this.fallbackEligible = fallbackEligible
+  }
+}
+
+interface RagStreamHandlers {
+  onAccepted?: (event: RagStreamAcceptedEvent) => void
+  onStage?: (event: RagStreamStageEvent) => void
+}
+
+const streamErrorOptions = (response: Response, body: unknown = null) => {
+  const record = body && typeof body === 'object' ? body as Record<string, unknown> : null
+  const code = Number(record?.code)
+  return {
+    code: Number.isFinite(code) ? code : null,
+    httpStatus: response.status,
+    traceId: response.headers.get('x-trace-id'),
+  }
+}
+
+const parseStreamErrorBody = async (response: Response) => {
+  try {
+    return await response.clone().json() as unknown
+  } catch {
+    return null
+  }
+}
+
+export const ragAskStreamApi = async (
+  data: RagAskRequest,
+  handlers: RagStreamHandlers = {},
+  signal?: AbortSignal,
+): Promise<RagAnswerResponse> => {
+  const token = readAuthToken()
+  let response: Response
+  try {
+    response = await fetch('/api/ai/rag/ask/stream', {
+      method: 'POST',
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+      signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new RagStreamError('流式连接未建立', false, true, { code: null, httpStatus: null, traceId: null })
+  }
+
+  if (!response.ok || !response.headers.get('content-type')?.toLowerCase().includes('text/event-stream')) {
+    const body = await parseStreamErrorBody(response)
+    const options = streamErrorOptions(response, body)
+    if (response.status === 401) handleAuthenticationRequired()
+    const record = body && typeof body === 'object' ? body as Record<string, unknown> : null
+    const message = typeof record?.message === 'string'
+      ? record.message : `流式请求失败（HTTP ${response.status}）`
+    throw new RagStreamError(message, false, [404, 405, 406].includes(response.status), options)
+  }
+
+  if (!response.body) {
+    throw new RagStreamError('浏览器不支持流式响应', false, true, {
+      code: null, httpStatus: response.status, traceId: null,
+    })
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let eventName = 'message'
+  let dataLines: string[] = []
+  let accepted = false
+  let complete: RagAnswerResponse | null = null
+
+  const dispatch = (name: string, rawData: string) => {
+    if (!rawData) return
+    let payload: unknown
+    try {
+      payload = JSON.parse(rawData)
+    } catch {
+      throw new RagStreamError('流式响应格式异常', accepted, false, {
+        code: 30003, httpStatus: response.status, traceId: response.headers.get('x-trace-id'),
+      })
+    }
+    if (name === 'accepted') {
+      accepted = true
+      handlers.onAccepted?.(payload as RagStreamAcceptedEvent)
+      return
+    }
+    if (name === 'stage') {
+      handlers.onStage?.(payload as RagStreamStageEvent)
+      return
+    }
+    if (name === 'complete') {
+      complete = payload as RagAnswerResponse
+      return
+    }
+    if (name === 'error') {
+      const record = payload as Record<string, unknown>
+      const code = Number(record.code)
+      throw new RagStreamError(
+        typeof record.message === 'string' ? record.message : 'RAG 流式请求失败',
+        accepted,
+        false,
+        {
+          code: Number.isFinite(code) ? code : null,
+          httpStatus: response.status,
+          traceId: response.headers.get('x-trace-id'),
+        },
+      )
+    }
+  }
+
+  const consumeLine = (line: string) => {
+    if (line.startsWith(':')) return
+    if (line === '') {
+      dispatch(eventName, dataLines.join('\n'))
+      eventName = 'message'
+      dataLines = []
+      return
+    }
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim()
+      return
+    }
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart())
+    }
+  }
+
+  try {
+    while (true) {
+      const next = await reader.read()
+      buffer += decoder.decode(next.value || new Uint8Array(), { stream: !next.done })
+      const lines = buffer.split(/\r?\n/)
+      buffer = lines.pop() || ''
+      lines.forEach(consumeLine)
+      if (next.done) break
+    }
+    if (buffer) consumeLine(buffer)
+    if (!complete) {
+      throw new RagStreamError('流式响应未返回完整结果', accepted, false, {
+        code: 30003, httpStatus: response.status, traceId: response.headers.get('x-trace-id'),
+      })
+    }
+    return complete
+  } catch (error) {
+    if (error instanceof RagStreamError) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new RagStreamError('读取流式响应失败', accepted, false, {
+      code: null, httpStatus: response.status, traceId: response.headers.get('x-trace-id'),
+    })
+  } finally {
+    reader.releaseLock()
+  }
 }
 
 export const getRagResultApi = (requestId: string): Promise<RagAnswerResponse> => {
